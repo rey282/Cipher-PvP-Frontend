@@ -78,9 +78,14 @@ export default function PlayerProfile() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [lastFetched, setLF] = useState<string | null>(null);
   const [showHist, setShow] = useState(false);
-  const [loading, setLoading] = useState(true); // initial page load
-  const [summaryLoading, setSumLoad] = useState(false); // only summary refresh
+  const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSumLoad] = useState(false);
   const [error, setError] = useState(false);
+  const [total, setTotal] = useState(0);
+
+  /* pagination */
+  const [page, setPage] = useState(0);
+  const limit = 15;
 
   /* two independent modes */
   const [summaryMode, setSummaryMode] = useState<"all" | "solo" | "duo">("all");
@@ -88,6 +93,8 @@ export default function PlayerProfile() {
 
   /* store scroll position when changing match filter */
   const scrollRef = useRef<number>(0);
+
+  const matchHistoryRef = useRef<HTMLDivElement>(null);
 
   /* ---------- fetch static char list once ---------- */
   useEffect(() => {
@@ -127,24 +134,27 @@ export default function PlayerProfile() {
       });
   }, [id, season, summaryMode]);
 
-  /* ---------- fetch MATCHES whenever id / season / matchMode changes ---------- */
+  /* ---------- fetch MATCHES whenever id / season / matchMode / page changes ---------- */
   useEffect(() => {
     if (!id) return;
     const qs = new URLSearchParams();
     qs.append("season", season);
     if (matchMode !== "all") qs.append("mode", matchMode);
+    qs.append("limit", limit.toString());
+    qs.append("offset", (page * limit).toString());
 
     fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/matches?${qs}`)
       .then((r) => r.json())
       .then((mResp) => {
         setMatches(mResp.data);
         setLF(mResp.lastFetched);
+        setTotal(mResp.total);
       })
       .catch((err) => {
         console.error(err);
         setError(true);
       });
-  }, [id, season, matchMode]);
+  }, [id, season, matchMode, page]);
 
   /* restore scroll position after matches update */
   useLayoutEffect(() => {
@@ -322,19 +332,24 @@ export default function PlayerProfile() {
                 </div>
               </div>
 
-              {/* ------- match history (unchanged) ------- */}
+              {/* ------- match history ------- */}
               {showHist && (
-                <div className="mt-5 d-flex flex-column gap-3">
+                <div ref={matchHistoryRef} className="mt-5 d-flex flex-column gap-3">
                   <div className="d-flex justify-content-between align-items-center flex-wrap">
                     <h2 className="fw-bold text-center mb-3">
-                      Match History (Last {matches.length}{" "}
-                      {matches.length === 1 ? "Match" : "Matches"})
+                      Match History (Page {page + 1}
+                      {total > 0 &&
+                        ` of ${Math.ceil(
+                          total / limit
+                        )}, Total Matches: ${total}`}
+                      )
                     </h2>
                     <select
                       value={matchMode}
                       onChange={(e) => {
                         scrollRef.current = window.scrollY;
                         setMatchMode(e.target.value as "all" | "solo" | "duo");
+                        setPage(0); // reset to first page on filter change
                       }}
                       className="form-select form-select-sm w-auto bg-dark text-white border-light"
                     >
@@ -434,6 +449,31 @@ export default function PlayerProfile() {
                       )}
                     </div>
                   ))}
+
+                  {/* ---------- pagination controls ---------- */}
+                  <div className="d-flex justify-content-center gap-3 mt-3">
+                    <button
+                      className="btn btn-outline-light btn-sm"
+                      onClick={() => {
+                        setPage((p) => Math.max(0, p - 1));
+                        matchHistoryRef.current?.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      disabled={page === 0}
+                    >
+                      ← Prev
+                    </button>
+
+                    <button
+                      className="btn btn-outline-light btn-sm"
+                      onClick={() => {
+                        setPage((p) => p + 1);
+                        matchHistoryRef.current?.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      disabled={matches.length < limit}
+                    >
+                      Next →
+                    </button>
+                  </div>
                 </div>
               )}
             </>
