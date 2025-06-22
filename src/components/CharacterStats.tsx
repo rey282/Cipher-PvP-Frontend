@@ -140,7 +140,7 @@ export default function CharacterStats() {
     setLoading(true);
     const url =
       cycle === -1
-        ? "${import.meta.env.VITE_API_BASE}/api/characters/all"
+        ? `${import.meta.env.VITE_API_BASE}/api/characters/all`
         : `${import.meta.env.VITE_API_BASE}/api/characters?cycle=${cycle}`;
 
     fetch(url)
