@@ -118,7 +118,7 @@ const eidolonArr = (c: CharacterStats): EidolonTuple[] => [
   { uses: c.e6_uses, wins: c.e6_wins },
 ];
 const splashSrc = (name: string) =>
-  `/characters/Character_${name.replace(/\s+/g, "_")}_Splash_Art.png`;
+  `/characters/Character_${name.replace(/\s+/g, "_")}_Splash_Art.webp`;
 
 /* ---------- component ---------- */
 export default function CharacterStats() {
