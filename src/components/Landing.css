@@ -87,8 +87,18 @@
 }
 
 /* ───────── game icon thumbnails ───────── */
-.game-thumb{border-radius:12px;opacity:.3;transition:.3s}
+.game-thumb{
+  border-radius:12px;
+  opacity:.3;
+  transition:.3s;
+  cursor: pointer;
+}
 .game-thumb.active{opacity:1;box-shadow:0 0 15px #f0e}
+
+.team-button-wrapper {
+  display: inline-block;
+}
+
 
 /* ───────── full-page fade-out (leaving landing) ───────── */
 .fade-out{animation:fadeOutPage .5s ease-in-out forwards;pointer-events:none;}
@@ -103,6 +113,9 @@
   font-weight: 600;
   border-radius: 6px;
   transition: background 0.2s ease;
+  display: inline-block;   
+  line-height: 1.2;         
+  cursor: pointer;      
 }
 .btn-team:hover {
   background: rgba(255, 215, 0, 0.12);
@@ -217,6 +230,30 @@
   text-decoration: none;
   color: #fff;
 }
+
+.glass-btn {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease-in-out;
+  display: inline-block;
+  line-height: 1.25;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.glass-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: white;
+  text-decoration: none;
+  color: #fff;
+}
+
+
 
 
 

@@ -295,7 +295,7 @@ export default function CharacterStats() {
           {/* top-row controls ------------- */}
           <div className="d-flex justify-content-between align-items-center mb-2">
             <button
-              className="btn btn-outline-light btn-sm back-button-glass"
+              className="glass-btn"
               onClick={() => setSortAsc((p) => !p)}
               title="Toggle sort direction"
             >
@@ -303,7 +303,7 @@ export default function CharacterStats() {
             </button>
 
             <button
-              className="btn btn-outline-light btn-sm back-button-glass"
+              className="glass-btn"
               onClick={() => setShowFilters((p) => !p)}
             >
               {showFilters ? "Hide Filters" : "Show Filters"}
@@ -323,6 +323,7 @@ export default function CharacterStats() {
                 backdropFilter: "blur(10px)",
                 borderRadius: 12,
                 zIndex: 10,
+                pointerEvents: showFilters ? "auto" : "none",
               }}
             >
               {/* MOC */}

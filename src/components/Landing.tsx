@@ -87,7 +87,7 @@ export default function Landing() {
             {/* Our Team hover button */}
             {game.id === 'hsr' && (
               <div
-                className="position-relative d-flex justify-content-center"
+                className="team-button-wrapper position-relative"
                 onMouseEnter={() => setShowTeam(true)}
                 onMouseLeave={() => setShowTeam(false)}
               >
