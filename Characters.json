@@ -1,0 +1,768 @@
+[
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d2",
+    "imageId": "1308",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1308.png",
+    "name": "Acheron",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "ac",
+    "subname": "acorn"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4db",
+    "imageId": "1402",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1402.png",
+    "name": "Aglaea",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "ae",
+    "subname": "aggy"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4cc",
+    "imageId": "1302",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1302.png",
+    "name": "Argenti",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "ag",
+    "subname": "messi ourgenti"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4a7",
+    "imageId": "1008",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1008.png",
+    "name": "Arlan",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "ar",
+    "subname": "ban"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4a8",
+    "imageId": "1009",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1009.png",
+    "name": "Asta",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "as",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4ce",
+    "imageId": "1304",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1304.png",
+    "name": "Aventurine",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "av",
+    "subname": "aven"
+  },
+  {
+    "_id": "67e42b7d35350c93a74f8ce3",
+    "imageId": "1211",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1211.png",
+    "name": "Bailu",
+    "rarity": "5",
+    "cost": [1, 1, 1, 1, 1, 1, 1],
+    "code": "ba",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d1",
+    "imageId": "1307",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1307.png",
+    "name": "Black Swan",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "bs",
+    "subname": "bs"
+  },
+  {
+    "_id": "67e42b4b35350c93a74f8ce2",
+    "imageId": "1205",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1205.png",
+    "name": "Blade",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "bl",
+    "subname": "swift dispatch balde"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d8",
+    "imageId": "1315",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1315.png",
+    "name": "Boothill",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "bh",
+    "subname": "bh"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4aa",
+    "imageId": "1101",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1101.png",
+    "name": "Bronya",
+    "rarity": "5",
+    "cost": [1, 1, 1, 1, 1, 1, 1],
+    "code": "br",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b0",
+    "imageId": "1107",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1107.png",
+    "name": "Clara",
+    "rarity": "5",
+    "cost": [1, 1, 1, 1, 1, 1, 1],
+    "code": "cl",
+    "subname": "child barefoot"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4a2",
+    "imageId": "1002",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1002.png",
+    "name": "Dan Heng",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "dh",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c0",
+    "imageId": "1213",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1213.png",
+    "name": "Dan Heng Imbibitor Lunae",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "il",
+    "subname": "dhil daniel"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4cf",
+    "imageId": "1305",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1305.png",
+    "name": "Dr Ratio",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "dr",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c5",
+    "imageId": "1220",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1220.png",
+    "name": "Feixiao",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "fe",
+    "subname": "fx"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d4",
+    "imageId": "1310",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1310.png",
+    "name": "Firefly",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "ff",
+    "subname": "ff flyflop fireflop"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4bc",
+    "imageId": "1208",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1208.png",
+    "name": "Fu Xuan",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "fx",
+    "subname": "fx"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4ca",
+    "imageId": "1225",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1225.png",
+    "name": "Fugue",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "fg",
+    "subname": "foogway stingyun"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4cb",
+    "imageId": "1301",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1301.png",
+    "name": "Gallagher",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "gl",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4ad",
+    "imageId": "1104",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1104.png",
+    "name": "Gepard",
+    "rarity": "5",
+    "cost": [1, 1, 1, 1, 1, 1, 1],
+    "code": "gp",
+    "subname": "geppy"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4be",
+    "imageId": "1210",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1210.png",
+    "name": "Guinaifen",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "gu",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c2",
+    "imageId": "1215",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1215.png",
+    "name": "Hanya",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "hy",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4a9",
+    "imageId": "1013",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1013.png",
+    "name": "Herta",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "ht",
+    "subname": "smerta puppet smol"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4a3",
+    "imageId": "1003",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1003.png",
+    "name": "Himeko",
+    "rarity": "5",
+    "cost": [1, 1, 1, 1, 1, 1, 1],
+    "code": "hm",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b2",
+    "imageId": "1109",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1109.png",
+    "name": "Hook",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "hk",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c3",
+    "imageId": "1217",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1217.png",
+    "name": "Huohuo",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "hh",
+    "subname": "hh tail hwehwe"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d7",
+    "imageId": "1314",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1314.png",
+    "name": "Jade",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "jd",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c4",
+    "imageId": "1218",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1218.png",
+    "name": "Jiaoqiu",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "jq",
+    "subname": "jq"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b9",
+    "imageId": "1204",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1204.png",
+    "name": "Jing Yuan",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "jy",
+    "subname": "jimmy jy kingyuan general"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4bf",
+    "imageId": "1212",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1212.png",
+    "name": "Jingliu",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "jl",
+    "subname": "jl"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4a5",
+    "imageId": "1005",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1005.png",
+    "name": "Kafka",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "kf",
+    "subname": "peak"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c7",
+    "imageId": "1222",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1222.png",
+    "name": "Lingsha",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "ls",
+    "subname": "ls"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b4",
+    "imageId": "1111",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1111.png",
+    "name": "Luka",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "lk",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b8",
+    "imageId": "1203",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1203.png",
+    "name": "Luocha",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "lo",
+    "subname": "fraud"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b3",
+    "imageId": "1110",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1110.png",
+    "name": "Lynx",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "ly",
+    "subname": "lynxdd"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4a1",
+    "imageId": "1001",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1001.png",
+    "name": "March 7th",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "mr",
+    "subname": "M7"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c9",
+    "imageId": "1224",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1224.png",
+    "name": "March 7th The Hunt",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "mh",
+    "subname": "m8 mh"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d5",
+    "imageId": "1312",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1312.png",
+    "name": "Misha",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "ms",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c8",
+    "imageId": "1223",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1223.png",
+    "name": "Moze",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "mz",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4dd",
+    "imageId": "1404",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1404.png",
+    "name": "Mydei",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "md",
+    "subname": "middei"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4ae",
+    "imageId": "1105",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1105.png",
+    "name": "Natasha",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "nt",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4af",
+    "imageId": "1106",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1106.png",
+    "name": "Pela",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "pl",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b6",
+    "imageId": "1201",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1201.png",
+    "name": "Qingque",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "qq",
+    "subname": "qq gremlin"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d9",
+    "imageId": "1317",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1317.png",
+    "name": "Rappa",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "rp",
+    "subname": "rapper"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d3",
+    "imageId": "1309",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1309.png",
+    "name": "Robin",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "rb",
+    "subname": "bean birb bird dove"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4cd",
+    "imageId": "1303",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1303.png",
+    "name": "Ruan Mei",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "rm",
+    "subname": "rm"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b1",
+    "imageId": "1108",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1108.png",
+    "name": "Sampo",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "sp",
+    "subname": "shampoo"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4ab",
+    "imageId": "1102",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1102.png",
+    "name": "Seele",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "sl",
+    "subname": "seal"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4ac",
+    "imageId": "1103",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1103.png",
+    "name": "Serval",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "sv",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4a6",
+    "imageId": "1006",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1006.png",
+    "name": "Silver Wolf",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "sw",
+    "subname": "sw"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d0",
+    "imageId": "1306",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1306.png",
+    "name": "Sparkle",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "sk",
+    "subname": "spork 4'11"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4d6",
+    "imageId": "1313",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1313.png",
+    "name": "Sunday",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "sy",
+    "subname": "monday"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4ba",
+    "imageId": "1206",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1206.png",
+    "name": "Sushang",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "su",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4da",
+    "imageId": "1401",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1401.png",
+    "name": "The Herta",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "th",
+    "subname": "therta peerless gem unrivaled genius inimitable beauty"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b7",
+    "imageId": "1202",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1202.png",
+    "name": "Tingyun",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "ty",
+    "subname": "ty stingyun preservation"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4b5",
+    "imageId": "1112",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1112.png",
+    "name": "Topaz & Numby",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "tp",
+    "subname": "paz topass"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4de",
+    "imageId": "8002",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/8002.png",
+    "name": "Trialblazer Destruction",
+    "rarity": "5",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "fm",
+    "subname": "dmc pmc"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4e0",
+    "imageId": "8006",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/8006.png",
+    "name": "Trialblazer Harmony",
+    "rarity": "5",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "im",
+    "subname": "hmc imc"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4df",
+    "imageId": "8004",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/8004.png",
+    "name": "Trialblazer Preservation",
+    "rarity": "5",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "pm",
+    "subname": "pmc fmc"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4e1",
+    "imageId": "8008",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/8008.png",
+    "name": "Trialblazer Remembrance",
+    "rarity": "5",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "ic",
+    "subname": "rmc imc"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4dc",
+    "imageId": "1403",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1403.png",
+    "name": "Tribbie",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "tb",
+    "subname": "tribios 2b 3b"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4a4",
+    "imageId": "1004",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1004.png",
+    "name": "Welt",
+    "rarity": "5",
+    "cost": [1, 1, 1, 1, 1, 1, 1],
+    "code": "wt",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c1",
+    "imageId": "1214",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1214.png",
+    "name": "Xueyi",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "xy",
+    "subname": ""
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4bd",
+    "imageId": "1209",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1209.png",
+    "name": "Yanqing",
+    "rarity": "5",
+    "cost": [1, 1, 1, 1, 1, 1, 1],
+    "code": "yq",
+    "subname": "yanking"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4bb",
+    "imageId": "1207",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1207.png",
+    "name": "Yukong",
+    "rarity": "4",
+    "cost": [0, 0, 0, 0, 0, 0, 0],
+    "code": "yk",
+    "subname": "yk"
+  },
+  {
+    "_id": "65f7e2a1b5d8a3c9f012e4c6",
+    "imageId": "1221",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1221.png",
+    "name": "Yunli",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "yl",
+    "subname": "yl midli barefoot"
+  },
+  {
+    "_id": {
+      "$oid": "67ed21c49270739af1b485b7"
+    },
+    "imageId": "1405",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1405.png",
+    "name": "Anaxa",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "an",
+    "subname": ""
+  },
+  {
+    "_id": {
+      "$oid": "67ed21c49270739af1b485b8"
+    },
+    "imageId": "1407",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1407.png",
+    "name": "Castorice",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "ca",
+    "subname": "wife"
+  },
+  {
+    "imageId":"1409",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1409.png",
+    "name": "Hyacine",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "hc",
+    "subname": "fat fuck ica"
+  },
+  {
+    "imageId":"1406",
+    "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1406.png",
+    "name": "Cipher",
+    "rarity": "5",
+    "cost": [1, 2, 3, 3, 4, 4, 5],
+    "code": "ci",
+    "subname": "thighs car cat neko"
+  },
+  {
+        "_id": "68527f29220f30c440d8a41f",
+        "imageId": "1014",
+        "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1014.png",
+        "name": "Saber",
+        "rarity": "5",
+        "cost": [
+            1,
+            2,
+            3,
+            3,
+            4,
+            4,
+            5
+        ],
+        "code": "sa",
+        "subname": "seiba excalibah artoria"
+    },
+    {
+        "_id": "6852805f220f30c440d8a420",
+        "imageId": "1015",
+        "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1015.png",
+        "name": "Archer",
+        "rarity": "5",
+        "cost": [
+            1,
+            2,
+            3,
+            3,
+            4,
+            4,
+            5
+        ],
+        "code": "ah",
+        "subname": "emiya shirou"
+    },
+    {
+        "_id": "685280a0220f30c440d8a422",
+        "imageId": "1408",
+        "imageUrl": "https://storage.googleapis.com/hsr-avatar-images/1408.png",
+        "name": "Phainon",
+        "rarity": "5",
+        "cost": [
+            1,
+            2,
+            3,
+            3,
+            4,
+            4,
+            5
+        ],
+        "code": "ph",
+        "subname": "bottom brick gay"
+    }
+]
