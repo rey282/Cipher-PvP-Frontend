@@ -132,7 +132,7 @@ export default function CharacterStats() {
   const [rarity, setRarity] = useState<number | null>(null);
   const [element, setElement] = useState<string | null>(null);
   const [path, setPath] = useState<string | null>(null);
-  const [sortAsc, setSortAsc] = useState(false);
+  const [sortAsc, setSortAsc] = useState(true);
 
   const [openChar, setOpenChar] = useState<CharacterStats | null>(null);
   const [showFilters, setShowFilters] = useState(false);
