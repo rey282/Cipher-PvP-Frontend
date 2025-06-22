@@ -413,8 +413,6 @@ export default function CharacterStats() {
                           right: 6,
                           width: 36,
                           height: 36,
-                          borderRadius: "50%",
-                          background: colour,
                           padding: 6,
                         }}
                       />
