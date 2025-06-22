@@ -6,7 +6,7 @@ const games = [
   {
     id: 'hsr',
     name: 'Cipher PvP',
-    bg: '/HsrBackground.jpg',
+    bg: '/HsrBackground.png',
     icon: '/hsr-icon.png',
     live: true,
     link: '/hsr',

@@ -207,7 +207,7 @@ export default function PlayerProfile() {
     <div
       className="page-fade-in"
       style={{
-        background: "url('/background.jpg') center/cover fixed",
+        background: "url('/background.png') center/cover fixed",
         minHeight: "100vh",
         position: "relative",
       }}
@@ -327,7 +327,8 @@ export default function PlayerProfile() {
                 <div className="mt-5 d-flex flex-column gap-3">
                   <div className="d-flex justify-content-between align-items-center flex-wrap">
                     <h2 className="fw-bold text-center mb-3">
-                      Match History (Last {matches.length} {matches.length === 1 ? "Match" : "Matches"})
+                      Match History (Last {matches.length}{" "}
+                      {matches.length === 1 ? "Match" : "Matches"})
                     </h2>
                     <select
                       value={matchMode}

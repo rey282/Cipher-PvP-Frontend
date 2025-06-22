@@ -59,7 +59,7 @@ export default function HsrHome() {
     <div
       className={`page-fade-in ${leaving ? "fade-out" : ""}`}
       style={{
-        backgroundImage: "url('/background.jpg')",
+        backgroundImage: "url('/background.png')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         minHeight: "100vh",

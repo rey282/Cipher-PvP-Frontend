@@ -178,7 +178,6 @@ export default function CharacterStats() {
       return sortAsc ? aVal - bVal : bVal - aVal;
     });
 
-
   const moc = mocOptions.find((m) => m.value === cycle)!;
 
   /* ---------- UI ---------- */
@@ -186,7 +185,7 @@ export default function CharacterStats() {
     <div
       className="page-fade-in"
       style={{
-        background: "url('/background.jpg') center/cover fixed",
+        background: "url('/background.png') center/cover fixed",
         minHeight: "100vh",
         position: "relative",
       }}
@@ -292,12 +291,12 @@ export default function CharacterStats() {
               </button>
             ))}
           </div>
-          
+
           {/* top-row controls ------------- */}
           <div className="d-flex justify-content-between align-items-center mb-2">
             <button
               className="btn btn-outline-light btn-sm back-button-glass"
-              onClick={() => setSortAsc(p => !p)}
+              onClick={() => setSortAsc((p) => !p)}
               title="Toggle sort direction"
             >
               {sortAsc ? "↑ Ascending" : "↓ Descending"}
@@ -305,7 +304,7 @@ export default function CharacterStats() {
 
             <button
               className="btn btn-outline-light btn-sm back-button-glass"
-              onClick={() => setShowFilters(p => !p)}
+              onClick={() => setShowFilters((p) => !p)}
             >
               {showFilters ? "Hide Filters" : "Show Filters"}
             </button>
@@ -358,7 +357,6 @@ export default function CharacterStats() {
               </div>
             </div>
           )}
-
 
           {/* grid + unobtrusive loader */}
           <div className="position-relative">
