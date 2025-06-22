@@ -44,13 +44,25 @@ export default function HsrHome() {
       title: "Matches",
       desc: "Play and track your match history",
       btnText: "Play now",
-      url: "https://yanyanpb.vercel.app/draft", // external link
+      url: "https://yanyanpb.vercel.app/draft",
     },
     {
       title: "Player Statistics",
       desc: "View your own win rate, ELO, and history",
       btnText: "View player stats",
       url: "/players",
+    },
+    {
+      title: "Tournament Archive",
+      desc: "Past tournaments and results",
+      btnText: "Coming soon...",
+      url: null, // disabled
+    },
+    {
+      title: "Roster Setup",
+      desc: "Build your own custom team roster",
+      btnText: "Coming soon...",
+      url: null, // disabled
     },
   ];
 
