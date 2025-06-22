@@ -84,21 +84,21 @@ const mocOptions = [
     bossImages: ["/bosses/alltime.png"],
   },
   {
-    label: "Lupine Moon-Devourer",
+    label: "Lupine Moon-Devourer (3.3)",
     value: 0,
     name: "Lupine Moon-Devourer",
     duration: "23 Jun 2025 → 04 Aug 2025",
     bossImages: ["/bosses/sting.png", "/bosses/hoolay.png"],
   },
   {
-    label: "Out of Home",
+    label: "Out of Home (3.1)",
     value: 1,
     name: "Out of Home",
     duration: "31 Mar 2025 → 12 May 2025",
     bossImages: ["/bosses/hoolay.png", "/bosses/reaver.png"],
   },
   {
-    label: "Breath of the Othershore",
+    label: "Breath of the Othershore (3.2)",
     value: 2,
     name: "Breath of the Othershore",
     duration: "12 May 2025 → 23 Jun 2025",
@@ -343,7 +343,7 @@ export default function CharacterStats() {
                 >
                   {sortOptions.map((o) => (
                     <option key={o.value} value={o.value}>
-                      Sort by {o.label}
+                      {o.label}
                     </option>
                   ))}
                 </select>
