@@ -40,8 +40,8 @@ export default function PlayerStats() {
     setLoading(true);
     const url =
       season === "all"
-        ? "http://localhost:3001/api/players?season=all"
-        : `http://localhost:3001/api/players?season=${season}`;
+        ? "${import.meta.env.VITE_API_BASE}/api/players?season=all"
+        : `${import.meta.env.VITE_API_BASE}/api/players?season=${season}`;
     fetch(url)
       .then((r) => r.json())
       .then((j: ApiResponse) => {
@@ -58,11 +58,16 @@ export default function PlayerStats() {
   }, [season]);
 
   const filtered = players.filter((p) =>
-    (p.username || p.nickname || "").toLowerCase().includes(searchTerm.toLowerCase())
+    (p.username || p.nickname || "")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
   );
 
   const pageCount = Math.ceil(filtered.length / ROWS_PER_PAGE);
-  const pageData = filtered.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
+  const pageData = filtered.slice(
+    (page - 1) * ROWS_PER_PAGE,
+    page * ROWS_PER_PAGE
+  );
 
   const goto = (n: number) => setPage(Math.min(Math.max(1, n), pageCount));
   const openPlayer = (id: string) => navigate(`/player/${id}?season=${season}`);
@@ -94,24 +99,34 @@ export default function PlayerStats() {
               <img src="/logo192.png" alt="" height={36} /> Haya
             </span>
           </Link>
-          <Link to="/hsr" className="btn btn-outline-light btn-sm back-button-glass">
+          <Link
+            to="/hsr"
+            className="btn btn-outline-light btn-sm back-button-glass"
+          >
             ← Back
           </Link>
         </nav>
 
         <div className="container">
-          <h1 className="display-4 fw-bold text-center mb-3">Player Statistics</h1>
+          <h1 className="display-4 fw-bold text-center mb-3">
+            Player Statistics
+          </h1>
 
           {(lastFetched || totalMatches !== null) && (
-            <p className="text-center text-white-50 mb-4" style={{ fontSize: "0.85rem" }}>
+            <p
+              className="text-center text-white-50 mb-4"
+              style={{ fontSize: "0.85rem" }}
+            >
               {lastFetched && (
                 <>
-                  Data last updated: {new Date(lastFetched).toLocaleString()}<br />
+                  Data last updated: {new Date(lastFetched).toLocaleString()}
+                  <br />
                 </>
               )}
               {totalMatches !== null && (
                 <>
-                  Total Matches{season === "all" ? "" : " this Season"}: <strong>{totalMatches}</strong>
+                  Total Matches{season === "all" ? "" : " this Season"}:{" "}
+                  <strong>{totalMatches}</strong>
                 </>
               )}
             </p>
@@ -191,16 +206,42 @@ export default function PlayerStats() {
                   >
                     <thead>
                       <tr>
-                        <th style={{ width: "40%", backgroundColor: "transparent", color: "#fff" }}>
+                        <th
+                          style={{
+                            width: "40%",
+                            backgroundColor: "transparent",
+                            color: "#fff",
+                          }}
+                        >
                           Username
                         </th>
-                        <th style={{ width: "20%", backgroundColor: "transparent", color: "#fff" }}>
+                        <th
+                          style={{
+                            width: "20%",
+                            backgroundColor: "transparent",
+                            color: "#fff",
+                          }}
+                        >
                           {season === "all" ? "Average ELO" : "ELO"}
                         </th>
-                        <th style={{ width: "20%", backgroundColor: "transparent", color: "#fff" }}>
-                          {season === "all" ? "Total Games Played" : "Games Played"}
+                        <th
+                          style={{
+                            width: "20%",
+                            backgroundColor: "transparent",
+                            color: "#fff",
+                          }}
+                        >
+                          {season === "all"
+                            ? "Total Games Played"
+                            : "Games Played"}
                         </th>
-                        <th style={{ width: "20%", backgroundColor: "transparent", color: "#fff" }}>
+                        <th
+                          style={{
+                            width: "20%",
+                            backgroundColor: "transparent",
+                            color: "#fff",
+                          }}
+                        >
                           {season === "all" ? "Average Win Rate" : "Win Rate"}
                         </th>
                       </tr>
@@ -223,9 +264,28 @@ export default function PlayerStats() {
                           >
                             {p.username || p.nickname || "Unknown"}
                           </td>
-                          <td style={{ backgroundColor: "transparent", color: "#fff" }}>{Math.round(p.elo)}</td>
-                          <td style={{ backgroundColor: "transparent", color: "#fff" }}>{p.games_played}</td>
-                          <td style={{ backgroundColor: "transparent", color: "#fff" }}>
+                          <td
+                            style={{
+                              backgroundColor: "transparent",
+                              color: "#fff",
+                            }}
+                          >
+                            {Math.round(p.elo)}
+                          </td>
+                          <td
+                            style={{
+                              backgroundColor: "transparent",
+                              color: "#fff",
+                            }}
+                          >
+                            {p.games_played}
+                          </td>
+                          <td
+                            style={{
+                              backgroundColor: "transparent",
+                              color: "#fff",
+                            }}
+                          >
                             {(p.win_rate * 100).toFixed(1)}%
                           </td>
                         </tr>

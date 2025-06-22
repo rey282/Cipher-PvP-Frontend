@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
 
 /* ---------- types ---------- */
-type CharTiny  = { code: string; name?: string; image_url?: string };
+type CharTiny = { code: string; name?: string; image_url?: string };
 type CountChar = CharTiny & { count: number };
-type WRChar    = CharTiny & { wins: number; games: number; winRate: number };
+type WRChar = CharTiny & { wins: number; games: number; winRate: number };
 
 type Summary = {
   playerId: string;
@@ -68,30 +68,30 @@ const ddmmyyyy = (iso: string) =>
 
 /* ---------- component ---------- */
 export default function PlayerProfile() {
-  const { id }   = useParams();
+  const { id } = useParams();
   const location = useLocation();
-  const query    = new URLSearchParams(location.search);
-  const season   = query.get("season") || "players";
+  const query = new URLSearchParams(location.search);
+  const season = query.get("season") || "players";
 
-  const [charMap, setCharMap]         = useState<CharMap>({});
-  const [summary, setSummary]         = useState<Summary | null>(null);
-  const [matches, setMatches]         = useState<Match[]>([]);
-  const [lastFetched, setLF]          = useState<string | null>(null);
-  const [showHist, setShow]           = useState(false);
-  const [loading, setLoading]         = useState(true);        // initial page load
-  const [summaryLoading, setSumLoad]  = useState(false);       // only summary refresh
-  const [error, setError]             = useState(false);
+  const [charMap, setCharMap] = useState<CharMap>({});
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [lastFetched, setLF] = useState<string | null>(null);
+  const [showHist, setShow] = useState(false);
+  const [loading, setLoading] = useState(true); // initial page load
+  const [summaryLoading, setSumLoad] = useState(false); // only summary refresh
+  const [error, setError] = useState(false);
 
   /* two independent modes */
-  const [summaryMode, setSummaryMode] = useState<"all"|"solo"|"duo">("all");
-  const [matchMode,   setMatchMode]   = useState<"all"|"solo"|"duo">("all");
+  const [summaryMode, setSummaryMode] = useState<"all" | "solo" | "duo">("all");
+  const [matchMode, setMatchMode] = useState<"all" | "solo" | "duo">("all");
 
   /* store scroll position when changing match filter */
   const scrollRef = useRef<number>(0);
 
   /* ---------- fetch static char list once ---------- */
   useEffect(() => {
-    fetch("http://localhost:3001/api/characters?cycle=0")
+    fetch("${import.meta.env.VITE_API_BASE}/api/characters?cycle=0")
       .then((r) => r.json())
       .then((j) => {
         const map: CharMap = {};
@@ -112,7 +112,7 @@ export default function PlayerProfile() {
     qs.append("season", season);
     if (summaryMode !== "all") qs.append("mode", summaryMode);
 
-    fetch(`http://localhost:3001/api/player/${id}/summary?${qs}`)
+    fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/summary?${qs}`)
       .then((r) => r.json())
       .then((s) => {
         setSummary(s);
@@ -134,7 +134,7 @@ export default function PlayerProfile() {
     qs.append("season", season);
     if (matchMode !== "all") qs.append("mode", matchMode);
 
-    fetch(`http://localhost:3001/api/player/${id}/matches?${qs}`)
+    fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/matches?${qs}`)
       .then((r) => r.json())
       .then((mResp) => {
         setMatches(mResp.data);
@@ -187,19 +187,20 @@ export default function PlayerProfile() {
   );
 
   /* ---------- dynamic section titles ---------- */
-  const titles = summaryMode === "solo"
-    ? {
-        picked: "Most Picked Characters",
-        banned: "Most Banned Characters",
-        best:   "Best Performing Characters",
-        worst:  "Worse Performing Characters",
-      }
-    : {
-        picked: "Most Picked Characters While on Team",
-        banned: "Most Banned Characters While Playing",
-        best:   "Best Performing Characters While on Their Team",
-        worst:  "Worst Performing Characters While on Their Team",
-      };
+  const titles =
+    summaryMode === "solo"
+      ? {
+          picked: "Most Picked Characters",
+          banned: "Most Banned Characters",
+          best: "Best Performing Characters",
+          worst: "Worse Performing Characters",
+        }
+      : {
+          picked: "Most Picked Characters While on Team",
+          banned: "Most Banned Characters While Playing",
+          best: "Best Performing Characters While on Their Team",
+          worst: "Worst Performing Characters While on Their Team",
+        };
 
   /* ---------- ui ---------- */
   return (
@@ -227,10 +228,12 @@ export default function PlayerProfile() {
               <img src="/logo192.png" alt="" height={36} /> Haya
             </span>
           </Link>
-          <Link to="/players" className="btn btn-outline-light btn-sm back-button-glass">
+          <Link
+            to="/players"
+            className="btn btn-outline-light btn-sm back-button-glass"
+          >
             ← Back to Player Stats
           </Link>
-
         </nav>
 
         <div className="container">
@@ -289,15 +292,18 @@ export default function PlayerProfile() {
 
                 {/* mini loader */}
                 {summaryLoading && (
-                  <p className="small text-white-50 mb-2" style={{ marginTop: -4 }}>
+                  <p
+                    className="small text-white-50 mb-2"
+                    style={{ marginTop: -4 }}
+                  >
                     Updating summary…
                   </p>
                 )}
 
                 {renderList(titles.picked, summary!.mostPicked, "count")}
                 {renderList(titles.banned, summary!.mostBanned, "count")}
-                {renderList(titles.best,   summary!.bestWinRate,  "wr")}
-                {renderList(titles.worst,  summary!.worstWinRate, "wr")}
+                {renderList(titles.best, summary!.bestWinRate, "wr")}
+                {renderList(titles.worst, summary!.worstWinRate, "wr")}
 
                 <div className="mt-4 mb-4">
                   <strong>15 Cycles Counter:</strong>{" "}
@@ -320,7 +326,9 @@ export default function PlayerProfile() {
               {showHist && (
                 <div className="mt-5 d-flex flex-column gap-3">
                   <div className="d-flex justify-content-between align-items-center flex-wrap">
-                    <h2 className="fw-bold text-center mb-3">Match History (Last 15 Matches)</h2>
+                    <h2 className="fw-bold text-center mb-3">
+                      Match History (Last 15 Matches)
+                    </h2>
 
                     <select
                       value={matchMode}
@@ -346,7 +354,9 @@ export default function PlayerProfile() {
                           {m.date ? ddmmyyyy(m.date) : "Unknown Date"} –{" "}
                           <span
                             className={
-                              m.result === "win" ? "text-success" : "text-danger"
+                              m.result === "win"
+                                ? "text-success"
+                                : "text-danger"
                             }
                           >
                             {m.result.toUpperCase()}
