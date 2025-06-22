@@ -140,23 +140,32 @@ export default function CharacterStats() {
   /* ---------- data fetch ---------- */
   useEffect(() => {
     setLoading(true);
+
     const url =
       cycle === -1
         ? `${import.meta.env.VITE_API_BASE}/api/characters/all`
         : `${import.meta.env.VITE_API_BASE}/api/characters?cycle=${cycle}`;
 
     fetch(url)
-      .then((r) => r.json())
+      .then(async (r) => {
+        const json = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          throw new Error(json.error || `Request failed with status ${r.status}`);
+        }
+        return json;
+      })
       .then((j: ApiResponse) => {
-        setRows(j.data);
-        setLast(j.lastFetched);
-        setLoading(false);
+        setRows(j.data || []);
+        setLast(j.lastFetched || null);
       })
       .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+        console.error("Character stats fetch failed:", err.message);
+        alert(err.message); // or a better styled notification
+      })
+      .finally(() => setLoading(false));
   }, [cycle]);
+
+
 
   /* ---------- filter + sort ---------- */
   const list = rows

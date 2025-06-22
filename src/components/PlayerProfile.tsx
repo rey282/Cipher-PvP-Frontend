@@ -99,19 +99,32 @@ export default function PlayerProfile() {
   /* ---------- fetch static char list once ---------- */
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        const json = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          throw new Error(json.error || `Request failed with status ${r.status}`);
+        }
+        return json;
+      })
       .then((j) => {
         const map: CharMap = {};
-        j.data.forEach(
+        (j.data || []).forEach(
           (c: any) => (map[c.code] = { name: c.name, image_url: c.image_url })
         );
         setCharMap(map);
+      })
+      .catch((err) => {
+        console.error("Character fetch failed:", err.message);
+        alert(err.message);
       });
   }, []);
+
+
 
   /* ---------- fetch SUMMARY whenever id / season / summaryMode changes ---------- */
   useEffect(() => {
     if (!id) return;
+
     if (!summary) setLoading(true);
     setSumLoad(true);
 
@@ -120,23 +133,34 @@ export default function PlayerProfile() {
     if (summaryMode !== "all") qs.append("mode", summaryMode);
 
     fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/summary?${qs}`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        const json = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          throw new Error(json.error || `Request failed with status ${r.status}`);
+        }
+        return json;
+      })
       .then((s) => {
         setSummary(s);
-        setLoading(false);
-        setSumLoad(false);
+        setError(false);
       })
       .catch((err) => {
-        console.error(err);
+        console.error("Summary fetch failed:", err.message);
+        alert(err.message);
         setError(true);
+      })
+      .finally(() => {
         setLoading(false);
         setSumLoad(false);
       });
   }, [id, season, summaryMode]);
 
+
+
   /* ---------- fetch MATCHES whenever id / season / matchMode / page changes ---------- */
   useEffect(() => {
     if (!id) return;
+
     const qs = new URLSearchParams();
     qs.append("season", season);
     if (matchMode !== "all") qs.append("mode", matchMode);
@@ -144,17 +168,26 @@ export default function PlayerProfile() {
     qs.append("offset", (page * limit).toString());
 
     fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/matches?${qs}`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) {
+          const msg = await r.json().catch(() => ({}));
+          throw new Error(msg.error || `Request failed with status ${r.status}`);
+        }
+        return r.json();
+      })
       .then((mResp) => {
         setMatches(mResp.data);
         setLF(mResp.lastFetched);
         setTotal(mResp.total);
       })
       .catch((err) => {
-        console.error(err);
+        console.error("Match fetch failed:", err.message);
+        alert(err.message);
         setError(true);
       });
   }, [id, season, matchMode, page]);
+
+
 
   /* restore scroll position after matches update */
   useLayoutEffect(() => {

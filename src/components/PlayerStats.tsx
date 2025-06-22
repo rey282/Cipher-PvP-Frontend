@@ -42,8 +42,17 @@ export default function PlayerStats() {
       season === "all"
         ? `${import.meta.env.VITE_API_BASE}/api/players?season=all`
         : `${import.meta.env.VITE_API_BASE}/api/players?season=${season}`;
+
     fetch(url)
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) {
+          const msg = await r.json().catch(() => ({}));
+          throw new Error(
+            msg.error || `Request failed with status ${r.status}`
+          );
+        }
+        return r.json();
+      })
       .then((j: ApiResponse) => {
         setPlayers(j.data);
         setFetched(j.lastFetched);
@@ -52,7 +61,8 @@ export default function PlayerStats() {
         setPage(1);
       })
       .catch((err) => {
-        console.error(err);
+        console.error("Player fetch failed:", err.message);
+        alert(err.message);
         setLoading(false);
       });
   }, [season]);
