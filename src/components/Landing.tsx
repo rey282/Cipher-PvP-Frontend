@@ -14,7 +14,7 @@ const games = [
   {
     id: 'genshin',
     name: 'Coming Soon',
-    bg: '/Background2.jpg',
+    bg: '/GiBackground.webp',
     icon: '/genshin-icon.png',
     live: false,
   },
