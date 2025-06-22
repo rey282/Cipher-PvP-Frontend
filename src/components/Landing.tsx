@@ -24,7 +24,10 @@ const team = [
   { name: 'Markistador', role: 'Server Owner / Balancer', avatar: '/avatars/mark.png' },
   { name: 'YanYan',      role: 'Developer',               avatar: '/avatars/yanyan.png' },
   { name: 'Haya',        role: 'Developer',               avatar: '/avatars/haya.png' },
-  { name: 'Bonk',        role: 'Balancer',                avatar: '/avatars/bonk.png' },
+  { name: 'bonk',        role: 'Balancer',                avatar: '/avatars/bonk.png' },
+  { name: 'Scaphism',    role: 'Balancer',                avatar: '/avatars/scappy.png' },
+  { name: 'Toscap',      role: 'Moderator',                avatar: '/avatars/toscap.png' },
+  { name: 'frog detective',role: 'Moderator',                avatar: '/avatars/frog.png' },
 ];
 
 export default function Landing() {
