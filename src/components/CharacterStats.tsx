@@ -512,6 +512,7 @@ export default function CharacterStats() {
                   src={splashSrc(openChar.name)}
                   onError={(e) => (e.currentTarget.style.display = "none")}
                   alt={`${openChar.name} splash`}
+                  loading="lazy"
                   style={{
                     maxHeight: "90vh",
                     maxWidth: "100%",
