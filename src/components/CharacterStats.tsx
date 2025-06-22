@@ -92,18 +92,18 @@ const mocOptions = [
     bossImages: ["/bosses/sting.png", "/bosses/hoolay.png"],
   },
   {
-    label: "Out of Home (3.1)",
-    value: 1,
-    name: "Out of Home",
-    duration: "31 Mar 2025 → 12 May 2025",
-    bossImages: ["/bosses/hoolay.png", "/bosses/reaver.png"],
-  },
-  {
     label: "Breath of the Othershore (3.2)",
     value: 2,
     name: "Breath of the Othershore",
     duration: "12 May 2025 → 23 Jun 2025",
     bossImages: ["/bosses/reaver.png", "/bosses/tv.png"],
+  },
+  {
+    label: "Out of Home (3.1)",
+    value: 1,
+    name: "Out of Home",
+    duration: "31 Mar 2025 → 12 May 2025",
+    bossImages: ["/bosses/hoolay.png", "/bosses/reaver.png"],
   },
 ];
 
