@@ -62,7 +62,13 @@ export default function HsrHome() {
       title: "Roster Setup",
       desc: "Build your own custom team roster",
       btnText: "Coming soon...",
-      url: null, // disabled
+      url: null,
+    },
+    {
+      title: "Balance Cost",
+      desc: "View current character costs",
+      btnText: "Coming soon...",
+      url: null,
     },
   ];
 
