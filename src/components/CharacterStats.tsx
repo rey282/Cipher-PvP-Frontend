@@ -131,6 +131,7 @@ export default function CharacterStats() {
   const [rarity, setRarity] = useState<number | null>(null);
   const [element, setElement] = useState<string | null>(null);
   const [path, setPath] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(false);
 
   const [openChar, setOpenChar] = useState<CharacterStats | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -160,15 +161,15 @@ export default function CharacterStats() {
   const list = rows
     .filter(
       (c) =>
-        (!rarity || c.rarity === rarity) &&
+        (!rarity  || c.rarity  === rarity)  &&
         (!element || c.element === element) &&
-        (!path || c.path === path)
+        (!path    || c.path    === path)
     )
-    .sort(
-      (a, b) =>
-        (Number(b[sortBy as keyof CharacterStats]) as number) -
-        (Number(a[sortBy as keyof CharacterStats]) as number)
-    );
+    .sort((a, b) => {                                
+      const aVal = Number(a[sortBy as keyof CharacterStats]) || 0;
+      const bVal = Number(b[sortBy as keyof CharacterStats]) || 0;
+      return sortAsc ? aVal - bVal : bVal - aVal;
+    });
 
   const moc = mocOptions.find((m) => m.value === cycle)!;
 
@@ -235,11 +236,68 @@ export default function CharacterStats() {
 
         {/* grid wrapper */}
         <div className="container pb-5 position-relative">
-          {/* filter toggle */}
-          <div className="d-flex justify-content-end mb-2">
+          {/* rarity / element / path filters */}
+          <div className="d-flex justify-content-center gap-3 mb-3">
+            {[5, 4].map((r) => (
+              <button
+                key={r}
+                className={`btn btn-sm px-4 ${
+                  rarity === r ? "btn-light text-dark" : "btn-outline-light"
+                }`}
+                onClick={() => setRarity((p) => (p === r ? null : r))}
+              >
+                {r}★
+              </button>
+            ))}
+          </div>
+          <div className="d-flex justify-content-center gap-2 flex-wrap mb-2">
+            {elementOptions.map((el) => (
+              <button
+                key={el}
+                className="bg-transparent border-0"
+                title={el}
+                style={{ opacity: element && element !== el ? 0.35 : 1 }}
+                onClick={() => setElement((p) => (p === el ? null : el))}
+              >
+                <img
+                  src={`/icons/${el.toLowerCase()}.png`}
+                  alt={el}
+                  style={{ height: 32 }}
+                />
+              </button>
+            ))}
+          </div>
+          <div className="d-flex justify-content-center gap-2 flex-wrap mb-4">
+            {pathOptions.map((pth) => (
+              <button
+                key={pth}
+                className="bg-transparent border-0"
+                title={pth}
+                style={{ opacity: path && path !== pth ? 0.35 : 1 }}
+                onClick={() => setPath((p) => (p === pth ? null : pth))}
+              >
+                <img
+                  src={`/icons/${pth.toLowerCase().replace(/\s/g, "")}.png`}
+                  alt={pth}
+                  style={{ height: 32 }}
+                />
+              </button>
+            ))}
+          </div>
+          
+          {/* top-row controls ------------- */}
+          <div className="d-flex justify-content-between align-items-center mb-2">
             <button
               className="btn btn-outline-light btn-sm back-button-glass"
-              onClick={() => setShowFilters((p) => !p)}
+              onClick={() => setSortAsc(p => !p)}
+              title="Toggle sort direction"
+            >
+              {sortAsc ? "↑ Ascending" : "↓ Descending"}
+            </button>
+
+            <button
+              className="btn btn-outline-light btn-sm back-button-glass"
+              onClick={() => setShowFilters(p => !p)}
             >
               {showFilters ? "Hide Filters" : "Show Filters"}
             </button>
@@ -293,54 +351,6 @@ export default function CharacterStats() {
             </div>
           )}
 
-          {/* rarity / element / path filters */}
-          <div className="d-flex justify-content-center gap-3 mb-3">
-            {[5, 4].map((r) => (
-              <button
-                key={r}
-                className={`btn btn-sm px-4 ${
-                  rarity === r ? "btn-light text-dark" : "btn-outline-light"
-                }`}
-                onClick={() => setRarity((p) => (p === r ? null : r))}
-              >
-                {r}★
-              </button>
-            ))}
-          </div>
-          <div className="d-flex justify-content-center gap-2 flex-wrap mb-2">
-            {elementOptions.map((el) => (
-              <button
-                key={el}
-                className="bg-transparent border-0"
-                title={el}
-                style={{ opacity: element && element !== el ? 0.35 : 1 }}
-                onClick={() => setElement((p) => (p === el ? null : el))}
-              >
-                <img
-                  src={`/icons/${el.toLowerCase()}.png`}
-                  alt={el}
-                  style={{ height: 32 }}
-                />
-              </button>
-            ))}
-          </div>
-          <div className="d-flex justify-content-center gap-2 flex-wrap mb-4">
-            {pathOptions.map((pth) => (
-              <button
-                key={pth}
-                className="bg-transparent border-0"
-                title={pth}
-                style={{ opacity: path && path !== pth ? 0.35 : 1 }}
-                onClick={() => setPath((p) => (p === pth ? null : pth))}
-              >
-                <img
-                  src={`/icons/${pth.toLowerCase().replace(/\s/g, "")}.png`}
-                  alt={pth}
-                  style={{ height: 32 }}
-                />
-              </button>
-            ))}
-          </div>
 
           {/* grid + unobtrusive loader */}
           <div className="position-relative">
