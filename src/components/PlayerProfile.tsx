@@ -207,7 +207,7 @@ export default function PlayerProfile() {
     <div
       className="page-fade-in"
       style={{
-        background: "url('/background.png') center/cover fixed",
+        background: "url('/background.webp') center/cover fixed",
         minHeight: "100vh",
         position: "relative",
       }}

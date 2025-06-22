@@ -76,7 +76,7 @@ export default function PlayerStats() {
     <div
       className="page-fade-in"
       style={{
-        backgroundImage: "url('/background.png')",
+        backgroundImage: "url('/background.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed",
