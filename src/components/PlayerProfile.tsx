@@ -327,9 +327,8 @@ export default function PlayerProfile() {
                 <div className="mt-5 d-flex flex-column gap-3">
                   <div className="d-flex justify-content-between align-items-center flex-wrap">
                     <h2 className="fw-bold text-center mb-3">
-                      Match History (Last 15 Matches)
+                      Match History (Last {matches.length} {matches.length === 1 ? "Match" : "Matches"})
                     </h2>
-
                     <select
                       value={matchMode}
                       onChange={(e) => {
