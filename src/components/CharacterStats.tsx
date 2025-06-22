@@ -69,6 +69,7 @@ const elementOptions = [
 ] as const;
 
 const sortOptions = [
+  { label: "Alphabetical", value: "name" },
   { label: "Appearances", value: "appearance_count" },
   { label: "Wins", value: "total_wins" },
   { label: "Picks", value: "pick_count" },
@@ -127,7 +128,7 @@ export default function CharacterStats() {
 
   const [cycle, setCycle] = useState(-1);
   const [sortBy, setSort] =
-    useState<(typeof sortOptions)[number]["value"]>("appearance_count");
+    useState<(typeof sortOptions)[number]["value"]>("name");
   const [rarity, setRarity] = useState<number | null>(null);
   const [element, setElement] = useState<string | null>(null);
   const [path, setPath] = useState<string | null>(null);
@@ -161,15 +162,22 @@ export default function CharacterStats() {
   const list = rows
     .filter(
       (c) =>
-        (!rarity  || c.rarity  === rarity)  &&
+        (!rarity || c.rarity === rarity) &&
         (!element || c.element === element) &&
-        (!path    || c.path    === path)
+        (!path || c.path === path)
     )
-    .sort((a, b) => {                                
+    .sort((a, b) => {
+      if (sortBy === "name") {
+        return sortAsc
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
+      }
+
       const aVal = Number(a[sortBy as keyof CharacterStats]) || 0;
       const bVal = Number(b[sortBy as keyof CharacterStats]) || 0;
       return sortAsc ? aVal - bVal : bVal - aVal;
     });
+
 
   const moc = mocOptions.find((m) => m.value === cycle)!;
 
