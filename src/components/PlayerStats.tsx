@@ -40,7 +40,7 @@ export default function PlayerStats() {
     setLoading(true);
     const url =
       season === "all"
-        ? "${import.meta.env.VITE_API_BASE}/api/players?season=all"
+        ? `${import.meta.env.VITE_API_BASE}/api/players?season=all`
         : `${import.meta.env.VITE_API_BASE}/api/players?season=${season}`;
     fetch(url)
       .then((r) => r.json())

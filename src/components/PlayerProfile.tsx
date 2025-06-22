@@ -91,7 +91,7 @@ export default function PlayerProfile() {
 
   /* ---------- fetch static char list once ---------- */
   useEffect(() => {
-    fetch('${import.meta.env.VITE_API_BASE}/api/characters?cycle=0')
+    fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`)
       .then((r) => r.json())
       .then((j) => {
         const map: CharMap = {};
