@@ -23,7 +23,7 @@ export default function HsrHome() {
       if (w) {
         w.draw("haya28", {
           type: "floating-chat",
-          "floating-chat.donateButton.text": "Support me",
+          "floating-chat.donateButton.text": "Support Us",
           "floating-chat.donateButton.background-color": "#8b5cf6",
           "floating-chat.donateButton.text-color": "#ffffff",
         });
