@@ -309,13 +309,13 @@ export default function CharacterStats() {
               className="glassmorphic-card p-3"
               style={{
                 position: "absolute",
-                top: "3.1rem",
+                top: "-3rem",
                 right: 0,
                 width: 260,
                 background: "rgba(0,0,0,0.85)",
                 backdropFilter: "blur(10px)",
                 borderRadius: 12,
-                zIndex: 5,
+                zIndex: 10,
               }}
             >
               {/* MOC */}
