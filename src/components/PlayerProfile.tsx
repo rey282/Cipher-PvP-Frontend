@@ -114,7 +114,9 @@ export default function PlayerProfile() {
 
   /* ---------- fetch static char list once ---------- */
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`)
+    fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`, {
+      credentials: 'include',
+    })
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
         if (!r.ok) {
@@ -137,6 +139,7 @@ export default function PlayerProfile() {
       });
   }, []);
 
+
   /* ---------- fetch SUMMARY whenever id / season / summaryMode changes ---------- */
   useEffect(() => {
     if (!id) return;
@@ -148,7 +151,9 @@ export default function PlayerProfile() {
     qs.append("season", season);
     if (summaryMode !== "all") qs.append("mode", summaryMode);
 
-    fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/summary?${qs}`)
+    fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/summary?${qs}`, {
+      credentials: 'include',
+    })
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
         if (!r.ok) {
@@ -183,7 +188,9 @@ export default function PlayerProfile() {
     qs.append("limit", limit.toString());
     qs.append("offset", (page * limit).toString());
 
-    fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/matches?${qs}`)
+    fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/matches?${qs}`, {
+      credentials: 'include',
+    })
       .then(async (r) => {
         if (!r.ok) {
           const msg = await r.json().catch(() => ({}));

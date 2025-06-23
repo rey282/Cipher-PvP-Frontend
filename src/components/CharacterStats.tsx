@@ -163,7 +163,9 @@ export default function CharacterStats() {
         ? `${import.meta.env.VITE_API_BASE}/api/characters/all`
         : `${import.meta.env.VITE_API_BASE}/api/characters?cycle=${cycle}`;
 
-    fetch(url)
+    fetch(url, {
+      credentials: "include", 
+    })
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
         if (!r.ok) {

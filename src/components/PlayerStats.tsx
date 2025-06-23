@@ -57,7 +57,9 @@ export default function PlayerStats() {
         ? `${import.meta.env.VITE_API_BASE}/api/players?season=all`
         : `${import.meta.env.VITE_API_BASE}/api/players?season=${season}`;
 
-    fetch(url)
+    fetch(url, {
+      credentials: "include", 
+    })
       .then(async (r) => {
         if (!r.ok) {
           const msg = await r.json().catch(() => ({}));
@@ -80,6 +82,7 @@ export default function PlayerStats() {
         setLoading(false);
       });
   }, [season]);
+
 
   const filtered = players.filter((p) =>
     (p.username || p.nickname || "")
