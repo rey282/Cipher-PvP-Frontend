@@ -1,0 +1,50 @@
+.footer-glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.logo-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #fff;
+}
+
+.footer-link {
+  color: #bbb;
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.footer-divider {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.footer-glass img {
+  opacity: 0.85;
+  transition: transform 0.2s ease;
+}
+
+.footer-glass img:hover {
+  transform: scale(1.1);
+  opacity: 1;
+}
+
+.tech-stack img {
+  opacity: 0.9;
+  transition: transform 0.2s ease;
+  margin-top: 2px;
+}
+
+.tech-stack img:hover {
+  transform: translateY(-3px) scale(1.1);
+  opacity: 1;
+  cursor: pointer;
+}
+
+

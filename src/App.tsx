@@ -4,6 +4,8 @@ import HsrHome from "./components/HsrHome";
 import CharacterStats from "./components/CharacterStats";
 import PlayerStats from './components/PlayerStats';
 import PlayerProfile from './components/PlayerProfile';
+import TermsOfService from './components/TermsOfService';
+import Footer from "./components/Footer";
 
 export default function App() {
   return (
@@ -14,8 +16,10 @@ export default function App() {
         <Route path="/characters" element={<CharacterStats />} />
         <Route path="/players" element={<PlayerStats />} />
         <Route path="/player/:id" element={<PlayerProfile />} />
+        <Route path="/terms" element={<TermsOfService />} />
         {/* Honkai: Star Rail page */}
       </Routes>
+      <Footer />
     </BrowserRouter>
   );
 }
