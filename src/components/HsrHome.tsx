@@ -106,7 +106,7 @@ export default function HsrHome() {
             className="border-0 bg-transparent p-0"
           >
             <span className="logo-title">
-              <img src="/logo192.png" alt="" height={36} /> Haya
+              <img src="/logo192.png" alt="" height={36} /> Cipher
             </span>
           </button>
         </nav>

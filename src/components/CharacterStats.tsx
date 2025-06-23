@@ -212,7 +212,7 @@ export default function CharacterStats() {
         <nav className="w-100 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
           <a href="/" className="text-decoration-none">
             <span className="logo-title d-inline-flex align-items-center gap-2">
-              <img src="/logo192.png" alt="" height={36} /> Haya
+              <img src="/logo192.png" alt="" height={36} /> Cipher
             </span>
           </a>
           <button

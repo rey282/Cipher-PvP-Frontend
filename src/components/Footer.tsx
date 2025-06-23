@@ -8,9 +8,9 @@ export default function Footer() {
         <div className="row gy-4 align-items-start">
           {/* Brand / Description */}
           <div className="col-12 col-md-4">
-            <h4 className="logo-title">HAYA PvP</h4>
+            <h4 className="logo-title">CIPHER PvP</h4>
             <p className="text-white-50 small mb-3">
-                Haya PvP is a competitive Honkai platform built for stats enthusiasts, 
+                Cipher PvP is a competitive Honkai platform built for stats enthusiasts, 
                 tierlist makers, and passionate players.
                 </p>
             <p className="text-white-50 small mb-0">
@@ -39,10 +39,15 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="https://discord.gg/MHzc5GRDQW" className="footer-link">
-                  Discord
+                <a
+                    href="https://discord.gg/MHzc5GRDQW"
+                    className="footer-link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    Discord
                 </a>
-              </li>
+            </li>
             </ul>
           </div>
 
@@ -120,7 +125,7 @@ export default function Footer() {
         </div>
           <hr className="footer-divider my-4" />
           <p className="text-center text-white-50 small mb-0">
-            © {new Date().getFullYear()} Haya PvP. All rights reserved.
+            © {new Date().getFullYear()} Cipher PvP. All rights reserved.
           </p>
         </div>
       </div>

@@ -268,7 +268,7 @@ export default function PlayerProfile() {
         <nav className="w-100 d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
           <Link to="/" className="text-decoration-none">
             <span className="logo-title d-inline-flex align-items-center gap-2">
-              <img src="/logo192.png" alt="" height={36} /> Haya
+              <img src="/logo192.png" alt="" height={36} /> Cipher
             </span>
           </Link>
           <Link

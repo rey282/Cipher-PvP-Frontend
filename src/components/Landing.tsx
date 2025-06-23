@@ -75,7 +75,7 @@ export default function Landing() {
         {/* ───────── top nav ───────── */}
         <nav className="w-100 px-4 py-3 d-flex justify-content-end">
           <span className="logo-title">
-            <img src="/logo192.png" alt="" height={36} /> Haya
+            <img src="/logo192.png" alt="" height={36} /> Cipher
           </span>
         </nav>
 
