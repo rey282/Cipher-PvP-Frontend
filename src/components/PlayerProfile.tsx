@@ -24,6 +24,7 @@ type Summary = {
   avatar?: string | null;
   mostPicked: CountChar[];
   mostBanned: CountChar[];
+  mostBannedAgainst: CountChar[];
   bestWinRate: WRChar[];
   worstWinRate: WRChar[];
   fifteenCycles: number;
@@ -115,7 +116,7 @@ export default function PlayerProfile() {
   /* ---------- fetch static char list once ---------- */
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`, {
-      credentials: 'include',
+      credentials: "include",
     })
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
@@ -139,7 +140,6 @@ export default function PlayerProfile() {
       });
   }, []);
 
-
   /* ---------- fetch SUMMARY whenever id / season / summaryMode changes ---------- */
   useEffect(() => {
     if (!id) return;
@@ -152,7 +152,7 @@ export default function PlayerProfile() {
     if (summaryMode !== "all") qs.append("mode", summaryMode);
 
     fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/summary?${qs}`, {
-      credentials: 'include',
+      credentials: "include",
     })
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
@@ -189,7 +189,7 @@ export default function PlayerProfile() {
     qs.append("offset", (page * limit).toString());
 
     fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}/matches?${qs}`, {
-      credentials: 'include',
+      credentials: "include",
     })
       .then(async (r) => {
         if (!r.ok) {
@@ -257,13 +257,15 @@ export default function PlayerProfile() {
     summaryMode === "solo"
       ? {
           picked: "Most Picked Characters",
-          banned: "Most Banned Characters",
+          banned: "Most Bans You Placed",
+          bannedVs: "MostBans Used Against You",
           best: "Best Performing Characters",
           worst: "Worse Performing Characters",
         }
       : {
           picked: "Most Picked Characters While on Team",
-          banned: "Most Banned Characters While Playing",
+          banned: "Most Bans Your Team Placed",
+          bannedVs: "MostBans Opponents Placed vs Your Team",
           best: "Best Performing Characters While on Their Team",
           worst: "Worst Performing Characters While on Their Team",
         };
@@ -430,6 +432,11 @@ export default function PlayerProfile() {
 
                 {renderList(titles.picked, summary!.mostPicked, "count")}
                 {renderList(titles.banned, summary!.mostBanned, "count")}
+                {renderList(
+                  titles.bannedVs,
+                  summary!.mostBannedAgainst,
+                  "count"
+                )}
                 {renderList(titles.best, summary!.bestWinRate, "wr")}
                 {renderList(titles.worst, summary!.worstWinRate, "wr")}
 
