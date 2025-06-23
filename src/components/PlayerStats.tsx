@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Landing.css";
+import { useAuth } from "../context/AuthContext";
+let lastErrorMsg = '';
+let lastErrorTime = 0;
+const ERROR_SUPPRESS_MS = 3000;
+
+function safeAlert(msg: string) {
+  const now = Date.now();
+  if (msg !== lastErrorMsg || now - lastErrorTime > ERROR_SUPPRESS_MS) {
+    alert(msg);
+    lastErrorMsg = msg;
+    lastErrorTime = now;
+  }
+}
 
 type Player = {
   discord_id: string;
@@ -29,12 +42,13 @@ export default function PlayerStats() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [lastFetched, setFetched] = useState<string | null>(null);
   const [totalMatches, setTotalMatches] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearch] = useState("");
   const [season, setSeason] = useState("players");
 
   const navigate = useNavigate();
+  const { user, loading, login, logout } = useAuth();
 
   useEffect(() => {
     setLoading(true);
@@ -62,7 +76,7 @@ export default function PlayerStats() {
       })
       .catch((err) => {
         console.error("Player fetch failed:", err.message);
-        alert(err.message);
+        safeAlert(err.message);
         setLoading(false);
       });
   }, [season]);
@@ -102,20 +116,55 @@ export default function PlayerStats() {
           zIndex: 1,
         }}
       />
-      <div className="position-relative z-2 text-white px-4 py-4">
-        <nav className="w-100 d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-          <Link to="/" className="text-decoration-none">
-            <span className="logo-title d-inline-flex align-items-center gap-2">
-              <img src="/logo192.png" alt="" height={36} /> Haya
-            </span>
-          </Link>
-          <Link
-            to="/hsr"
-            className="btn btn-outline-light btn-sm back-button-glass"
-          >
-            ← Back
-          </Link>
+      <div className="position-relative z-2 text-white d-flex flex-column px-4" style={{ minHeight: "100vh" }}>
+        <nav className="w-100 py-3 d-flex justify-content-between align-items-center">
+          <button onClick={() => navigate("/hsr")} className="border-0 bg-transparent p-0">
+            <span className="logo-title">Cipher</span>
+          </button>
+
+          {loading ? (
+            <span className="text-white-50">…</span>
+          ) : user ? (
+            <div className="dropdown">
+              <button
+                className="btn p-0 border-0 bg-transparent"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                style={{ outline: 'none' }}
+              >
+                <img
+                  src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
+                  alt="avatar"
+                  className="rounded-circle"
+                  width={36}
+                  height={36}
+                />
+              </button>
+
+              <ul className="dropdown-menu dropdown-menu-end glass-dropdown p-2 text-center" style={{ minWidth: '180px' }}>
+                <li className="mb-1 text-white fw-bold" style={{ fontSize: '0.9rem' }}>
+                  {user.username}
+                </li>
+                <li><hr className="dropdown-divider" /></li>
+                <li>
+                  <button className="dropdown-item text-danger" onClick={logout}>
+                    Logout
+                  </button>
+                </li>
+              </ul>
+            </div>
+          ) : (
+            <button className="btn back-button-glass" onClick={login}>
+              Login with Discord
+            </button>
+          )}
         </nav>
+
+      <div className="w-100 d-flex justify-content-end mb-3 pe-4">
+        <Link to="/hsr" className="btn back-button-glass">
+          ← Back
+        </Link>
+      </div>
 
         <div className="container">
           <h1 className="display-4 fw-bold text-center mb-3">
@@ -188,7 +237,7 @@ export default function PlayerStats() {
             </select>
           </div>
 
-          {loading ? (
+          {isLoading ? (
             <p className="text-center">Loading players…</p>
           ) : (
             <>

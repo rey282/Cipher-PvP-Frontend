@@ -262,6 +262,22 @@
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+.glass-dropdown {
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.glass-dropdown .dropdown-item {
+  color: white;
+}
+.glass-dropdown .dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 
 
 

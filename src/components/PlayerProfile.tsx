@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState, useLayoutEffect } from "react";
-import { Link, useParams, useLocation } from "react-router-dom";
+import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+let lastErrorMsg = "";
+let lastErrorTime = 0;
+const ERROR_SUPPRESS_MS = 3000;
 
+function safeAlert(msg: string) {
+  const now = Date.now();
+  if (msg !== lastErrorMsg || now - lastErrorTime > ERROR_SUPPRESS_MS) {
+    alert(msg);
+    lastErrorMsg = msg;
+    lastErrorTime = now;
+  }
+}
 /* ---------- types ---------- */
 type CharTiny = { code: string; name?: string; image_url?: string };
 type CountChar = CharTiny & { count: number };
@@ -9,6 +21,7 @@ type WRChar = CharTiny & { wins: number; games: number; winRate: number };
 type Summary = {
   playerId: string;
   username: string;
+  avatar?: string | null;
   mostPicked: CountChar[];
   mostBanned: CountChar[];
   bestWinRate: WRChar[];
@@ -78,10 +91,13 @@ export default function PlayerProfile() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [lastFetched, setLF] = useState<string | null>(null);
   const [showHist, setShow] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setLoading] = useState(true);
   const [summaryLoading, setSumLoad] = useState(false);
   const [error, setError] = useState(false);
   const [total, setTotal] = useState(0);
+  const navigate = useNavigate();
+
+  const { user, loading, login, logout } = useAuth();
 
   /* pagination */
   const [page, setPage] = useState(0);
@@ -102,7 +118,9 @@ export default function PlayerProfile() {
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
         if (!r.ok) {
-          throw new Error(json.error || `Request failed with status ${r.status}`);
+          throw new Error(
+            json.error || `Request failed with status ${r.status}`
+          );
         }
         return json;
       })
@@ -115,11 +133,9 @@ export default function PlayerProfile() {
       })
       .catch((err) => {
         console.error("Character fetch failed:", err.message);
-        alert(err.message);
+        safeAlert(err.message);
       });
   }, []);
-
-
 
   /* ---------- fetch SUMMARY whenever id / season / summaryMode changes ---------- */
   useEffect(() => {
@@ -136,7 +152,9 @@ export default function PlayerProfile() {
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
         if (!r.ok) {
-          throw new Error(json.error || `Request failed with status ${r.status}`);
+          throw new Error(
+            json.error || `Request failed with status ${r.status}`
+          );
         }
         return json;
       })
@@ -146,7 +164,7 @@ export default function PlayerProfile() {
       })
       .catch((err) => {
         console.error("Summary fetch failed:", err.message);
-        alert(err.message);
+        safeAlert(err.message);
         setError(true);
       })
       .finally(() => {
@@ -154,8 +172,6 @@ export default function PlayerProfile() {
         setSumLoad(false);
       });
   }, [id, season, summaryMode]);
-
-
 
   /* ---------- fetch MATCHES whenever id / season / matchMode / page changes ---------- */
   useEffect(() => {
@@ -171,7 +187,9 @@ export default function PlayerProfile() {
       .then(async (r) => {
         if (!r.ok) {
           const msg = await r.json().catch(() => ({}));
-          throw new Error(msg.error || `Request failed with status ${r.status}`);
+          throw new Error(
+            msg.error || `Request failed with status ${r.status}`
+          );
         }
         return r.json();
       })
@@ -182,12 +200,10 @@ export default function PlayerProfile() {
       })
       .catch((err) => {
         console.error("Match fetch failed:", err.message);
-        alert(err.message);
+        safeAlert(err.message);
         setError(true);
       });
   }, [id, season, matchMode, page]);
-
-
 
   /* restore scroll position after matches update */
   useLayoutEffect(() => {
@@ -263,27 +279,89 @@ export default function PlayerProfile() {
           zIndex: 1,
         }}
       />
-      <div className="position-relative z-2 text-white px-4 py-4">
+      <div
+        className="position-relative z-2 text-white d-flex flex-column px-4"
+        style={{ minHeight: "100vh" }}
+      >
         {/* Top nav */}
-        <nav className="w-100 d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-          <Link to="/" className="text-decoration-none">
-            <span className="logo-title d-inline-flex align-items-center gap-2">
-              <img src="/logo192.png" alt="" height={36} /> Cipher
-            </span>
-          </Link>
-          <Link
-            to="/players"
-            className="btn btn-outline-light btn-sm back-button-glass"
+        <nav className="w-100 py-3 d-flex justify-content-between align-items-center">
+          <button
+            onClick={() => navigate("/hsr")}
+            className="border-0 bg-transparent p-0"
           >
-            ← Back to Player Stats
-          </Link>
+            <span className="logo-title">Cipher</span>
+          </button>
+
+          {loading ? (
+            <span className="text-white-50">…</span>
+          ) : user ? (
+            <div className="dropdown">
+              <button
+                className="btn p-0 border-0 bg-transparent"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                style={{ outline: "none" }}
+              >
+                <img
+                  src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
+                  alt="avatar"
+                  className="rounded-circle"
+                  width={36}
+                  height={36}
+                />
+              </button>
+              <ul
+                className="dropdown-menu dropdown-menu-end glass-dropdown p-2 text-center"
+                style={{ minWidth: "180px" }}
+              >
+                <li
+                  className="mb-1 text-white fw-bold"
+                  style={{ fontSize: "0.9rem" }}
+                >
+                  {user.username}
+                </li>
+                <li>
+                  <hr className="dropdown-divider" />
+                </li>
+                <li>
+                  <button
+                    className="dropdown-item text-danger"
+                    onClick={logout}
+                  >
+                    Logout
+                  </button>
+                </li>
+              </ul>
+            </div>
+          ) : (
+            <button className="btn back-button-glass" onClick={login}>
+              Login with Discord
+            </button>
+          )}
         </nav>
 
-        <div className="container">
-          <h1 className="display-5 fw-bold text-center mb-1">
-            Player Summary{summary?.username ? `: ${summary.username}` : ""}
-          </h1>
+        <div className="w-100 d-flex justify-content-end mb-3 pe-4">
+          <Link to="/players" className="btn back-button-glass">
+            ← Back
+          </Link>
+        </div>
 
+        <div className="container">
+          <div className="d-flex justify-content-center align-items-center gap-3 mb-2">
+            {summary?.avatar && summary?.playerId && (
+              <img
+                src={`https://cdn.discordapp.com/avatars/${summary.playerId}/${summary.avatar}.png?size=64`}
+                alt="avatar"
+                className="rounded-circle"
+                width={48}
+                height={48}
+                style={{ objectFit: "cover", border: "2px solid white" }}
+              />
+            )}
+            <h1 className="display-5 fw-bold text-center mb-1">
+              Player Summary: {summary?.username}
+            </h1>
+          </div>
           {season && (
             <p className="text-center text-white-50 mb-2">
               Season View:{" "}
@@ -306,7 +384,7 @@ export default function PlayerProfile() {
             </p>
           )}
 
-          {loading ? (
+          {isLoading ? (
             <p className="text-center">Loading…</p>
           ) : error || !summary ? (
             <p className="text-center text-danger">
@@ -367,7 +445,10 @@ export default function PlayerProfile() {
 
               {/* ------- match history ------- */}
               {showHist && (
-                <div ref={matchHistoryRef} className="mt-5 d-flex flex-column gap-3">
+                <div
+                  ref={matchHistoryRef}
+                  className="mt-5 d-flex flex-column gap-3"
+                >
                   <div className="d-flex justify-content-between align-items-center flex-wrap">
                     <h2 className="fw-bold text-center mb-3">
                       Match History (Page {page + 1}
@@ -489,7 +570,9 @@ export default function PlayerProfile() {
                       className="btn btn-outline-light btn-sm"
                       onClick={() => {
                         setPage((p) => Math.max(0, p - 1));
-                        matchHistoryRef.current?.scrollIntoView({ behavior: "smooth" });
+                        matchHistoryRef.current?.scrollIntoView({
+                          behavior: "smooth",
+                        });
                       }}
                       disabled={page === 0}
                     >
@@ -500,7 +583,9 @@ export default function PlayerProfile() {
                       className="btn btn-outline-light btn-sm"
                       onClick={() => {
                         setPage((p) => p + 1);
-                        matchHistoryRef.current?.scrollIntoView({ behavior: "smooth" });
+                        matchHistoryRef.current?.scrollIntoView({
+                          behavior: "smooth",
+                        });
                       }}
                       disabled={matches.length < limit}
                     >

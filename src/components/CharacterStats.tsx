@@ -1,5 +1,20 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import "./Landing.css";
+import { useAuth } from "../context/AuthContext";
+
+let lastErrorMsg = '';
+let lastErrorTime = 0;
+const ERROR_SUPPRESS_MS = 3000;
+
+function safeAlert(msg: string) {
+  const now = Date.now();
+  if (msg !== lastErrorMsg || now - lastErrorTime > ERROR_SUPPRESS_MS) {
+    alert(msg);
+    lastErrorMsg = msg;
+    lastErrorTime = now;
+  }
+}
 
 /* ---------- types ---------- */
 type EidolonTuple = { uses: number; wins: number };
@@ -124,7 +139,7 @@ const splashSrc = (name: string) =>
 export default function CharacterStats() {
   const [rows, setRows] = useState<CharacterStats[]>([]);
   const [lastFetched, setLast] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setLoading] = useState(true);
 
   const [cycle, setCycle] = useState(-1);
   const [sortBy, setSort] =
@@ -136,6 +151,8 @@ export default function CharacterStats() {
 
   const [openChar, setOpenChar] = useState<CharacterStats | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+
+  const { user, loading: authLoading, login, logout } = useAuth();
 
   /* ---------- data fetch ---------- */
   useEffect(() => {
@@ -160,12 +177,10 @@ export default function CharacterStats() {
       })
       .catch((err) => {
         console.error("Character stats fetch failed:", err.message);
-        alert(err.message); // or a better styled notification
+        safeAlert(err.message);
       })
       .finally(() => setLoading(false));
   }, [cycle]);
-
-
 
   /* ---------- filter + sort ---------- */
   const list = rows
@@ -207,21 +222,49 @@ export default function CharacterStats() {
           zIndex: 1,
         }}
       />
-      <div className="position-relative z-2 text-white px-4">
-        {/* nav */}
-        <nav className="w-100 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <a href="/" className="text-decoration-none">
-            <span className="logo-title d-inline-flex align-items-center gap-2">
-              <img src="/logo192.png" alt="" height={36} /> Cipher
-            </span>
-          </a>
-          <button
-            className="btn btn-outline-light btn-sm back-button-glass"
-            onClick={() => window.history.back()}
-          >
-            ← Back
+      <div className="position-relative z-2 text-white d-flex flex-column px-4" style={{ minHeight: "100vh" }}>
+        {/* Top nav */}
+        <nav className="w-100 py-3 d-flex justify-content-between align-items-center">
+          <button onClick={() => window.history.back()} className="border-0 bg-transparent p-0">
+            <span className="logo-title">Cipher</span>
           </button>
+
+          {authLoading ? (
+            <span className="text-white-50">…</span>
+          ) : user ? (
+            <div className="dropdown">
+              <button
+                className="btn p-0 border-0 bg-transparent"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                style={{ outline: "none" }}
+              >
+                <img
+                  src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
+                  alt="avatar"
+                  className="rounded-circle"
+                  width={36}
+                  height={36}
+                />
+              </button>
+              <ul className="dropdown-menu dropdown-menu-end glass-dropdown p-2 text-center" style={{ minWidth: "180px" }}>
+                <li className="mb-1 text-white fw-bold" style={{ fontSize: "0.9rem" }}>{user.username}</li>
+                <li><hr className="dropdown-divider" /></li>
+                <li>
+                  <button className="dropdown-item text-danger" onClick={logout}>Logout</button>
+                </li>
+              </ul>
+            </div>
+          ) : (
+            <button className="btn back-button-glass" onClick={login}>Login with Discord</button>
+          )}
         </nav>
+
+        <div className="w-100 d-flex justify-content-end mb-3 pe-4">
+          <Link to="/hsr" className="btn back-button-glass">
+            ← Back
+          </Link>
+        </div>
 
         {/* cycle info */}
         <div className="text-center my-4">
@@ -370,7 +413,7 @@ export default function CharacterStats() {
 
           {/* grid + unobtrusive loader */}
           <div className="position-relative">
-            {loading && (
+            {isLoading && (
               <div
                 className="text-center mb-2"
                 style={{
@@ -388,8 +431,8 @@ export default function CharacterStats() {
             <div
               className="row g-4"
               style={{
-                opacity: loading ? 0.5 : 1,
-                pointerEvents: loading ? "none" : "auto",
+                opacity: isLoading ? 0.5 : 1,
+                pointerEvents: isLoading ? "none" : "auto",
                 transition: "opacity .25s",
               }}
             >
