@@ -135,6 +135,7 @@ export default function HsrHome() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-outline-light btn-sm mt-3"
+                          onClick={() => window.scrollTo(0, 0)}
                         >
                           {btnText}
                         </a>
@@ -142,12 +143,13 @@ export default function HsrHome() {
                         <Link
                           to={url}
                           className="btn btn-outline-light btn-sm mt-3"
+                          onClick={() => window.scrollTo(0, 0)}
                         >
                           {btnText}
                         </Link>
                       )
                     ) : (
-                      <button className="btn btn-outline-light btn-sm mt-3">
+                      <button className="btn btn-outline-light btn-sm mt-3" disabled>
                         {btnText}
                       </button>
                     )}
