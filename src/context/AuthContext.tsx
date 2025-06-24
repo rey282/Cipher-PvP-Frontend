@@ -22,27 +22,29 @@ export const useAuth = () => useContext(AuthContext)!;
 
 /* ---------- provider ---------- */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser]     = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate            = useNavigate();          // ⬅️
+  const navigate = useNavigate(); // ⬅️
 
   /* ─── Check session on load ─── */
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_BASE}/auth/me`, {
       credentials: "include",
     })
-      .then(res => res.json())
-      .then(data => setUser(data.user ?? null))
+      .then((res) => res.json())
+      .then((data) => setUser(data.user ?? null))
       .finally(() => setLoading(false));
   }, []);
 
   /* ─── Start Discord OAuth ─── */
-  const login = (redirectTo = window.location.pathname + window.location.search) => {
-    // Persist the page we want to return to
+  const login = (redirectTo = window.location.href) => {
     localStorage.setItem("redirectAfterLogin", redirectTo);
 
-    // Hit backend route that starts Passport’s Discord strategy
-    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord`;
+    // ✅ include ?redirect= in backend call
+    const authUrl = `${
+      import.meta.env.VITE_API_BASE
+    }/auth/discord?redirect=${encodeURIComponent(redirectTo)}`;
+    window.location.href = authUrl;
   };
 
   /* ─── Logout ─── */
