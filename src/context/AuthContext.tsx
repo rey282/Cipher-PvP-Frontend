@@ -34,7 +34,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = () => {
     const currentUrl = window.location.href;
     const encoded = encodeURIComponent(currentUrl);
-    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?redirect=${encoded}`;
+    window.location.href = `${
+      import.meta.env.VITE_API_BASE
+    }/auth/discord?redirect=${encoded}`;
   };
 
   const logout = async () => {
@@ -43,9 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       credentials: "include",
     });
     setUser(null);
-    window.location.href = "https://cipher.uno"; 
+    window.location.reload();
   };
-
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>
