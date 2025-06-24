@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = () => {
     const currentUrl = window.location.href;
     const encoded = encodeURIComponent(currentUrl);
-    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?redirect=${encoded}`;
+    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?state=${encoded}`;
   };
 
 
