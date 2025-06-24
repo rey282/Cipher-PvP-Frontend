@@ -34,9 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = () => {
     const currentUrl = window.location.href;
     const encoded = encodeURIComponent(currentUrl);
-    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?state=${encoded}`;
+    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?redirect=${encoded}`;
   };
-
 
   const logout = async () => {
     await fetch(`${import.meta.env.VITE_API_BASE}/auth/logout`, {
