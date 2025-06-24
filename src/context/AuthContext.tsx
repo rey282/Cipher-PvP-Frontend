@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
   const logout = async () => {
-    await fetch(`${import.meta.env.VITE_API_BASE}/logout`, {
+    await fetch(`${import.meta.env.VITE_API_BASE}/auth/logout`, {
       method: "POST",
       credentials: "include",
     });
