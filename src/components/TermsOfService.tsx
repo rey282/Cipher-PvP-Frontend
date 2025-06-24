@@ -47,10 +47,10 @@ export default function TermsOfService() {
           <section className="mb-4">
             <h5>Agreement of Use</h5>
             <p>
-              By accessing or using Cipher&nbsp;PvP you agree to abide by these
-              terms, our community guidelines, and our privacy policy. Any
-              behaviour that disrupts, exploits, or otherwise harms the platform
-              or other players may result in warnings, temporary suspensions, or
+              By accessing or using Cipher you agree to abide by these terms,
+              our community guidelines, and our privacy policy. Any behaviour
+              that disrupts, exploits, or otherwise harms the platform or other
+              players may result in warnings, temporary suspensions, or
               permanent bans.
             </p>
           </section>
@@ -59,7 +59,7 @@ export default function TermsOfService() {
           <section className="mb-4">
             <h5>Affiliation</h5>
             <p>
-              Cipher&nbsp;PvP is a community driven fan project and is&nbsp;
+              Cipher is a community driven fan project and is&nbsp;
               <strong>not</strong>&nbsp;affiliated with, sponsored by, or
               endorsed by HoYoverse. All Honkai: Star&nbsp;Rail names, images,
               and other assets remain the property of HoYoverse.

@@ -10,12 +10,14 @@ export default function Footer() {
           <div className="col-12 col-md-4">
             <h4 className="logo-title">CIPHER PvP</h4>
             <p className="text-white-50 small mb-3">
-                Cipher PvP is a competitive Honkai platform built for stats enthusiasts, 
-                tierlist makers, and passionate players.
-                </p>
+              Cipher is a competitive Honkai platform built for stats
+              enthusiasts and passionate players.
+            </p>
             <p className="text-white-50 small mb-0">
-                <em>This is a fan-made project and is not affiliated with HoYoverse. 
-                    All game assets belong to HoYoverse.</em>
+              <em>
+                This is a fan-made project and is not affiliated with HoYoverse.
+                All game assets belong to HoYoverse.
+              </em>
             </p>
           </div>
 
@@ -40,92 +42,120 @@ export default function Footer() {
               </li>
               <li>
                 <a
-                    href="https://discord.gg/MHzc5GRDQW"
-                    className="footer-link"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  href="https://discord.gg/MHzc5GRDQW"
+                  className="footer-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                    Discord
+                  Discord
                 </a>
-            </li>
+              </li>
             </ul>
           </div>
 
           {/* Dev / Support */}
-        <div className="col-6 col-md-3">
+          <div className="col-6 col-md-3">
             <h6 className="fw-bold mb-3">Project</h6>
             <ul className="list-unstyled small">
-                <li>
+              <li>
                 <a
-                    href="https://ko-fi.com/haya28"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="footer-link"
+                  href="https://ko-fi.com/haya28"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="footer-link"
                 >
-                    Support on Ko-fi ☕
+                  Support on Ko-fi ☕
                 </a>
-                </li>
-                <li>
+              </li>
+              <li>
                 <a
-                    href="https://discord.com/users/371513247641370625"
-                    className="footer-link"
+                  href="https://discord.com/users/371513247641370625"
+                  className="footer-link"
                 >
-                    Report a Bug
+                  Report a Bug
                 </a>
-                </li>
-                <li>
+              </li>
+              <li>
                 <Link to="/terms" className="footer-link">
-                    Terms of Service
+                  Terms of Service
                 </Link>
-                </li>
+              </li>
             </ul>
-        </div>
-
+          </div>
 
           {/* Creator Signature */}
-        <div className="col-12 col-md-2 text-md-end text-center mt-4 mt-md-0">
+          <div className="col-12 col-md-2 text-md-end text-center mt-4 mt-md-0">
             <p className="mb-2 text-white-50 small">
-            Made by <strong>Cipher Dev Team</strong>
+              Made by <strong>Cipher Dev Team</strong>
             </p>
             <div className="d-flex justify-content-center justify-content-md-end align-items-center gap-3 mb-3">
-            <div className="text-center">
+              <div className="text-center">
                 <img
-                src="/avatars/yanyan.png"
-                alt="YanYan"
-                className="footer-avatar"
+                  src="/avatars/yanyan.png"
+                  alt="YanYan"
+                  className="footer-avatar"
                 />
                 <p className="text-white-50 small mb-0 mt-1">YanYan</p>
-            </div>
-            <div className="text-center">
+              </div>
+              <div className="text-center">
                 <img
-                src="/avatars/haya.png"
-                alt="Haya"
-                className="footer-avatar"
+                  src="/avatars/haya.png"
+                  alt="Haya"
+                  className="footer-avatar"
                 />
                 <p className="text-white-50 small mb-0 mt-1">Haya</p>
-            </div>
+              </div>
             </div>
 
             <div className="tech-stack-wrapper pt-4">
-                <p className="text-white-50 text-center text-md-end mb-2 fw-semibold">Built With</p>
-                <div className="tech-stack d-flex justify-content-center justify-content-md-end gap-4 mb-3">
-                    <img src="/icons/react.svg"       alt="React"        height="32" title="React" />
-                    <img src="/icons/typescript.svg"  alt="TypeScript"   height="32" title="TypeScript" />
-                    <img src="/icons/nodejs.svg"      alt="Node.js"      height="32" title="Node.js" />
-                </div>
-                <div className="tech-stack d-flex justify-content-center justify-content-md-end gap-4">
-                    <img src="/icons/express.svg"     alt="Express"      height="32" title="Express" />
-                    <img src="/icons/postgresql.svg"  alt="PostgreSQL"   height="32" title="PostgreSQL" />
-                    <img src="/icons/vercel.svg"      alt="Vercel"       height="28" title="Vercel" />
-                </div>
+              <p className="text-white-50 text-center text-md-end mb-2 fw-semibold">
+                Built With
+              </p>
+              <div className="tech-stack d-flex justify-content-center justify-content-md-end gap-4 mb-3">
+                <img
+                  src="/icons/react.svg"
+                  alt="React"
+                  height="32"
+                  title="React"
+                />
+                <img
+                  src="/icons/typescript.svg"
+                  alt="TypeScript"
+                  height="32"
+                  title="TypeScript"
+                />
+                <img
+                  src="/icons/nodejs.svg"
+                  alt="Node.js"
+                  height="32"
+                  title="Node.js"
+                />
+              </div>
+              <div className="tech-stack d-flex justify-content-center justify-content-md-end gap-4">
+                <img
+                  src="/icons/express.svg"
+                  alt="Express"
+                  height="32"
+                  title="Express"
+                />
+                <img
+                  src="/icons/postgresql.svg"
+                  alt="PostgreSQL"
+                  height="32"
+                  title="PostgreSQL"
+                />
+                <img
+                  src="/icons/vercel.svg"
+                  alt="Vercel"
+                  height="28"
+                  title="Vercel"
+                />
+              </div>
             </div>
-
-
-
-        </div>
+          </div>
           <hr className="footer-divider my-4" />
           <p className="text-center text-white-50 small mb-0">
-            © {new Date().getFullYear()} Cipher PvP. All rights reserved.
+            © {new Date().getFullYear()} Cipher. All rights reserved.
           </p>
         </div>
       </div>
