@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { Link } from "react-router-dom";
 import "./Landing.css";
 import Navbar from "../components/Navbar";
 
@@ -224,6 +225,12 @@ export default function CharacterStats() {
       <div className="position-relative z-2 text-white d-flex flex-column px-4" style={{ minHeight: "100vh" }}>
         {/* Top nav */}
         <Navbar />
+
+        <div className="w-100 d-flex justify-content-end mb-3 pe-4">
+          <Link to="/hsr" className="btn back-button-glass">
+            ← Back
+          </Link>
+        </div>
 
         {/* cycle info */}
         <div className="text-center my-4">
