@@ -31,11 +31,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = (redirectTo?: string) => {
-    const target = redirectTo || window.location.pathname + window.location.search;
-    const encoded = encodeURIComponent(target);
-    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?redirect=${encoded}`;
+  const login = () => {
+    const currentUrl = window.location.pathname + window.location.search;
+    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?redirect=${encodeURIComponent(currentUrl)}`;
   };
+
 
 
   const logout = async () => {
