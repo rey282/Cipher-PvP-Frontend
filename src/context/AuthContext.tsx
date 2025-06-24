@@ -37,14 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /* ─── Start Discord OAuth ─── */
-  const login = () => {
-    const fullUrl = window.location.origin + window.location.pathname + window.location.search;
+  const login = (redirectTo = window.location.pathname + window.location.search) => {
+    // Persist the page we want to return to
+    localStorage.setItem("redirectAfterLogin", redirectTo);
 
-    // Optional: you can keep this as a fallback
-    localStorage.setItem("redirectAfterLogin", fullUrl);
-
-    // Pass the full URL as a query param
-    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?redirect=${encodeURIComponent(fullUrl)}`;
+    // Hit backend route that starts Passport’s Discord strategy
+    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord`;
   };
 
   /* ─── Logout ─── */
