@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Landing.css";
-import { useAuth } from "../context/AuthContext";
+import Navbar from "../components/Navbar";
+
 let lastErrorMsg = '';
 let lastErrorTime = 0;
 const ERROR_SUPPRESS_MS = 3000;
@@ -48,7 +49,6 @@ export default function PlayerStats() {
   const [season, setSeason] = useState("players");
 
   const navigate = useNavigate();
-  const { user, loading, login, logout } = useAuth();
 
   useEffect(() => {
     setLoading(true);
@@ -120,48 +120,7 @@ export default function PlayerStats() {
         }}
       />
       <div className="position-relative z-2 text-white d-flex flex-column px-4" style={{ minHeight: "100vh" }}>
-        <nav className="w-100 py-3 d-flex justify-content-between align-items-center">
-          <button onClick={() => navigate("/hsr")} className="border-0 bg-transparent p-0">
-            <span className="logo-title">Cipher</span>
-          </button>
-
-          {loading ? (
-            <span className="text-white-50">…</span>
-          ) : user ? (
-            <div className="dropdown">
-              <button
-                className="btn p-0 border-0 bg-transparent"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-                style={{ outline: 'none' }}
-              >
-                <img
-                  src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
-                  alt="avatar"
-                  className="rounded-circle"
-                  width={36}
-                  height={36}
-                />
-              </button>
-
-              <ul className="dropdown-menu dropdown-menu-end glass-dropdown p-2 text-center" style={{ minWidth: '180px' }}>
-                <li className="mb-1 text-white fw-bold" style={{ fontSize: '0.9rem' }}>
-                  {user.username}
-                </li>
-                <li><hr className="dropdown-divider" /></li>
-                <li>
-                  <button className="dropdown-item text-danger" onClick={logout}>
-                    Logout
-                  </button>
-                </li>
-              </ul>
-            </div>
-          ) : (
-            <button className="btn back-button-glass" onClick={login}>
-              Login with Discord
-            </button>
-          )}
-        </nav>
+        <Navbar />
 
       <div className="w-100 d-flex justify-content-end mb-3 pe-4">
         <Link to="/hsr" className="btn back-button-glass">

@@ -32,16 +32,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = () => {
-    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord`;
+    const currentUrl = window.location.href;
+    const encoded = encodeURIComponent(currentUrl);
+    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?redirect=${encoded}`;
   };
 
+
   const logout = async () => {
-    await fetch(`${import.meta.env.VITE_API_BASE}/auth/logout`, {
+    await fetch(`${import.meta.env.VITE_API_BASE}/logout`, {
       method: "POST",
       credentials: "include",
     });
     setUser(null);
+    window.location.href = "https://cipher.uno"; 
   };
+
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>

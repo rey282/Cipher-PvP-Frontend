@@ -1,7 +1,7 @@
-import { Link } from "react-router-dom";
 import { useEffect } from "react";
 import "./Landing.css";
 import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";
 
 export default function TermsOfService() {
   const navigate = useNavigate();
@@ -20,13 +20,9 @@ export default function TermsOfService() {
     >
       <div className="position-relative z-2 text-white px-4 py-4">
         {/* --- top nav (identical to PlayerProfile) --- */}
-        <nav className="w-100 d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-          <Link to="/" className="text-decoration-none">
-            <span className="logo-title d-inline-flex align-items-center gap-2">
-              Cipher
-            </span>
-          </Link>
-          <button
+        <Navbar />
+
+        <button
             className="btn btn-outline-light btn-sm back-button-glass"
             onClick={() => {
               navigate("/");
@@ -35,7 +31,6 @@ export default function TermsOfService() {
           >
             ← Back
           </button>
-        </nav>
 
         <div className="container">
           {/* -------- page heading -------- */}
