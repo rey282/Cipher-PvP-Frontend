@@ -50,7 +50,10 @@ export default function Navbar() {
           </ul>
         </div>
       ) : (
-        <button className="btn back-button-glass" onClick={login}>
+        <button
+          className="btn back-button-glass"
+          onClick={() => login(window.location.pathname + window.location.search)}
+        >
           Login with Discord
         </button>
       )}

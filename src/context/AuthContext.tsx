@@ -11,7 +11,7 @@ type User = {
 type AuthContextType = {
   user: User | null;
   loading: boolean;
-  login(): void;
+  login(redirectTo?: string): void;
   logout(): Promise<void>;
 };
 
@@ -31,13 +31,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = () => {
-    const currentUrl = window.location.href;
-    const encoded = encodeURIComponent(currentUrl);
-    window.location.href = `${
-      import.meta.env.VITE_API_BASE
-    }/auth/discord?redirect=${encoded}`;
+  const login = (redirectTo?: string) => {
+    const target = redirectTo || window.location.pathname + window.location.search;
+    const encoded = encodeURIComponent(target);
+    window.location.href = `${import.meta.env.VITE_API_BASE}/auth/discord?redirect=${encoded}`;
   };
+
 
   const logout = async () => {
     await fetch(`${import.meta.env.VITE_API_BASE}/auth/logout`, {
