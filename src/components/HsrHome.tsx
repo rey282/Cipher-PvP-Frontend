@@ -55,16 +55,16 @@ export default function HsrHome() {
       url: "/players",
     },
     {
+      title: "Roster Setup",
+      desc: "Build your own character roster",
+      btnText: "View Roster",
+      url: "https://draft.cipher.uno/player",
+    },
+    {
       title: "Tournament Archive",
       desc: "Past tournaments and results",
       btnText: "Coming soon...",
       url: null, // disabled
-    },
-    {
-      title: "Roster Setup",
-      desc: "Build your own custom team roster",
-      btnText: "Coming soon...",
-      url: null,
     },
     {
       title: "Balance Cost",
