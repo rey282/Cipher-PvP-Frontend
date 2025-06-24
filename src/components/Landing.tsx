@@ -84,7 +84,10 @@ export default function Landing() {
       )}
       <div className="overlay" />
 
-      <div className="content d-flex flex-column min-vh-100">
+      <div
+        className="position-relative z-2 text-white d-flex flex-column px-4"
+        style={{ minHeight: "100vh" }}
+      >
         {/* ───────── top nav ───────── */}
         <Navbar />
 

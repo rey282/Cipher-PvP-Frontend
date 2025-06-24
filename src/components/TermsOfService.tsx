@@ -22,7 +22,8 @@ export default function TermsOfService() {
         {/* --- top nav (identical to PlayerProfile) --- */}
         <Navbar />
 
-        <button
+        <div className="d-flex justify-content-end px-4 mt-2">
+          <button
             className="btn btn-outline-light btn-sm back-button-glass"
             onClick={() => {
               navigate("/");
@@ -31,6 +32,7 @@ export default function TermsOfService() {
           >
             ← Back
           </button>
+        </div>
 
         <div className="container">
           {/* -------- page heading -------- */}
