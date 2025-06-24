@@ -46,7 +46,7 @@ export default function HsrHome() {
       title: "Matches",
       desc: "Play and track your match history",
       btnText: "Play now",
-      url: "https://yanyanpb.vercel.app/draft",
+      url: "https://draft.cipher.uno/draft",
     },
     {
       title: "Player Statistics",
@@ -103,7 +103,10 @@ export default function HsrHome() {
       >
         {/* navbar */}
         <nav className="w-100 py-3 d-flex justify-content-between align-items-center">
-          <button onClick={handleBackToLanding} className="border-0 bg-transparent p-0">
+          <button
+            onClick={handleBackToLanding}
+            className="border-0 bg-transparent p-0"
+          >
             <span className="logo-title">Cipher</span>
           </button>
 
@@ -115,7 +118,7 @@ export default function HsrHome() {
                 className="btn p-0 border-0 bg-transparent"
                 data-bs-toggle="dropdown"
                 aria-expanded="false"
-                style={{ outline: 'none' }}
+                style={{ outline: "none" }}
               >
                 <img
                   src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
@@ -126,13 +129,24 @@ export default function HsrHome() {
                 />
               </button>
 
-              <ul className="dropdown-menu dropdown-menu-end glass-dropdown p-2 text-center" style={{ minWidth: '180px' }}>
-                <li className="mb-1 text-white fw-bold" style={{ fontSize: '0.9rem' }}>
+              <ul
+                className="dropdown-menu dropdown-menu-end glass-dropdown p-2 text-center"
+                style={{ minWidth: "180px" }}
+              >
+                <li
+                  className="mb-1 text-white fw-bold"
+                  style={{ fontSize: "0.9rem" }}
+                >
                   {user.username}
                 </li>
-                <li><hr className="dropdown-divider" /></li>
                 <li>
-                  <button className="dropdown-item text-danger" onClick={logout}>
+                  <hr className="dropdown-divider" />
+                </li>
+                <li>
+                  <button
+                    className="dropdown-item text-danger"
+                    onClick={logout}
+                  >
                     Logout
                   </button>
                 </li>
@@ -183,7 +197,10 @@ export default function HsrHome() {
                         </Link>
                       )
                     ) : (
-                      <button className="btn btn-outline-light btn-sm mt-3" disabled>
+                      <button
+                        className="btn btn-outline-light btn-sm mt-3"
+                        disabled
+                      >
                         {btnText}
                       </button>
                     )}
