@@ -25,6 +25,7 @@ type Summary = {
   mostPicked: CountChar[];
   mostBanned: CountChar[];
   mostBannedAgainst: CountChar[];
+  mostPrebanned: CountChar[];
   bestWinRate: WRChar[];
   worstWinRate: WRChar[];
   fifteenCycles: number;
@@ -258,14 +259,16 @@ export default function PlayerProfile() {
       ? {
           picked: "Most Picked Characters",
           banned: "Most Bans You Placed",
-          bannedVs: "MostBans Used Against You",
+          bannedVs: "Most Bans Used Against You",
+          prebanned: "Most Prebans & Joker",
           best: "Best Performing Characters",
-          worst: "Worse Performing Characters",
+          worst: "Worst Performing Characters",
         }
       : {
           picked: "Most Picked Characters While on Team",
           banned: "Most Bans Your Team Placed",
-          bannedVs: "MostBans Opponents Placed vs Your Team",
+          bannedVs: "Most Bans Opponents Placed vs Your Team",
+          prebanned: "Most Prebans & Joker",
           best: "Best Performing Characters While on Their Team",
           worst: "Worst Performing Characters While on Their Team",
         };
@@ -437,6 +440,7 @@ export default function PlayerProfile() {
                   summary!.mostBannedAgainst,
                   "count"
                 )}
+                {renderList(titles.prebanned, summary!.mostPrebanned, "count")}
                 {renderList(titles.best, summary!.bestWinRate, "wr")}
                 {renderList(titles.worst, summary!.worstWinRate, "wr")}
 
