@@ -53,19 +53,18 @@ export default function HsrHome() {
       url: "https://draft.cipher.uno/player",
     },
     {
+      title: "Balance Cost",
+      desc: "View current character costs",
+      btnText: "View Balance Cost",
+      url: "/balance-cost",
+    },
+    {
       title: "Tournament Archive",
       desc: "Past tournaments and results",
       btnText: "Coming soon...",
       url: null, // disabled
     },
-    {
-      title: "Balance Cost",
-      desc: "View current character costs",
-      btnText: "Coming soon...",
-      url: null,
-    },
-  ];
-
+  ]
   /* ───────── markup ───────── */
   return (
     <div

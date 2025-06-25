@@ -11,6 +11,7 @@ const PlayerProfile = lazy(() => import("./components/PlayerProfile"));
 const TermsOfService = lazy(() => import("./components/TermsOfService"));
 const AdminPage = lazy(() => import("./components/AdminPage"));
 const BalancePage = lazy(() => import("./components/BalancePage"));
+const BalancePreview = lazy(() => import("./components/BalancePreview")); 
 
 function PageWithFooter({ children }: { children: React.ReactNode }) {
   return (
@@ -18,7 +19,6 @@ function PageWithFooter({ children }: { children: React.ReactNode }) {
       {children}
       <Footer />
 
-      {/* Back to top button */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         className="btn btn-light position-fixed"
@@ -46,7 +46,6 @@ function PageWithFooter({ children }: { children: React.ReactNode }) {
   );
 }
 
-
 export default function App() {
   return (
     <Routes>
@@ -58,7 +57,6 @@ export default function App() {
           </PageWithFooter>
         }
       />
-
       <Route
         path="/hsr"
         element={
@@ -129,7 +127,16 @@ export default function App() {
           </Suspense>
         }
       />
-
+      <Route
+        path="/balance-cost"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <BalancePreview />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
       <Route
         path="*"
         element={
@@ -137,15 +144,12 @@ export default function App() {
             className="d-flex flex-column"
             style={{ minHeight: "100vh", background: "#000" }}
           >
-            {/* Centered 404 content */}
             <div className="flex-grow-1 d-flex flex-column justify-content-center align-items-center text-white text-center">
               <h4 className="mb-4">Where you trying to go?</h4>
               <Link to="/" className="btn back-button-glass">
                 ← Back to Home
               </Link>
             </div>
-
-            {/* Footer at the bottom */}
             <Footer />
           </div>
         }
