@@ -8,14 +8,14 @@ import "./Landing.css";
 type CharacterCost = {
   id: string;
   name: string;
-  costs: number[]; // E0–E6
+  costs: number[]; // E0-E6
 };
 
 export default function BalanceView() {
   const [chars, setChars] = useState<CharacterCost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [leaving] = useState(false); // keep the same fade-logic API
+  const [leaving] = useState(false); // for your page-fade css
 
   /* ───────── fetch balance once ───────── */
   useEffect(() => {
@@ -25,34 +25,23 @@ export default function BalanceView() {
       .then((r) => r.json())
       .then((j: { characters: CharacterCost[] }) => {
         setChars(j.characters);
-        setLoading(false);
+        setLoad(false);
       })
       .catch((err) => {
         console.error(err);
         setError("Failed to load balance sheet.");
-        setLoading(false);
+        setLoad(false);
       });
   }, []);
 
-  /* ───────── loading / error states ───────── */
-  if (loading) {
+  /* ───────── loading / error ───────── */
+  if (loading || error) {
     return (
       <div
         className="d-flex justify-content-center align-items-center text-white"
         style={{ minHeight: "100vh", background: "#000" }}
       >
-        <p>Loading balance cost…</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div
-        className="d-flex justify-content-center align-items-center text-white"
-        style={{ minHeight: "100vh", background: "#000" }}
-      >
-        <p>{error}</p>
+        <p>{error || "Loading balance cost…"}</p>
       </div>
     );
   }
@@ -102,9 +91,9 @@ export default function BalanceView() {
             Balance Cost
           </h2>
 
-          {/* table – identical styling to admin page but inputs replaced by plain text */}
+          {/* ── responsive scrollable wrapper ── */}
           <div
-            className="mx-auto mb-4"
+            className="w-100 mb-4"
             style={{
               background: "rgba(0,0,0,0.5)",
               backdropFilter: "blur(6px)",
@@ -112,10 +101,13 @@ export default function BalanceView() {
               borderRadius: "12px",
               boxShadow: "0 0 18px rgba(0,0,0,0.4)",
               padding: "1rem",
-              maxWidth: 1000,
+              maxWidth: "100%",
+              overflowX: "auto",
+              WebkitOverflowScrolling: "touch",
             }}
           >
-            <div className="table-responsive">
+            {/* give the table room to breathe on narrow screens */}
+            <div style={{ minWidth: "950px" }}>
               <table
                 className="table table-hover mb-0 text-white text-center"
                 style={{
@@ -135,17 +127,21 @@ export default function BalanceView() {
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
-                        maxWidth: "220px",
+                        minWidth: "160px",
+                        fontSize: "0.9rem",
                       }}
                     >
                       Character
                     </th>
+
                     {[...Array(7)].map((_, i) => (
                       <th
                         key={i}
                         style={{
                           backgroundColor: "transparent",
                           color: "#fff",
+                          fontSize: "0.85rem",
+                          minWidth: "85px", // each E-column fixed width
                         }}
                       >
                         E{i}
@@ -156,6 +152,7 @@ export default function BalanceView() {
                 <tbody>
                   {chars.map((c) => (
                     <tr key={c.id}>
+                      {/* name cell */}
                       <td
                         className="text-start"
                         title={c.name}
@@ -165,17 +162,22 @@ export default function BalanceView() {
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          maxWidth: "220px",
+                          minWidth: "160px",
+                          fontSize: "0.9rem",
                         }}
                       >
                         {c.name}
                       </td>
-                      {c.costs.map((v, ei) => (
+
+                      {/* cost cells */}
+                      {c.costs.map((v, idx) => (
                         <td
-                          key={ei}
+                          key={idx}
                           style={{
                             backgroundColor: "transparent",
                             color: "#fff",
+                            fontSize: "0.85rem",
+                            minWidth: "85px",
                           }}
                         >
                           {v}

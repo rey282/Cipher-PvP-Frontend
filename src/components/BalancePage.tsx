@@ -18,8 +18,8 @@ export default function BalancePage() {
   const [leaving] = useState(false);
 
   const [chars, setChars] = useState<CharacterCost[]>([]);
-  const [originalChars, setOriginalChars] = useState<CharacterCost[]>([]);
-  const [changesSummary, setChangesSummary] = useState<string[]>([]);
+  const [originalChars, setOrig] = useState<CharacterCost[]>([]);
+  const [changesSummary, setSumm] = useState<string[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export default function BalancePage() {
       .then((r) => r.json())
       .then((j: { characters: CharacterCost[] }) => {
         setChars(j.characters);
-        setOriginalChars(j.characters); // baseline for diff
+        setOrig(j.characters);
         setFetched(true);
       })
       .catch((err) => {
@@ -84,22 +84,19 @@ export default function BalancePage() {
     setSaving(true);
     setError(null);
     try {
-      const payload = { characters: chars };
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE}/api/admin/balance`,
         {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ characters: chars }),
         }
       );
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
 
-      /* build diff summary */
-      const diff = compareCosts(originalChars, chars);
-      setChangesSummary(diff);
-      setOriginalChars(chars); // reset baseline
+      setSumm(compareCosts(originalChars, chars));
+      setOrig(chars);
       alert("Balance costs updated successfully!");
     } catch (err: any) {
       console.error(err);
@@ -117,9 +114,8 @@ export default function BalancePage() {
       .map((r) => r.map((v) => `"${v}"`).join(","))
       .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
+    a.href = URL.createObjectURL(blob);
     a.download = "balance_costs.csv";
     document.body.appendChild(a);
     a.click();
@@ -175,6 +171,7 @@ export default function BalancePage() {
         </div>
 
         <div className="container py-4 animate__animated animate__fadeInUp">
+          {/* header / buttons */}
           <div
             className="d-flex flex-column align-items-center gap-2 mb-4"
             style={{ paddingLeft: "10rem", paddingRight: "10rem" }}
@@ -198,7 +195,7 @@ export default function BalancePage() {
               </div>
             </div>
 
-            {/* summary of changes */}
+            {/* summary toggle */}
             {changesSummary.length > 0 && (
               <div className="text-center mt-2">
                 <button
@@ -233,7 +230,7 @@ export default function BalancePage() {
 
           {error && <div className="alert alert-danger py-2">{error}</div>}
 
-          {/* table (unchanged) */}
+          {/* ───────── scrollable table wrapper ───────── */}
           <div
             className="mx-auto mb-4"
             style={{
@@ -243,10 +240,12 @@ export default function BalancePage() {
               borderRadius: "12px",
               boxShadow: "0 0 18px rgba(0,0,0,0.4)",
               padding: "1rem",
-              maxWidth: 1000,
+              maxWidth: "100%",
+              overflowX: "auto",
+              WebkitOverflowScrolling: "touch",
             }}
           >
-            <div className="table-responsive">
+            <div style={{ minWidth: "950px" }}>
               <table
                 className="table table-hover mb-0 text-white text-center"
                 style={{
@@ -266,7 +265,7 @@ export default function BalancePage() {
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
-                        maxWidth: "220px",
+                        minWidth: "160px",
                       }}
                     >
                       Character
@@ -277,6 +276,7 @@ export default function BalancePage() {
                         style={{
                           backgroundColor: "transparent",
                           color: "#fff",
+                          minWidth: "85px",
                         }}
                       >
                         E{i}
@@ -287,6 +287,7 @@ export default function BalancePage() {
                 <tbody>
                   {chars.map((c, ci) => (
                     <tr key={c.id}>
+                      {/* name cell */}
                       <td
                         className="text-start"
                         title={c.name}
@@ -296,13 +297,22 @@ export default function BalancePage() {
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          maxWidth: "220px",
+                          minWidth: "160px",
                         }}
                       >
                         {c.name}
                       </td>
+
+                      {/* editable cost cells */}
                       {c.costs.map((v, ei) => (
-                        <td key={ei} style={{ backgroundColor: "transparent" }}>
+                        <td
+                          key={ei}
+                          style={{
+                            backgroundColor: "transparent",
+                            color: "#fff",
+                            minWidth: "85px",
+                          }}
+                        >
                           <input
                             type="number"
                             min={0}
