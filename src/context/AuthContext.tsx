@@ -7,6 +7,7 @@ type User = {
   discriminator: string;
   avatar?: string | null;
   name?: string;
+  isAdmin?: boolean;
 };
 
 type AuthContextType = {
@@ -63,7 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const dest = localStorage.getItem("redirectAfterLogin");
       if (dest) {
         localStorage.removeItem("redirectAfterLogin");
-        navigate(dest, { replace: true });
+
+        if (dest.startsWith("http")) {
+          window.location.href = dest;
+        } else {
+          navigate(dest, { replace: true });
+        }
       }
     }
   }, [loading, user, navigate]);
