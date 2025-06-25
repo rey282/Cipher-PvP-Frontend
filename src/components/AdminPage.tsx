@@ -28,10 +28,10 @@ export default function AdminPage() {
       url: "/admin/balance",
     },
     {
-      title: "Coming Soon",
-      desc: "Coming Soon",
-      btnText: "Coming soon...",
-      url: null,
+      title: "Match History",
+      desc: "View and rollback submitted matches",
+      btnText: "Review Matches",
+      url: "/admin/match-history",
     },
     {
       title: "Coming Soon",

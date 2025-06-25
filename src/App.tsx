@@ -11,7 +11,8 @@ const PlayerProfile = lazy(() => import("./components/PlayerProfile"));
 const TermsOfService = lazy(() => import("./components/TermsOfService"));
 const AdminPage = lazy(() => import("./components/AdminPage"));
 const BalancePage = lazy(() => import("./components/BalancePage"));
-const BalancePreview = lazy(() => import("./components/BalancePreview")); 
+const BalancePreview = lazy(() => import("./components/BalancePreview"));
+const AdminMatchHistory = lazy(() => import("./components/AdminMatchHistory"));
 
 function PageWithFooter({ children }: { children: React.ReactNode }) {
   return (
@@ -123,6 +124,16 @@ export default function App() {
           <Suspense fallback={<LoadingSplash />}>
             <PageWithFooter>
               <BalancePage />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/admin/match-history"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <AdminMatchHistory />
             </PageWithFooter>
           </Suspense>
         }
