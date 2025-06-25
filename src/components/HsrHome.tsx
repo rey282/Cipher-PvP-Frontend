@@ -64,7 +64,7 @@ export default function HsrHome() {
       btnText: "Coming soon...",
       url: null, // disabled
     },
-  ]
+  ];
   /* ───────── markup ───────── */
   return (
     <div
@@ -116,7 +116,7 @@ export default function HsrHome() {
                       url.startsWith("http") ? (
                         <a
                           href={url}
-                          target="_blank"
+                          target="_self"
                           rel="noopener noreferrer"
                           className="btn btn-outline-light btn-sm mt-3"
                           onClick={() => window.scrollTo(0, 0)}
