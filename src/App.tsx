@@ -1,8 +1,7 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Link } from "react-router-dom";
 import { lazy, Suspense } from "react";
-import Landing from "./components/Landing";
 import Footer from "./components/Footer";
-import { Link } from "react-router-dom";
+import Landing from "./components/Landing";
 
 const HsrHome = lazy(() => import("./components/HsrHome"));
 const CharacterStats = lazy(() => import("./components/CharacterStats"));
@@ -12,85 +11,119 @@ const TermsOfService = lazy(() => import("./components/TermsOfService"));
 const AdminPage = lazy(() => import("./components/AdminPage"));
 const BalancePage = lazy(() => import("./components/BalancePage"));
 
-export default function App() {
+function PageWithFooter({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route
-          path="/hsr"
-          element={
-            <Suspense fallback={<Loading />}>
+      {children}
+      <Footer />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <PageWithFooter>
+            <Landing />
+          </PageWithFooter>
+        }
+      />
+
+      <Route
+        path="/hsr"
+        element={
+          <Suspense fallback={<Loading />}>
+            <PageWithFooter>
               <HsrHome />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/characters"
-          element={
-            <Suspense fallback={<Loading />}>
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/characters"
+        element={
+          <Suspense fallback={<Loading />}>
+            <PageWithFooter>
               <CharacterStats />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/players"
-          element={
-            <Suspense fallback={<Loading />}>
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/players"
+        element={
+          <Suspense fallback={<Loading />}>
+            <PageWithFooter>
               <PlayerStats />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/player/:id"
-          element={
-            <Suspense fallback={<Loading />}>
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/player/:id"
+        element={
+          <Suspense fallback={<Loading />}>
+            <PageWithFooter>
               <PlayerProfile />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/terms"
-          element={
-            <Suspense fallback={<Loading />}>
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/terms"
+        element={
+          <Suspense fallback={<Loading />}>
+            <PageWithFooter>
               <TermsOfService />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <Suspense fallback={<Loading />}>
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <Suspense fallback={<Loading />}>
+            <PageWithFooter>
               <AdminPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="/admin/balance"
-          element={
-            <Suspense fallback={<Loading />}>
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/admin/balance"
+        element={
+          <Suspense fallback={<Loading />}>
+            <PageWithFooter>
               <BalancePage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="*"
-          element={
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
+      <Route
+        path="*"
+        element={
+          <PageWithFooter>
             <div className="text-center text-white py-5">
               <h4 className="mb-4">Where you trying to go?</h4>
               <Link to="/" className="btn back-button-glass">
                 ← Back to Home
               </Link>
             </div>
-          }
-        />
-      </Routes>
-
-      <Footer />
-    </>
+          </PageWithFooter>
+        }
+      />
+    </Routes>
   );
 }
 
 function Loading() {
-  return <div className="text-white text-center py-5">Loading…</div>;
+  return (
+    <div className="text-white text-center py-5" style={{ minHeight: "100vh" }}>
+      Loading…
+    </div>
+  );
 }
