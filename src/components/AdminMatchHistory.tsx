@@ -227,14 +227,24 @@ export default function AdminMatchHistory() {
               </p>
             </>
           )}
-          {/* search bar */}
+          {/* Search Box  */}
           <div className="d-flex justify-content-center mb-4">
             <input
+              type="text"
+              placeholder="Search by player name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="form-control bg-dark text-white border-light"
-              style={{ maxWidth: 320 }}
-              placeholder="Search by player name…"
+              style={{
+                width: "100%",
+                maxWidth: 500,
+                padding: "0.75rem 1rem",
+                backgroundColor: "rgba(0,0,0,0.5)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: "10px",
+                color: "#fff",
+                backdropFilter: "blur(6px)",
+                outline: "none",
+              }}
             />
           </div>
           {/* heading with page info */}
