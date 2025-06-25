@@ -9,7 +9,7 @@ import "./Landing.css";
 type CharacterCost = {
   id: string;
   name: string;
-  costs: number[]; // index 0-6 (E0–E6)
+  costs: number[]; // E0-E6
 };
 
 export default function BalancePage() {
@@ -18,16 +18,19 @@ export default function BalancePage() {
   const [leaving] = useState(false);
 
   const [chars, setChars] = useState<CharacterCost[]>([]);
+  const [originalChars, setOriginalChars] = useState<CharacterCost[]>([]);
+  const [changesSummary, setChangesSummary] = useState<string[]>([]);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetched, setFetched] = useState(false);
 
-  // ───────── guard ─────────
+  /* ───────── guard ───────── */
   useEffect(() => {
     if (!loading && (!user || !user.isAdmin)) navigate("/");
   }, [user, loading, navigate]);
 
-  // ───────── fetch from own backend ─────────
+  /* ───────── fetch balance ───────── */
   useEffect(() => {
     if (loading || fetched) return;
 
@@ -37,6 +40,7 @@ export default function BalancePage() {
       .then((r) => r.json())
       .then((j: { characters: CharacterCost[] }) => {
         setChars(j.characters);
+        setOriginalChars(j.characters); // baseline for diff
         setFetched(true);
       })
       .catch((err) => {
@@ -45,7 +49,7 @@ export default function BalancePage() {
       });
   }, [loading, fetched]);
 
-  // ───────── update cost value ─────────
+  /* ───────── helpers ───────── */
   const updateCost = (charIdx: number, eidolon: number, value: number) => {
     setChars((prev) =>
       prev.map((c, i) =>
@@ -59,20 +63,28 @@ export default function BalancePage() {
     );
   };
 
-  // ───────── submit edits ─────────
+  const compareCosts = (before: CharacterCost[], after: CharacterCost[]) => {
+    const out: string[] = [];
+    for (const oldChar of before) {
+      const newChar = after.find((c) => c.id === oldChar.id);
+      if (!newChar) continue;
+      for (let e = 0; e < 7; e++) {
+        if (oldChar.costs[e] !== newChar.costs[e]) {
+          out.push(
+            `${oldChar.name} E${e} ${oldChar.costs[e]} → ${newChar.costs[e]}`
+          );
+        }
+      }
+    }
+    return out;
+  };
+
+  /* ───────── save ───────── */
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-
     try {
-      const payload = {
-        characters: chars.map((c) => ({
-          id: c.id,
-          name: c.name,
-          costs: c.costs,
-        })),
-      };
-
+      const payload = { characters: chars };
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE}/api/admin/balance`,
         {
@@ -82,35 +94,39 @@ export default function BalancePage() {
           body: JSON.stringify(payload),
         }
       );
-
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
+
+      /* build diff summary */
+      const diff = compareCosts(originalChars, chars);
+      setChangesSummary(diff);
+      setOriginalChars(chars); // reset baseline
       alert("Balance costs updated successfully!");
     } catch (err: any) {
       console.error(err);
-      setError(err.message);
+      setError(err.message || "Save failed");
     } finally {
       setSaving(false);
     }
   };
 
+  /* ───────── CSV export ───────── */
   const exportToCSV = () => {
     const headers = ["Character", "E0", "E1", "E2", "E3", "E4", "E5", "E6"];
-    const rows = chars.map((char) => [char.name, ...char.costs]);
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map((v) => `"${v}"`).join(","))
+    const rows = chars.map((c) => [c.name, ...c.costs]);
+    const csv = [headers, ...rows]
+      .map((r) => r.map((v) => `"${v}"`).join(","))
       .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "balance_costs.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "balance_costs.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
-  // ───────── render ─────────
+  /* ───────── render ───────── */
   if (loading || !user) {
     return (
       <div
@@ -160,21 +176,64 @@ export default function BalancePage() {
 
         <div className="container py-4 animate__animated animate__fadeInUp">
           <div
-            className="d-flex justify-content-between align-items-center mb-4"
+            className="d-flex flex-column align-items-center gap-2 mb-4"
             style={{ paddingLeft: "10rem", paddingRight: "10rem" }}
           >
-            <h2 className="fw-bold mb-0">Balance Cost</h2>
-            <button
-              className="back-button-glass btn btn-sm"
-              onClick={exportToCSV}
-            >
-              Import to CSV
-            </button>
+            <div className="d-flex justify-content-between w-100 align-items-center">
+              <h2 className="fw-bold mb-0">Balance Cost</h2>
+              <div className="d-flex gap-2">
+                <button
+                  className="back-button-glass btn"
+                  disabled={saving}
+                  onClick={handleSave}
+                >
+                  {saving ? "Saving…" : "Save All Changes"}
+                </button>
+                <button
+                  className="back-button-glass btn btn-sm"
+                  onClick={exportToCSV}
+                >
+                  Import to CSV
+                </button>
+              </div>
+            </div>
+
+            {/* summary of changes */}
+            {changesSummary.length > 0 && (
+              <div className="text-center mt-2">
+                <button
+                  className="back-button-glass btn btn-sm"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#changesSummary"
+                  aria-expanded="false"
+                  aria-controls="changesSummary"
+                >
+                  Show Summary of Changes
+                </button>
+                <div className="collapse mt-2" id="changesSummary">
+                  <div
+                    className="text-white text-start p-3 mt-2 rounded"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.05)",
+                      maxWidth: 800,
+                      margin: "0 auto",
+                    }}
+                  >
+                    <ul className="mb-0 small">
+                      {changesSummary.map((line, idx) => (
+                        <li key={idx}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {error && <div className="alert alert-danger py-2">{error}</div>}
 
-          {/* table */}
+          {/* table (unchanged) */}
           <div
             className="mx-auto mb-4"
             style={{
@@ -264,16 +323,6 @@ export default function BalancePage() {
                 </tbody>
               </table>
             </div>
-          </div>
-
-          <div className="text-center mt-3">
-            <button
-              className="back-button-glass btn"
-              disabled={saving}
-              onClick={handleSave}
-            >
-              {saving ? "Saving…" : "Save All Changes"}
-            </button>
           </div>
         </div>
       </div>
