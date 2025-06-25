@@ -61,7 +61,10 @@ export default function AdminPage() {
 
   if (loading || !user) {
     return (
-      <div className="text-white text-center py-5">
+      <div
+        className="d-flex justify-content-center align-items-center text-white"
+        style={{ minHeight: "100vh", background: "#000" }}
+      >
         <p>Checking admin access…</p>
       </div>
     );

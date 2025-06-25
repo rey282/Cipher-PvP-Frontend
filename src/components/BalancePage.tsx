@@ -22,7 +22,6 @@ export default function BalancePage() {
   const [error, setError] = useState<string | null>(null);
   const [fetched, setFetched] = useState(false);
 
-
   // ───────── guard ─────────
   useEffect(() => {
     if (!loading && (!user || !user.isAdmin)) navigate("/");
@@ -51,7 +50,10 @@ export default function BalancePage() {
     setChars((prev) =>
       prev.map((c, i) =>
         i === charIdx
-          ? { ...c, costs: c.costs.map((v, ei) => (ei === eidolon ? value : v)) }
+          ? {
+              ...c,
+              costs: c.costs.map((v, ei) => (ei === eidolon ? value : v)),
+            }
           : c
       )
     );
@@ -71,12 +73,15 @@ export default function BalancePage() {
         })),
       };
 
-      const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/admin/balance`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/admin/balance`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
       alert("Balance costs updated successfully!");
@@ -91,10 +96,9 @@ export default function BalancePage() {
   const exportToCSV = () => {
     const headers = ["Character", "E0", "E1", "E2", "E3", "E4", "E5", "E6"];
     const rows = chars.map((char) => [char.name, ...char.costs]);
-    const csvContent =
-        [headers, ...rows]
-        .map((row) => row.map((v) => `"${v}"`).join(","))
-        .join("\n");
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((v) => `"${v}"`).join(","))
+      .join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -104,13 +108,15 @@ export default function BalancePage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    };
-
+  };
 
   // ───────── render ─────────
   if (loading || !user) {
     return (
-      <div className="text-white text-center py-5">
+      <div
+        className="d-flex justify-content-center align-items-center text-white"
+        style={{ minHeight: "100vh", background: "#000" }}
+      >
         <p>Checking admin access…</p>
       </div>
     );
@@ -153,124 +159,122 @@ export default function BalancePage() {
         </div>
 
         <div className="container py-4 animate__animated animate__fadeInUp">
-            <div
-                className="d-flex justify-content-between align-items-center mb-4"
-                style={{ paddingLeft: "10rem", paddingRight: "10rem" }}
-                >
-                <h2 className="fw-bold mb-0">Balance Cost</h2>
-                <button
-                    className="back-button-glass btn btn-sm"
-                    onClick={exportToCSV}
-                >
-                    Import to CSV
-                </button>
-                </div>
+          <div
+            className="d-flex justify-content-between align-items-center mb-4"
+            style={{ paddingLeft: "10rem", paddingRight: "10rem" }}
+          >
+            <h2 className="fw-bold mb-0">Balance Cost</h2>
+            <button
+              className="back-button-glass btn btn-sm"
+              onClick={exportToCSV}
+            >
+              Import to CSV
+            </button>
+          </div>
 
-          {error && (
-            <div className="alert alert-danger py-2">{error}</div>
-          )}
+          {error && <div className="alert alert-danger py-2">{error}</div>}
 
           {/* table */}
           <div
             className="mx-auto mb-4"
             style={{
-                background: "rgba(0,0,0,0.5)",
-                backdropFilter: "blur(6px)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "12px",
-                boxShadow: "0 0 18px rgba(0,0,0,0.4)",
-                padding: "1rem",
-                maxWidth: 1000,
+              background: "rgba(0,0,0,0.5)",
+              backdropFilter: "blur(6px)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "12px",
+              boxShadow: "0 0 18px rgba(0,0,0,0.4)",
+              padding: "1rem",
+              maxWidth: 1000,
             }}
-            >
+          >
             <div className="table-responsive">
-                <table
+              <table
                 className="table table-hover mb-0 text-white text-center"
                 style={{
-                    backgroundColor: "transparent",
-                    color: "white",
-                    tableLayout: "fixed",
-                    width: "100%",
+                  backgroundColor: "transparent",
+                  color: "white",
+                  tableLayout: "fixed",
+                  width: "100%",
                 }}
-                >
+              >
                 <thead>
-                    <tr>
+                  <tr>
                     <th
-                        className="text-start"
-                        style={{
+                      className="text-start"
+                      style={{
                         backgroundColor: "transparent",
                         color: "#fff",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         maxWidth: "220px",
-                        }}
+                      }}
                     >
-                        Character
+                      Character
                     </th>
                     {[...Array(7)].map((_, i) => (
-                        <th
+                      <th
                         key={i}
                         style={{
-                            backgroundColor: "transparent",
-                            color: "#fff",
+                          backgroundColor: "transparent",
+                          color: "#fff",
                         }}
-                        >
+                      >
                         E{i}
-                        </th>
+                      </th>
                     ))}
-                    </tr>
+                  </tr>
                 </thead>
                 <tbody>
-                    {chars.map((c, ci) => (
+                  {chars.map((c, ci) => (
                     <tr key={c.id}>
-                        <td
+                      <td
                         className="text-start"
                         title={c.name}
                         style={{
-                            backgroundColor: "transparent",
-                            color: "#fff",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            maxWidth: "220px",
+                          backgroundColor: "transparent",
+                          color: "#fff",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          maxWidth: "220px",
                         }}
-                        >
+                      >
                         {c.name}
-                        </td>
-                        {c.costs.map((v, ei) => (
+                      </td>
+                      {c.costs.map((v, ei) => (
                         <td key={ei} style={{ backgroundColor: "transparent" }}>
-                            <input
+                          <input
                             type="number"
                             min={0}
                             className="form-control form-control-sm bg-dark text-white border-secondary"
                             style={{ width: 80 }}
                             value={v}
                             onChange={(e) => {
-                                const val = Number(e.target.value);
-                                if (!Number.isNaN(val) && val >= 0) {
-                                    updateCost(ci, ei, val);
-                                }
-                                }}
-                            />
+                              const val = Number(e.target.value);
+                              if (!Number.isNaN(val) && val >= 0) {
+                                updateCost(ci, ei, val);
+                              }
+                            }}
+                          />
                         </td>
-                        ))}
+                      ))}
                     </tr>
-                    ))}
+                  ))}
                 </tbody>
-                </table>
+              </table>
             </div>
-            </div>
+          </div>
 
           <div className="text-center mt-3">
             <button
-                className="back-button-glass btn"
-                disabled={saving}
-                onClick={handleSave}
+              className="back-button-glass btn"
+              disabled={saving}
+              onClick={handleSave}
             >
-                {saving ? "Saving…" : "Save All Changes"}
+              {saving ? "Saving…" : "Save All Changes"}
             </button>
-            </div>
+          </div>
         </div>
       </div>
     </div>

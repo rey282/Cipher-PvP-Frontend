@@ -106,14 +106,23 @@ export default function App() {
       <Route
         path="*"
         element={
-          <PageWithFooter>
-            <div className="text-center text-white py-5">
+          <div
+            className="d-flex flex-column"
+            style={{ minHeight: "100vh", background: "#000" }}
+          >
+            {/* Centered 404 content */}
+            <div
+              className="flex-grow-1 d-flex flex-column justify-content-center align-items-center text-white text-center"
+            >
               <h4 className="mb-4">Where you trying to go?</h4>
               <Link to="/" className="btn back-button-glass">
                 ← Back to Home
               </Link>
             </div>
-          </PageWithFooter>
+
+            {/* Footer at the bottom */}
+            <Footer />
+          </div>
         }
       />
     </Routes>
