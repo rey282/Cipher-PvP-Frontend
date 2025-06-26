@@ -74,9 +74,30 @@ export default function AdminMatchHistory() {
   const [lastFetched, setLF] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [reloadKey, setReloadKey] = useState(0); // 👈 added
+  const [reloadKey, setReloadKey] = useState(0);
   const limit = 10; // 10 per page
   const scrollTopRef = useRef<HTMLDivElement>(null);
+
+  const confirmRollback = async (matchId: number) => {
+    try {
+      const r = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/admin/rollback/${matchId}`,
+        { method: "POST", credentials: "include" }
+      );
+      if (!r.ok) {
+        const msg = await r.json().catch(() => ({}));
+        throw new Error(msg.error || `Status ${r.status}`);
+      }
+
+      setMatches((m) => m.filter((x) => x.matchId !== matchId));
+      setTotal((t) => t - 1);
+      toast.success("✅ Rollback successful.");
+    } catch (err: any) {
+      console.error("rollback failed:", err.message);
+      toast.error(`❌ Rollback failed: ${err.message}`);
+    }
+  };
+  
 
   const handleRefresh = async () => {
     try {
@@ -146,27 +167,37 @@ export default function AdminMatchHistory() {
   }, [page]);
 
   /* rollback helper */
-  const rollbackMatch = async (mid: number) => {
-    if (!window.confirm(`Are you sure want to rollback match #${mid}?`)) return;
-
-    try {
-      const r = await fetch(
-        `${import.meta.env.VITE_API_BASE}/api/admin/rollback/${mid}`,
-        { method: "POST", credentials: "include" }
-      );
-      if (!r.ok) {
-        const msg = await r.json().catch(() => ({}));
-        throw new Error(msg.error || `Status ${r.status}`);
+  const rollbackMatch = (matchId: number) => {
+    toast.info(
+      ({ closeToast }) => (
+        <div className="d-flex flex-column gap-2">
+          <span>Are you sure you want to rollback match #{matchId}?</span>
+          <div className="d-flex justify-content-end gap-2 mt-2">
+            <button className="btn btn-sm btn-secondary" onClick={closeToast}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-sm btn-danger"
+              onClick={() => {
+                closeToast();
+                confirmRollback(matchId);
+              }}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      ),
+      {
+        position: "top-center",
+        autoClose: false,
+        closeOnClick: false,
+        draggable: false,
+        closeButton: false,
       }
-
-      setMatches((m) => m.filter((x) => x.matchId !== mid));
-      setTotal((t) => t - 1);
-      toast.success("✅ Rollback successful.");
-    } catch (err: any) {
-      console.error("rollback failed:", err.message);
-      toast.error(`❌ Rollback failed: ${err.message}`);
-    }
+    );
   };
+  
 
   /* search filter (client-side) */
   const filtered = matches.filter((m) => {

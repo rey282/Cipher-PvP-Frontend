@@ -361,7 +361,14 @@ export default function CharacterStats() {
                 <select
                   className="form-select bg-dark text-white border-light"
                   value={sortBy}
-                  onChange={(e) => setSort(e.target.value as any)}
+                  onChange={(e) => {
+                    const selected = e.target
+                      .value as (typeof sortOptions)[number]["value"];
+                    setSort(selected);
+                    if (selected !== sortBy) {
+                      setSortAsc(selected === "name"); // A→Z for name, Descending for all others
+                    }
+                  }}
                 >
                   {sortOptions.map((o) => (
                     <option key={o.value} value={o.value}>

@@ -6,21 +6,21 @@ export default function Navbar() {
   const { user, loading, login, logout } = useAuth();
 
   return (
-    <nav className="w-100 px-4 py-3 d-flex justify-content-between align-items-center">
+    <nav className="w-100 px-2 py-3 d-flex justify-content-between align-items-center">
       <a href="/" className="logo-title d-inline-block">
         <img
           src="/cipher.png"
           alt="Cipher Logo"
           style={{
-            width: "180px", // or whatever width you want
-            height: "auto", // keeps aspect ratio
+            width: "160px",
+            height: "auto",
             objectFit: "contain",
             verticalAlign: "middle",
           }}
         />
       </a>
 
-      <div className="d-flex align-items-center gap-4">
+      <div className="d-flex align-items-center gap-3">
         {/* Admin link (only if user is admin) */}
         {user?.isAdmin && (
           <Link
@@ -71,6 +71,11 @@ export default function Navbar() {
               )}
               <li>
                 <hr className="dropdown-divider" />
+              </li>
+              <li>
+                <Link to="/profile" className="dropdown-item text-white">
+                  Profile
+                </Link>
               </li>
               <li>
                 <button className="dropdown-item text-danger" onClick={logout}>

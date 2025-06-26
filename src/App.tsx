@@ -6,16 +6,19 @@ import LoadingSplash from "./components/LoadingSplash";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+/* ─────────── Lazy-loaded pages ─────────── */
 const HsrHome = lazy(() => import("./components/HsrHome"));
 const CharacterStats = lazy(() => import("./components/CharacterStats"));
 const PlayerStats = lazy(() => import("./components/PlayerStats"));
 const PlayerProfile = lazy(() => import("./components/PlayerProfile"));
+const Profile = lazy(() => import("./components/Profile")); // your own profile
 const TermsOfService = lazy(() => import("./components/TermsOfService"));
 const AdminPage = lazy(() => import("./components/AdminPage"));
 const BalancePage = lazy(() => import("./components/BalancePage"));
 const BalancePreview = lazy(() => import("./components/BalancePreview"));
 const AdminMatchHistory = lazy(() => import("./components/AdminMatchHistory"));
 
+/* ─────────── Layout wrapper (footer + toast + back-to-top) ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
   return (
     <>
@@ -58,9 +61,11 @@ function PageWithFooter({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ─────────── App router ─────────── */
 export default function App() {
   return (
     <Routes>
+      {/* Landing */}
       <Route
         path="/"
         element={
@@ -69,6 +74,8 @@ export default function App() {
           </PageWithFooter>
         }
       />
+
+      {/* Game home */}
       <Route
         path="/hsr"
         element={
@@ -79,6 +86,8 @@ export default function App() {
           </Suspense>
         }
       />
+
+      {/* Character stats */}
       <Route
         path="/characters"
         element={
@@ -89,6 +98,8 @@ export default function App() {
           </Suspense>
         }
       />
+
+      {/* Player ranking table */}
       <Route
         path="/players"
         element={
@@ -99,6 +110,8 @@ export default function App() {
           </Suspense>
         }
       />
+
+      {/* Public player performance page */}
       <Route
         path="/player/:id"
         element={
@@ -109,6 +122,31 @@ export default function App() {
           </Suspense>
         }
       />
+
+      {/* Private logged-in profile page */}
+      <Route
+        path="/profile"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <Profile />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
+      <Route
+        path="/profile/:id"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <Profile />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
+      {/* Terms of Service */}
       <Route
         path="/terms"
         element={
@@ -119,6 +157,8 @@ export default function App() {
           </Suspense>
         }
       />
+
+      {/* Admin pages */}
       <Route
         path="/admin"
         element={
@@ -149,6 +189,8 @@ export default function App() {
           </Suspense>
         }
       />
+
+      {/* Public read-only balance preview */}
       <Route
         path="/balance-cost"
         element={
@@ -159,6 +201,8 @@ export default function App() {
           </Suspense>
         }
       />
+
+      {/* 404 fallback */}
       <Route
         path="*"
         element={
