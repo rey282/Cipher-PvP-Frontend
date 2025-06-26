@@ -21,6 +21,7 @@ type WRChar = CharTiny & { wins: number; games: number; winRate: number };
 type Summary = {
   playerId: string;
   username: string;
+  global_name?: string;
   avatar?: string | null;
   mostPicked: CountChar[];
   mostBanned: CountChar[];
@@ -97,7 +98,6 @@ export default function PlayerProfile() {
   const [summaryLoading, setSumLoad] = useState(false);
   const [error, setError] = useState(false);
   const [total, setTotal] = useState(0);
-
 
   /* pagination */
   const [page, setPage] = useState(0);
@@ -315,7 +315,7 @@ export default function PlayerProfile() {
               />
             )}
             <h1 className="display-5 fw-bold text-center mb-1">
-              Player Summary: {summary?.username}
+              Player Summary: {summary?.global_name || summary?.username}
             </h1>
           </div>
           {season && (

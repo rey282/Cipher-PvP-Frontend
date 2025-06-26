@@ -23,6 +23,7 @@ type Player = {
   elo: number;
   games_played: number;
   win_rate: number;
+  global_name?: string;
 };
 
 type ApiResponse = {

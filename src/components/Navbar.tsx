@@ -14,13 +14,13 @@ export default function Navbar() {
       <div className="d-flex align-items-center gap-4">
         {/* Admin link (only if user is admin) */}
         {user?.isAdmin && (
-        <Link
-          to="/admin"
-          className="admin-link fw-semibold text-decoration-none"
-        >
-          Admin
-        </Link>
-      )}
+          <Link
+            to="/admin"
+            className="admin-link fw-semibold text-decoration-none"
+          >
+            Admin
+          </Link>
+        )}
 
         {/* Avatar / Login button */}
         {loading ? (
@@ -46,10 +46,23 @@ export default function Navbar() {
               className="dropdown-menu dropdown-menu-end glass-dropdown p-2 text-center"
               style={{ minWidth: "180px" }}
             >
-              <li className="mb-1 text-white fw-bold" style={{ fontSize: "0.9rem" }}>
-                {user.username}
+              <li
+                className="mb-1 text-white fw-bold"
+                style={{ fontSize: "0.9rem" }}
+              >
+                {user.global_name || user.username}
               </li>
-              <li><hr className="dropdown-divider" /></li>
+              {user.global_name && (
+                <li
+                  className="mb-2 text-white-50"
+                  style={{ fontSize: "0.8rem" }}
+                >
+                  @{user.username}
+                </li>
+              )}
+              <li>
+                <hr className="dropdown-divider" />
+              </li>
               <li>
                 <button className="dropdown-item text-danger" onClick={logout}>
                   Logout
