@@ -15,46 +15,35 @@ export default function AdminPage() {
     }
   }, [user, loading, navigate]);
 
-  const cards: {
-    title: string;
-    desc: string;
-    btnText: string;
-    url: string | null;
-  }[] = [
+  const cards = [
     {
       title: "Balance Cost Changes",
       desc: "Adjust cost values for each character and Eidolon",
-      btnText: "Cost update",
       url: "/admin/balance",
     },
     {
       title: "Match History",
       desc: "View and rollback submitted matches",
-      btnText: "Review Matches",
       url: "/admin/match-history",
     },
     {
       title: "Coming Soon",
       desc: "Coming Soon",
-      btnText: "Coming soon...",
       url: null,
     },
     {
       title: "Coming Soon",
       desc: "Coming Soon",
-      btnText: "Coming soon...",
       url: null,
     },
     {
       title: "Coming Soon",
       desc: "Coming Soon",
-      btnText: "Coming soon...",
       url: null,
     },
     {
       title: "Coming Soon",
       desc: "Coming Soon",
-      btnText: "Coming soon...",
       url: null,
     },
   ];
@@ -96,7 +85,6 @@ export default function AdminPage() {
         className="position-relative z-2 text-white d-flex flex-column px-4"
         style={{ minHeight: "100vh" }}
       >
-        {/* navbar */}
         <Navbar />
 
         {/* back button */}
@@ -108,73 +96,70 @@ export default function AdminPage() {
 
         {/* hero */}
         <div className="text-center py-5 animate__animated animate__fadeInDown">
-          <h1 className="display-4 fw-bold mb-3">Admin Dashboard</h1>
-          <p className="lead text-white-50">Welcome, {user.username}!</p>
+          <h1 className="display-4 fw-bold mb-3">Cipher PvP Admin</h1>
+          <p className="lead text-white-50">
+            Welcome, {user.global_name || user.username}!
+          </p>
         </div>
 
         {/* card grid */}
         <div className="container mb-5">
           <div className="row g-4 animate__animated animate__fadeInUp animate__delay-1s">
-            {cards.map(({ title, desc, btnText, url }, i) => (
+            {cards.map(({ title, desc, url }, i) => (
               <div className="col-sm-6 col-lg-4" key={i}>
-                <div className="card bg-dark bg-opacity-75 text-white h-100 shadow">
-                  <div className="card-body d-flex flex-column justify-content-between">
-                    <div>
-                      <h5 className="card-title">{title}</h5>
-                      <p className="card-text">{desc}</p>
-                    </div>
-
-                    {url ? (
-                      url.startsWith("http") ? (
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-outline-light btn-sm mt-3"
-                          onClick={() => window.scrollTo(0, 0)}
-                        >
-                          {btnText}
-                        </a>
-                      ) : (
-                        <Link
-                          to={url}
-                          className="btn btn-outline-light btn-sm mt-3"
-                          onClick={() => window.scrollTo(0, 0)}
-                        >
-                          {btnText}
-                        </Link>
-                      )
-                    ) : (
-                      <button
-                        className="btn btn-outline-light btn-sm mt-3"
-                        disabled
-                      >
-                        {btnText}
-                      </button>
-                    )}
+                {url ? (
+                  url.startsWith("http") ? (
+                    <a
+                      href={url}
+                      target="_self"
+                      rel="noopener noreferrer"
+                      className="feature-card text-decoration-none d-flex flex-column align-items-center justify-content-center text-white link-hover"
+                      onClick={() => window.scrollTo(0, 0)}
+                    >
+                      <div className="feature-title">{title}</div>
+                      <div className="feature-desc text-center">{desc}</div>
+                    </a>
+                  ) : (
+                    <Link
+                      to={url}
+                      className="feature-card text-decoration-none d-flex flex-column align-items-center justify-content-center text-white link-hover"
+                      onClick={() => window.scrollTo(0, 0)}
+                    >
+                      <div className="feature-title">{title}</div>
+                      <div className="feature-desc text-center">{desc}</div>
+                    </Link>
+                  )
+                ) : (
+                  <div className="feature-card text-white text-center disabled-feature d-flex flex-column align-items-center justify-content-center">
+                    <div className="feature-title">{title}</div>
+                    <div className="feature-desc">{desc}</div>
+                    <small className="text-muted">Coming Soon</small>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
-        </div>
-
-        {/* footer */}
-        <div
-          className="text-center mb-4 animate__animated animate__fadeInUp animate__delay-2s"
-          style={{
-            maxWidth: "800px",
-            margin: "0 auto",
-            backgroundColor: "rgba(0,0,0,0.5)",
-            padding: "1rem 2rem",
-            borderRadius: "12px",
-            color: "#fff",
-            backdropFilter: "blur(6px)",
-            border: "1px solid rgba(255,255,255,0.1)",
-          }}
-        >
-          <h5 className="fw-bold mb-2">Admin Notes</h5>
-          <p className="mb-0">Haya is the goat</p>
+          {/* admin notes footer */}
+          <div
+            className="text-center mb-4 mt-5 animate__animated animate__fadeInUp animate__delay-2s px-3"
+            style={{
+              maxWidth: "600px",
+              marginLeft: "auto",
+              marginRight: "auto",
+              backgroundColor: "rgba(0,0,0,0.5)",
+              padding: "1rem 1.5rem",
+              borderRadius: "12px",
+              color: "#fff",
+              backdropFilter: "blur(6px)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <h5 className="fw-bold mb-3">Admin Notes</h5>
+            <p className="mb-2"></p>
+            <p className="mb-2"></p>
+            <p className="mb-2"></p>
+            <p className="mb-0"> Haya is the goat.</p>
+          </div>
         </div>
       </div>
     </div>

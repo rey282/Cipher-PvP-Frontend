@@ -8,7 +8,21 @@ export default function Footer() {
         <div className="row gy-4 align-items-start">
           {/* Brand / Description */}
           <div className="col-12 col-md-4">
-            <h4 className="logo-title">CIPHER PvP</h4>
+            {/* Logo Image */}
+            <a href="/" className="d-inline-block mb-2">
+              <img
+                src="/cipher.png"
+                alt="Cipher Logo"
+                style={{
+                  width: "200px", // or match whatever you use in the navbar
+                  height: "auto",
+                  objectFit: "contain",
+                  verticalAlign: "middle",
+                }}
+              />
+            </a>
+
+            {/* Description */}
             <p className="text-white-50 small mb-3">
               Cipher is a competitive Honkai platform built for stats
               enthusiasts and passionate players.

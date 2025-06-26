@@ -2,10 +2,14 @@ import { useState, useEffect } from "react";
 import "./Landing.css";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import { useAuth } from "../context/AuthContext";
+
 
 export default function HsrHome() {
   /* ───────── page fade logic ───────── */
   const [leaving] = useState(false);
+  const [announcement, setAnnouncement] = useState<string | null>(null);
+  const { user } = useAuth();
 
   /* ───────── Ko-fi floating widget ───────── */
   useEffect(() => {
@@ -24,6 +28,13 @@ export default function HsrHome() {
       }
     };
     document.body.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_BASE}/api/announcement`)
+      .then((res) => res.json())
+      .then((data) => setAnnouncement(data.message))
+      .catch(() => setAnnouncement(null));
   }, []);
 
   /* ───────── data for cards ───────── */
@@ -97,51 +108,56 @@ export default function HsrHome() {
 
         {/* hero */}
         <div className="text-center py-5 animate__animated animate__fadeInDown">
-          <h1 className="display-2 fw-bold mb-4">Welcome to Cipher PvP!</h1>
+          <h1 className="display-4 fw-bold mb-3">Cipher PvP!</h1>
+          {user && (
+            <p className="lead text-white-50">
+              Welcome, {user.global_name || user.username}!
+            </p>
+          )}
         </div>
+        {announcement && (
+          <div className="announcement-banner d-flex align-items-center justify-content-center gap-2">
+            <span role="img" aria-label="alert" style={{ fontSize: "1.3rem" }}>
+              📢
+            </span>
+            <span>{announcement}</span>
+          </div>
+        )}
 
         {/* grid */}
         <div className="container mb-5">
           <div className="row g-4 animate__animated animate__fadeInUp animate__delay-1s">
-            {cards.map(({ title, desc, btnText, url }, i) => (
+            {cards.map(({ title, desc, url }, i) => (
               <div className="col-sm-6 col-lg-4" key={i}>
-                <div className="card bg-dark bg-opacity-75 text-white h-100 shadow">
-                  <div className="card-body d-flex flex-column justify-content-between">
-                    <div>
-                      <h5 className="card-title">{title}</h5>
-                      <p className="card-text">{desc}</p>
-                    </div>
-
-                    {url ? (
-                      url.startsWith("http") ? (
-                        <a
-                          href={url}
-                          target="_self"
-                          rel="noopener noreferrer"
-                          className="btn btn-outline-light btn-sm mt-3"
-                          onClick={() => window.scrollTo(0, 0)}
-                        >
-                          {btnText}
-                        </a>
-                      ) : (
-                        <Link
-                          to={url}
-                          className="btn btn-outline-light btn-sm mt-3"
-                          onClick={() => window.scrollTo(0, 0)}
-                        >
-                          {btnText}
-                        </Link>
-                      )
-                    ) : (
-                      <button
-                        className="btn btn-outline-light btn-sm mt-3"
-                        disabled
-                      >
-                        {btnText}
-                      </button>
-                    )}
+                {url ? (
+                  url.startsWith("http") ? (
+                    <a
+                      href={url}
+                      target="_self"
+                      rel="noopener noreferrer"
+                      className="feature-card text-decoration-none d-flex flex-column align-items-center justify-content-center text-white"
+                      onClick={() => window.scrollTo(0, 0)}
+                    >
+                      <div className="feature-title">{title}</div>
+                      <div className="feature-desc text-center">{desc}</div>
+                    </a>
+                  ) : (
+                    <Link
+                      to={url}
+                      className="feature-card text-decoration-none d-flex flex-column align-items-center justify-content-center text-white"
+                      onClick={() => window.scrollTo(0, 0)}
+                    >
+                      <div className="feature-title">{title}</div>
+                      <div className="feature-desc text-center">{desc}</div>
+                    </Link>
+                  )
+                ) : (
+                  <div className="feature-card text-white text-center disabled-feature d-flex flex-column align-items-center justify-content-center">
+                    <div className="feature-title">{title}</div>
+                    <div className="feature-desc">{desc}</div>
+                    <small className="text-muted">Coming Soon</small>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
@@ -156,12 +172,7 @@ export default function HsrHome() {
             href="https://discord.gg/MHzc5GRDQW"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn"
-            style={{
-              backgroundColor: "#5865F2",
-              color: "#fff",
-              fontWeight: 600,
-            }}
+            className="btn discord-glass-button"
           >
             Join Discord
           </a>

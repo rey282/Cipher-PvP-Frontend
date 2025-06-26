@@ -7,8 +7,17 @@ export default function Navbar() {
 
   return (
     <nav className="w-100 px-4 py-3 d-flex justify-content-between align-items-center">
-      <a href="/" className="logo-title text-decoration-none text-white">
-        Cipher
+      <a href="/" className="logo-title d-inline-block">
+        <img
+          src="/cipher.png"
+          alt="Cipher Logo"
+          style={{
+            width: "180px", // or whatever width you want
+            height: "auto", // keeps aspect ratio
+            objectFit: "contain",
+            verticalAlign: "middle",
+          }}
+        />
       </a>
 
       <div className="d-flex align-items-center gap-4">
