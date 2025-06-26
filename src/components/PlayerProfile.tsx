@@ -1,18 +1,8 @@
 import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
-let lastErrorMsg = "";
-let lastErrorTime = 0;
-const ERROR_SUPPRESS_MS = 3000;
+import { toast } from "react-toastify";
 
-function safeAlert(msg: string) {
-  const now = Date.now();
-  if (msg !== lastErrorMsg || now - lastErrorTime > ERROR_SUPPRESS_MS) {
-    alert(msg);
-    lastErrorMsg = msg;
-    lastErrorTime = now;
-  }
-}
 /* ---------- types ---------- */
 type CharTiny = { code: string; name?: string; image_url?: string };
 type CountChar = CharTiny & { count: number };
@@ -112,6 +102,8 @@ export default function PlayerProfile() {
 
   const matchHistoryRef = useRef<HTMLDivElement>(null);
 
+  const SUMMARY_TOAST_ID = "summary-fetch-failed";
+
   /* ---------- fetch static char list once ---------- */
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`, {
@@ -135,7 +127,11 @@ export default function PlayerProfile() {
       })
       .catch((err) => {
         console.error("Character fetch failed:", err.message);
-        safeAlert(err.message);
+        toast.warn(`⚠️ ${err.message}`, {
+          position: "top-right",
+          autoClose: 3000,
+          toastId: SUMMARY_TOAST_ID,
+        });
       });
   }, []);
 
@@ -168,7 +164,11 @@ export default function PlayerProfile() {
       })
       .catch((err) => {
         console.error("Summary fetch failed:", err.message);
-        safeAlert(err.message);
+        toast.warn(`⚠️ ${err.message}`, {
+          position: "top-right",
+          autoClose: 3000,
+          toastId: SUMMARY_TOAST_ID,
+        });
         setError(true);
       })
       .finally(() => {
@@ -206,7 +206,11 @@ export default function PlayerProfile() {
       })
       .catch((err) => {
         console.error("Match fetch failed:", err.message);
-        safeAlert(err.message);
+        toast.warn(`⚠️ ${err.message}`, {
+          position: "top-right",
+          autoClose: 3000,
+          toastId: "summary-fetch-failed",
+        });
         setError(true);
       });
   }, [id, season, matchMode, page]);

@@ -3,6 +3,8 @@ import { useEffect, useState, useLayoutEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
+
 
 /* ───────── types ───────── */
 type AdminMatch = {
@@ -146,6 +148,7 @@ export default function AdminMatchHistory() {
   /* rollback helper */
   const rollbackMatch = async (mid: number) => {
     if (!window.confirm(`Are you sure want to rollback match #${mid}?`)) return;
+
     try {
       const r = await fetch(
         `${import.meta.env.VITE_API_BASE}/api/admin/rollback/${mid}`,
@@ -155,13 +158,13 @@ export default function AdminMatchHistory() {
         const msg = await r.json().catch(() => ({}));
         throw new Error(msg.error || `Status ${r.status}`);
       }
-      /* remove locally and refetch page if needed */
+
       setMatches((m) => m.filter((x) => x.matchId !== mid));
       setTotal((t) => t - 1);
-      alert("Rollback successful.");
+      toast.success("✅ Rollback successful.");
     } catch (err: any) {
       console.error("rollback failed:", err.message);
-      alert("Rollback failed: " + err.message);
+      toast.error(`❌ Rollback failed: ${err.message}`);
     }
   };
 

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 type User = {
   id: string;
@@ -18,15 +19,13 @@ type AuthContextType = {
   logout(): Promise<void>;
 };
 
-/* ---------- context ---------- */
 const AuthContext = createContext<AuthContextType | null>(null);
 export const useAuth = () => useContext(AuthContext)!;
 
-/* ---------- provider ---------- */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate(); // ⬅️
+  const navigate = useNavigate();
 
   /* ─── Check session on load ─── */
   useEffect(() => {
@@ -34,15 +33,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       credentials: "include",
     })
       .then((res) => res.json())
-      .then((data) => setUser(data.user ?? null))
+      .then((data) => {
+        const newUser = data.user ?? null;
+        setUser(newUser);
+
+        // ✅ Show welcome toast if not shown in this session
+        if (newUser && !sessionStorage.getItem("welcomed")) {
+          sessionStorage.setItem("welcomed", "true");
+          const name = newUser.global_name || newUser.username;
+          toast.success(`Welcome, ${name}!`);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
   /* ─── Start Discord OAuth ─── */
   const login = (redirectTo = window.location.href) => {
     localStorage.setItem("redirectAfterLogin", redirectTo);
-
-    // ✅ include ?redirect= in backend call
     const authUrl = `${
       import.meta.env.VITE_API_BASE
     }/auth/discord?redirect=${encodeURIComponent(redirectTo)}`;

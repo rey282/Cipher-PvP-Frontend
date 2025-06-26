@@ -3,6 +3,8 @@ import { lazy, Suspense } from "react";
 import Footer from "./components/Footer";
 import Landing from "./components/Landing";
 import LoadingSplash from "./components/LoadingSplash";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const HsrHome = lazy(() => import("./components/HsrHome"));
 const CharacterStats = lazy(() => import("./components/CharacterStats"));
@@ -19,6 +21,15 @@ function PageWithFooter({ children }: { children: React.ReactNode }) {
     <>
       {children}
       <Footer />
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover
+        draggable
+        style={{ marginTop: "80px" }}
+      />
 
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}

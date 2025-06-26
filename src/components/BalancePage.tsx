@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import "./Landing.css";
+import { toast } from "react-toastify";
 
 /* ---------- types ---------- */
 type CharacterCost = {
@@ -97,10 +98,10 @@ export default function BalancePage() {
 
       setSumm(compareCosts(originalChars, chars));
       setOrig(chars);
-      alert("Balance costs updated successfully!");
+      toast.success("✅ Balance costs updated successfully!");
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Save failed");
+      toast.error(err.message || "❌ Save failed");
     } finally {
       setSaving(false);
     }

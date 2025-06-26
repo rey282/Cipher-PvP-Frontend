@@ -1,20 +1,8 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./Landing.css";
 import Navbar from "../components/Navbar";
-
-let lastErrorMsg = '';
-let lastErrorTime = 0;
-const ERROR_SUPPRESS_MS = 3000;
-
-function safeAlert(msg: string) {
-  const now = Date.now();
-  if (msg !== lastErrorMsg || now - lastErrorTime > ERROR_SUPPRESS_MS) {
-    alert(msg);
-    lastErrorMsg = msg;
-    lastErrorTime = now;
-  }
-}
+import { toast } from "react-toastify";
 
 /* ---------- types ---------- */
 type EidolonTuple = { uses: number; wins: number };
@@ -162,12 +150,14 @@ export default function CharacterStats() {
         : `${import.meta.env.VITE_API_BASE}/api/characters?cycle=${cycle}`;
 
     fetch(url, {
-      credentials: "include", 
+      credentials: "include",
     })
       .then(async (r) => {
         const json = await r.json().catch(() => ({}));
         if (!r.ok) {
-          throw new Error(json.error || `Request failed with status ${r.status}`);
+          throw new Error(
+            json.error || `Request failed with status ${r.status}`
+          );
         }
         return json;
       })
@@ -177,7 +167,10 @@ export default function CharacterStats() {
       })
       .catch((err) => {
         console.error("Character stats fetch failed:", err.message);
-        safeAlert(err.message);
+        toast.warn(`⚠️ ${err.message}`, {
+          position: "top-right",
+          autoClose: 3000,
+        });
       })
       .finally(() => setLoading(false));
   }, [cycle]);
@@ -222,7 +215,10 @@ export default function CharacterStats() {
           zIndex: 1,
         }}
       />
-      <div className="position-relative z-2 text-white d-flex flex-column px-4" style={{ minHeight: "100vh" }}>
+      <div
+        className="position-relative z-2 text-white d-flex flex-column px-4"
+        style={{ minHeight: "100vh" }}
+      >
         {/* Top nav */}
         <Navbar />
 

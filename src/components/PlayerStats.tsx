@@ -2,19 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Landing.css";
 import Navbar from "../components/Navbar";
-
-let lastErrorMsg = '';
-let lastErrorTime = 0;
-const ERROR_SUPPRESS_MS = 3000;
-
-function safeAlert(msg: string) {
-  const now = Date.now();
-  if (msg !== lastErrorMsg || now - lastErrorTime > ERROR_SUPPRESS_MS) {
-    alert(msg);
-    lastErrorMsg = msg;
-    lastErrorTime = now;
-  }
-}
+import { toast } from "react-toastify";
 
 type Player = {
   discord_id: string;
@@ -59,7 +47,7 @@ export default function PlayerStats() {
         : `${import.meta.env.VITE_API_BASE}/api/players?season=${season}`;
 
     fetch(url, {
-      credentials: "include", 
+      credentials: "include",
     })
       .then(async (r) => {
         if (!r.ok) {
@@ -79,9 +67,13 @@ export default function PlayerStats() {
       })
       .catch((err) => {
         console.error("Player fetch failed:", err.message);
-        safeAlert(err.message);
+        toast.warn(`⚠️ ${err.message}`, {
+          position: "top-right",
+          autoClose: 3000,
+        });
         setLoading(false);
       });
+      
   }, [season]);
 
 
