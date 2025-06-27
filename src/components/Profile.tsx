@@ -95,7 +95,7 @@ export default function Profile() {
     if (!targetId) return;
 
     Promise.all([
-      fetch(`${import.meta.env.VITE_YANYAN_URL}/getUsers`).then((r) =>
+      fetch(`${import.meta.env.VITE_API_BASE}/api/roster/users`).then((r) =>
         r.json()
       ),
       fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`).then(
