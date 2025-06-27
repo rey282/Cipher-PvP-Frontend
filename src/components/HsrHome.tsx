@@ -133,7 +133,7 @@ export default function HsrHome() {
                   url.startsWith("http") ? (
                     <a
                       href={url}
-                      target="_self"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="feature-card text-decoration-none d-flex flex-column align-items-center justify-content-center text-white"
                       onClick={() => window.scrollTo(0, 0)}

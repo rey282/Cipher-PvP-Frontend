@@ -1,11 +1,12 @@
 // src/pages/Profile.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 import { seasonOptions } from "../data/season";
 import type { SeasonValue } from "../data/season";
+import Modal from "react-bootstrap/Modal";
 
 type Profile = {
   discord_id: string;
@@ -59,7 +60,11 @@ export default function Profile() {
   const [season, setSeason] = useState<SeasonValue>("players");
 
   const [charMap, setCharMap] = useState<Record<string, CharMeta>>({});
-  const [ownedRoster, setOwnedRoster] = useState<Record<string, number>>({}); // id -> eidolon
+  const [ownedRoster, setOwnedRoster] = useState<Record<string, number>>({});
+  const [selectedChar, setSelectedChar] = useState<{ name: string } | null>(
+    null
+  );
+
 
   const MAX_DESC_LEN = 512;
   const tidy = (s: string) => s.trim();
@@ -438,7 +443,9 @@ export default function Profile() {
                       <div
                         key={char.id}
                         title={char.name}
+                        onClick={() => setSelectedChar(char)}
                         style={{
+                          cursor: "pointer",
                           zIndex: 1,
                           width: 64,
                           height: 64,
@@ -450,7 +457,14 @@ export default function Profile() {
                           filter: isOwned
                             ? "none"
                             : "grayscale(100%) brightness(0.4)",
+                          transition: "transform 0.2s",
                         }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.transform = "scale(1.05)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.transform = "scale(1)")
+                        }
                       >
                         <img
                           src={char.image_url}
@@ -481,6 +495,49 @@ export default function Profile() {
                     );
                   })}
               </div>
+
+              <Modal
+                show={!!selectedChar}
+                onHide={() => setSelectedChar(null)}
+                backdropClassName="glass-blur-backdrop"
+                dialogClassName="border-0 m-0"
+                centered
+                animation={false}
+                size="xl"
+                contentClassName="bg-transparent border-0"
+              >
+                <div
+                  onClick={() => setSelectedChar(null)}
+                  className="w-100 h-100 d-flex justify-content-center align-items-center"
+                  style={{
+                    backdropFilter: "blur(12px)",
+                    backgroundColor: "rgba(0,0,0,0.4)",
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    zIndex: 1050,
+                  }}
+                >
+                  {selectedChar && (
+                    <img
+                      onClick={(e) => e.stopPropagation()}
+                      src={`/characters/Character_${selectedChar.name.replace(
+                        / /g,
+                        "_"
+                      )}_Splash_Art.webp`}
+                      alt={selectedChar.name}
+                      style={{
+                        maxWidth: "90%",
+                        maxHeight: "80vh",
+                        objectFit: "contain",
+                        borderRadius: 12,
+                        boxShadow: "0 0 20px rgba(0,0,0,0.5)",
+                      }}
+                    />
+                  )}
+                </div>
+              </Modal>
+
               <div className="d-flex justify-content-end mt-3">
                 <a
                   href="https://draft.cipher.uno/player"
