@@ -387,6 +387,28 @@
   background-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Custom scrollbar for horizontal scroll in Insights page */
+.scroll-container::-webkit-scrollbar {
+  height: 10px;
+}
 
+.scroll-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+  /* dark background */
+  border-radius: 5px;
+}
 
+.scroll-container::-webkit-scrollbar-thumb {
+  background-color: #222;
+  /* darker thumb */
+  border-radius: 5px;
+}
+
+.scroll-container::-webkit-scrollbar-thumb:hover {
+  background-color: #444;
+}
+
+.edit-roster-btn:hover {
+  transform: scale(1.2);
+}
 

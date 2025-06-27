@@ -21,12 +21,9 @@ type ApiResponse = {
 };
 
 const ROWS_PER_PAGE = 10;
-/*----add here for future season---*/
-const seasonOptions = [
-  { label: "All-Time", value: "all" },
-  { label: "Season 2", value: "players" },
-  { label: "Season 1", value: "players_1" },
-] as const;
+
+import { seasonOptions } from "../data/season";
+import type { SeasonValue } from "../data/season";
 
 export default function PlayerStats() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -35,7 +32,7 @@ export default function PlayerStats() {
   const [isLoading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearch] = useState("");
-  const [season, setSeason] = useState("players");
+  const [season, setSeason] = useState<SeasonValue>("players");
 
   const navigate = useNavigate();
 
@@ -112,14 +109,17 @@ export default function PlayerStats() {
           zIndex: 1,
         }}
       />
-      <div className="position-relative z-2 text-white d-flex flex-column px-4" style={{ minHeight: "100vh" }}>
+      <div
+        className="position-relative z-2 text-white d-flex flex-column px-4"
+        style={{ minHeight: "100vh" }}
+      >
         <Navbar />
 
-      <div className="w-100 d-flex justify-content-end mb-3 pe-4">
-        <Link to="/hsr" className="btn back-button-glass">
-          ← Back
-        </Link>
-      </div>
+        <div className="w-100 d-flex justify-content-end mb-3 pe-4">
+          <Link to="/hsr" className="btn back-button-glass">
+            ← Back
+          </Link>
+        </div>
 
         <div className="container">
           <h1 className="display-4 fw-bold text-center mb-3">
@@ -171,7 +171,7 @@ export default function PlayerStats() {
             </div>
             <select
               value={season}
-              onChange={(e) => setSeason(e.target.value)}
+              onChange={(e) => setSeason(e.target.value as SeasonValue)}
               className="form-select"
               style={{
                 width: 160,

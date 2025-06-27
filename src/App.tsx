@@ -17,6 +17,7 @@ const AdminPage = lazy(() => import("./components/AdminPage"));
 const BalancePage = lazy(() => import("./components/BalancePage"));
 const BalancePreview = lazy(() => import("./components/BalancePreview"));
 const AdminMatchHistory = lazy(() => import("./components/AdminMatchHistory"));
+const HsrInsights = lazy(() => import("./components/HsrInsights"));
 
 /* ─────────── Layout wrapper (footer + toast + back-to-top) ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
@@ -82,6 +83,17 @@ export default function App() {
           <Suspense fallback={<LoadingSplash />}>
             <PageWithFooter>
               <HsrHome />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
+      <Route
+        path="/hsr-insights"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <HsrInsights />
             </PageWithFooter>
           </Suspense>
         }

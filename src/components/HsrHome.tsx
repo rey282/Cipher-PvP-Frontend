@@ -70,10 +70,10 @@ export default function HsrHome() {
       url: "/balance-cost",
     },
     {
-      title: "Tournament Archive",
-      desc: "Past tournaments and results",
-      btnText: "Coming soon...",
-      url: null, // disabled
+      title: "Game Insights",
+      desc: "Average cycles, penalties, and match trends",
+      btnText: "View Insights",
+      url: "/hsr-insights",
     },
   ];
   /* ───────── markup ───────── */
