@@ -1,88 +1,143 @@
-// src/components/Profile.tsx
+// src/pages/BalancePage.tsx
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Navbar from "./Navbar";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { toast } from "react-toastify";
+import Navbar from "../components/Navbar";
 import "./Landing.css";
+import { toast } from "react-toastify";
 
-/* ────────── types ────────── */
-type Profile = {
-  discord_id: string;
-  display_name: string;
-  username: string;
-  games_played: number;
-  win_rate: number;
-  description: string | null;
-  banner_url: string | null;
-  color: string | null;
+/* ---------- types ---------- */
+type CharacterCost = {
+  id: string;
+  name: string;
+  costs: number[]; // E0-E6
 };
 
-export default function ProfilePage() {
+export default function BalancePage() {
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [leaving] = useState(false);
 
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
-  const [descInput, setDescInput] = useState("");
-  const [bannerInput, setBannerInput] = useState("");
+  const [chars, setChars] = useState<CharacterCost[]>([]);
+  const [originalChars, setOrig] = useState<CharacterCost[]>([]);
+  const [changesSummary, setSumm] = useState<string[]>([]);
 
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fetched, setFetched] = useState(false);
+
+  /* ───────── guard ───────── */
   useEffect(() => {
-    if (!user) return;
+    if (!loading && (!user || !user.isAdmin)) navigate("/");
+  }, [user, loading, navigate]);
 
-    fetch(`${import.meta.env.VITE_API_BASE}/player/${user.id}`, {
+  /* ───────── fetch balance ───────── */
+  useEffect(() => {
+    if (loading || fetched) return;
+
+    fetch(`${import.meta.env.VITE_API_BASE}/api/balance`, {
       credentials: "include",
     })
       .then((r) => r.json())
-      .then((data) => {
-        setProfile(data);
-        setDescInput(data.description ?? "");
-        setBannerInput(data.banner_url ?? "");
+      .then((j: { characters: CharacterCost[] }) => {
+        setChars(j.characters);
+        setOrig(j.characters);
+        setFetched(true);
       })
-      .catch(() => toast.error("Failed to load profile"))
-      .finally(() => setLoading(false));
-  }, [user]);
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load balance sheet.");
+      });
+  }, [loading, fetched]);
 
-  const handleSave = () => {
-    fetch(`${import.meta.env.VITE_API_BASE}/player/${user?.id}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        description: descInput,
-        banner_url: bannerInput,
-      }),
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error();
-        return r.json();
-      })
-      .then((data) => {
-        setProfile((p) => (p ? { ...p, ...data } : p));
-        toast.success("Profile updated!");
-        setEditMode(false);
-      })
-      .catch(() => toast.error("Update failed"));
+  /* ───────── helpers ───────── */
+  const updateCost = (charIdx: number, eidolon: number, value: number) => {
+    setChars((prev) =>
+      prev.map((c, i) =>
+        i === charIdx
+          ? {
+              ...c,
+              costs: c.costs.map((v, ei) => (ei === eidolon ? value : v)),
+            }
+          : c
+      )
+    );
   };
 
+  const compareCosts = (before: CharacterCost[], after: CharacterCost[]) => {
+    const out: string[] = [];
+    for (const oldChar of before) {
+      const newChar = after.find((c) => c.id === oldChar.id);
+      if (!newChar) continue;
+      for (let e = 0; e < 7; e++) {
+        if (oldChar.costs[e] !== newChar.costs[e]) {
+          out.push(
+            `${oldChar.name} E${e} ${oldChar.costs[e]} → ${newChar.costs[e]}`
+          );
+        }
+      }
+    }
+    return out;
+  };
+
+  /* ───────── save ───────── */
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/admin/balance`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ characters: chars }),
+        }
+      );
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
+
+      setSumm(compareCosts(originalChars, chars));
+      setOrig(chars);
+      toast.success("✅ Balance costs updated successfully!");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "❌ Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* ───────── CSV export ───────── */
+  const exportToCSV = () => {
+    const headers = ["Character", "E0", "E1", "E2", "E3", "E4", "E5", "E6"];
+    const rows = chars.map((c) => [c.name, ...c.costs]);
+    const csv = [headers, ...rows]
+      .map((r) => r.map((v) => `"${v}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "balance_costs.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  /* ───────── render ───────── */
   if (loading || !user) {
     return (
-      <div className="d-flex justify-content-center align-items-center text-white" style={{ minHeight: "100vh", background: "#000" }}>
-        <p>Loading profile…</p>
+      <div
+        className="d-flex justify-content-center align-items-center text-white"
+        style={{ minHeight: "100vh", background: "#000" }}
+      >
+        <p>Checking admin access…</p>
       </div>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <div className="text-center mt-5 text-danger">Profile not found</div>
     );
   }
 
   return (
     <div
-      className="page-fade-in"
+      className={`page-fade-in ${leaving ? "fade-out" : ""}`}
       style={{
         backgroundImage: "url('/background.webp')",
         backgroundSize: "cover",
@@ -102,109 +157,183 @@ export default function ProfilePage() {
         }}
       />
 
-      <div className="position-relative z-2 text-white">
+      {/* content */}
+      <div
+        className="position-relative z-2 text-white d-flex flex-column px-4"
+        style={{ minHeight: "100vh" }}
+      >
         <Navbar />
 
-        {profile.banner_url && (
+        {/* back button */}
+        <div className="w-100 d-flex justify-content-end mb-3 pe-4">
+          <Link to="/admin" className="btn back-button-glass">
+            ← Back
+          </Link>
+        </div>
+
+        <div className="container py-4 animate__animated animate__fadeInUp">
+          {/* header / buttons */}
           <div
-            className="w-100"
-            style={{
-              height: "220px",
-              background: `url(${profile.banner_url}) center/cover no-repeat`,
-            }}
-          />
-        )}
-
-        <div className="container py-4">
-          {/* profile header */}
-          <div className="d-flex align-items-center gap-3 mb-4">
-            <img
-              src={`https://cdn.discordapp.com/avatars/${profile.discord_id}/${user?.avatar}.png?size=128`}
-              alt="avatar"
-              className="rounded-circle"
-              width={96}
-              height={96}
-            />
-            <div>
-              <h2 className="m-0">{profile.display_name}</h2>
-              <small className="text-white-50">@{profile.username}</small>
-            </div>
-            <button
-              className="btn back-button-glass ms-auto"
-              onClick={() => navigate(-1)}
-            >
-              ← Back
-            </button>
-          </div>
-
-          {/* stats */}
-          <div className="row row-cols-2 row-cols-md-4 g-3">
-            <div className="col">
-              <div className="card bg-dark bg-opacity-75 text-center p-3 h-100">
-                <strong>{profile.games_played}</strong>
-                <span className="text-white-50">Matches</span>
+            className="d-flex flex-column align-items-center gap-2 mb-4"
+            style={{ paddingLeft: "10rem", paddingRight: "10rem" }}
+          >
+            <div className="d-flex flex-column flex-md-row justify-content-between w-100 align-items-start align-items-md-center gap-2">
+              <h2 className="fw-bold mb-0">Balance Cost</h2>
+              <div className="d-flex gap-2">
+                <button
+                  className="back-button-glass btn"
+                  disabled={saving}
+                  onClick={handleSave}
+                >
+                  {saving ? "Saving…" : "Save All Changes"}
+                </button>
+                <button
+                  className="back-button-glass btn btn-sm"
+                  onClick={exportToCSV}
+                >
+                  Import to CSV
+                </button>
               </div>
             </div>
-            <div className="col">
-              <div className="card bg-dark bg-opacity-75 text-center p-3 h-100">
-                <strong>{(profile.win_rate * 100).toFixed(1)}%</strong>
-                <span className="text-white-50">Win&nbsp;Rate</span>
-              </div>
-            </div>
-          </div>
 
-          {/* description */}
-          <div className="mt-4 card bg-dark bg-opacity-75 p-3">
-            <h5 className="mb-3">About</h5>
-            {editMode ? (
-              <>
-                <textarea
-                  className="form-control mb-3"
-                  rows={4}
-                  value={descInput}
-                  placeholder="Describe yourself…"
-                  onChange={(e) => setDescInput(e.target.value)}
-                />
-                <input
-                  className="form-control mb-3"
-                  type="url"
-                  value={bannerInput}
-                  placeholder="Banner image / GIF URL"
-                  onChange={(e) => setBannerInput(e.target.value)}
-                />
-                <div className="d-flex gap-2">
-                  <button className="btn btn-success px-4" onClick={handleSave}>
-                    Save
-                  </button>
-                  <button
-                    className="btn btn-outline-secondary"
-                    onClick={() => {
-                      setEditMode(false);
-                      setDescInput(profile.description ?? "");
-                      setBannerInput(profile.banner_url ?? "");
+            {/* summary toggle */}
+            {changesSummary.length > 0 && (
+              <div className="text-center mt-2">
+                <button
+                  className="back-button-glass btn btn-sm"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#changesSummary"
+                  aria-expanded="false"
+                  aria-controls="changesSummary"
+                >
+                  Show Summary of Changes
+                </button>
+                <div className="collapse mt-2" id="changesSummary">
+                  <div
+                    className="text-white text-start p-3 mt-2 rounded"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.05)",
+                      maxWidth: 800,
+                      margin: "0 auto",
                     }}
                   >
-                    Cancel
-                  </button>
+                    <ul className="mb-0 small">
+                      {changesSummary.map((line, idx) => (
+                        <li key={idx}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              </>
-            ) : (
-              <>
-                <p className="mb-2">
-                  {profile.description || (
-                    <span className="text-white-50 fst-italic">
-                      No description
-                    </span>
-                  )}
-                </p>
-                <button
-                  className="btn btn-outline-light btn-sm"
-                  onClick={() => setEditMode(true)}
-                >
-                  Edit
-                </button>
-              </>
+              </div>
             )}
+          </div>
+
+          {error && <div className="alert alert-danger py-2">{error}</div>}
+
+          {/* ───────── scrollable table wrapper ───────── */}
+          <div
+            className="mx-auto mb-4"
+            style={{
+              background: "rgba(0,0,0,0.5)",
+              backdropFilter: "blur(6px)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "12px",
+              boxShadow: "0 0 18px rgba(0,0,0,0.4)",
+              padding: "1rem",
+              maxWidth: "100%",
+              overflowX: "auto",
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            <div style={{ minWidth: "950px" }}>
+              <table
+                className="table table-hover mb-0 text-white text-center"
+                style={{
+                  backgroundColor: "transparent",
+                  color: "white",
+                  tableLayout: "fixed",
+                  width: "100%",
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th
+                      className="text-start"
+                      style={{
+                        backgroundColor: "transparent",
+                        color: "#fff",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        minWidth: "160px",
+                      }}
+                    >
+                      Character
+                    </th>
+                    {[...Array(7)].map((_, i) => (
+                      <th
+                        key={i}
+                        style={{
+                          backgroundColor: "transparent",
+                          color: "#fff",
+                          minWidth: "85px",
+                        }}
+                      >
+                        E{i}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {chars.map((c, ci) => (
+                    <tr key={c.id}>
+                      {/* name cell */}
+                      <td
+                        className="text-start"
+                        title={c.name}
+                        style={{
+                          backgroundColor: "transparent",
+                          color: "#fff",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          minWidth: "160px",
+                        }}
+                      >
+                        {c.name}
+                      </td>
+
+                      {/* editable cost cells */}
+                      {c.costs.map((v, ei) => (
+                        <td
+                          key={ei}
+                          style={{
+                            backgroundColor: "transparent",
+                            color: "#fff",
+                            minWidth: "85px",
+                          }}
+                        >
+                          <input
+                            type="number"
+                            min={0}
+                            className="form-control form-control-sm bg-dark text-white border-secondary"
+                            style={{ width: 80 }}
+                            value={v}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              if (!Number.isNaN(val) && val >= 0) {
+                                updateCost(ci, ei, val);
+                              }
+                            }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

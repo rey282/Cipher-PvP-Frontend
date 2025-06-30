@@ -89,7 +89,16 @@ export default function Navbar() {
             className="btn back-button-glass"
             onClick={() => login(window.location.href)}
           >
-            Login with Discord
+            {
+              <img
+                src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
+                alt="Discord"
+                width={20}
+                height={20}
+                style={{ filter: "brightness(0) saturate(100%) invert(100%)" }}
+              />
+            }{" "}
+            &nbsp; Login with Discord
           </button>
         )}
       </div>
