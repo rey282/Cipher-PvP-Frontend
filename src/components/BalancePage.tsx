@@ -301,6 +301,18 @@ export default function BalancePage() {
                           minWidth: "160px",
                         }}
                       >
+                        <img
+                          src={`https://storage.googleapis.com/hsr-avatar-images/${c.id}.png`}
+                          alt={c.name}
+                          title={c.name}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            objectFit: "cover",
+                            borderRadius: 4,
+                            marginRight: 6,
+                          }}
+                        />
                         {c.name}
                       </td>
 

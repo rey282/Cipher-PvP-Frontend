@@ -164,8 +164,22 @@ export default function BalanceView() {
                           textOverflow: "ellipsis",
                           minWidth: "160px",
                           fontSize: "0.9rem",
+                          display: "flex",
+                          alignItems: "center",
                         }}
                       >
+                        <img
+                          src={`https://storage.googleapis.com/hsr-avatar-images/${c.id}.png`}
+                          alt={c.name}
+                          title={c.name}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            objectFit: "cover",
+                            borderRadius: 4,
+                            marginRight: 6,
+                          }}
+                        />
                         {c.name}
                       </td>
 
