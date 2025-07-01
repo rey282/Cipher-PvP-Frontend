@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 
-
 export default function HsrHome() {
   /* ───────── page fade logic ───────── */
   const [leaving] = useState(false);
@@ -40,22 +39,10 @@ export default function HsrHome() {
   /* ───────── data for cards ───────── */
   const cards = [
     {
-      title: "MOC Statistics",
-      desc: "Track character win rates each MOC cycle",
-      btnText: "View MOC Stats",
-      url: "/characters",
-    },
-    {
-      title: "Matches",
-      desc: "Play and track your match history",
+      title: "Play Now",
+      desc: "Draft and Play Matches",
       btnText: "Play now",
       url: "https://draft.cipher.uno/draft",
-    },
-    {
-      title: "Player Statistics",
-      desc: "View your own win rate, ELO, and history",
-      btnText: "View player stats",
-      url: "/players",
     },
     {
       title: "Roster Setup",
@@ -65,15 +52,27 @@ export default function HsrHome() {
     },
     {
       title: "Balance Cost",
-      desc: "View current character costs",
+      desc: "View current character account costs",
       btnText: "View Balance Cost",
       url: "/balance-cost",
     },
     {
-      title: "Game Insights",
-      desc: "Average cycles, penalties, and match trends",
+      title: "Player Statistics",
+      desc: "View statistics for any player",
+      btnText: "View player stats",
+      url: "/players",
+    },
+    {
+      title: "Season statistics",
+      desc: "View overall statistics for each season",
       btnText: "View Insights",
       url: "/hsr-insights",
+    },
+    {
+      title: "Character Statistics",
+      desc: "All time Character statistics from all moc cycles",
+      btnText: "View MOC Stats",
+      url: "/characters",
     },
   ];
   /* ───────── markup ───────── */
@@ -165,16 +164,26 @@ export default function HsrHome() {
 
         {/* footer with Discord button */}
         <div className="text-center mb-4 animate__animated animate__fadeInUp animate__delay-2s">
-          <p className="mb-3">
-            Join our Discord for updates, feedback, and support!
-          </p>
+          <p className="mb-3">Join our Discord to play!</p>
           <a
             href="https://discord.gg/MHzc5GRDQW"
             target="_blank"
             rel="noopener noreferrer"
             className="btn discord-glass-button"
           >
-            Join Discord
+            {
+              <img
+                src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
+                alt="Discord"
+                width={20}
+                height={20}
+                style={{
+                  filter: "brightness(0) saturate(100%) invert(100%)",
+                  marginBottom: 4,
+                }}
+              />
+            }{" "}
+            &nbsp; Join Discord
           </a>
         </div>
       </div>

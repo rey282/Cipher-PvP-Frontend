@@ -95,7 +95,10 @@ export default function Navbar() {
                 alt="Discord"
                 width={20}
                 height={20}
-                style={{ filter: "brightness(0) saturate(100%) invert(100%)" }}
+                style={{
+                  filter: "brightness(0) saturate(100%) invert(100%)",
+                  marginBottom: 4,
+                }}
               />
             }{" "}
             &nbsp; Login with Discord

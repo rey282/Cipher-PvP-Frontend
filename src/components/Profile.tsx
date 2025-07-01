@@ -69,6 +69,9 @@ export default function Profile() {
   const MAX_DESC_LEN = 512;
   const tidy = (s: string) => s.trim();
 
+  const openPlayer = (id: string) => navigate(`/player/${id}?season=${season}`);
+
+
   useEffect(() => {
     if (!user || !targetId) return;
     setLoading(true);
@@ -300,7 +303,7 @@ export default function Profile() {
             </select>
           </div>
 
-          <div className="row row-cols-2 row-cols-md-4 g-3 mt-4">
+          <div className="row row-cols-2 row-cols-md-5 g-3 mt-4">
             {[
               { label: "Matches", value: games },
               { label: "Win Rate", value: winRate },
@@ -313,6 +316,48 @@ export default function Profile() {
                 </div>
               </div>
             ))}
+
+            {profile.discord_id && (
+              <div className="col">
+                <button
+                  type="button"
+                  className="btn btn-glass-summary w-100 h-100 d-flex flex-column justify-content-center align-items-center shadow-sm"
+                  style={{
+                    backgroundColor: "rgba(0,0,0,0.45)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 12,
+                    color: "#0dcaf0",
+                    cursor: "pointer",
+                    transition:
+                      "background-color 0.25s ease, transform 0.2s ease",
+                    padding: "1rem",
+                    minHeight: "100px",
+                    userSelect: "none",
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                  }}
+                  onClick={() => openPlayer(profile.discord_id)}
+                  onMouseEnter={(e) => {
+                    (
+                      e.currentTarget as HTMLButtonElement
+                    ).style.backgroundColor = "rgba(13,202,240,0.1)";
+                    (e.currentTarget as HTMLButtonElement).style.transform =
+                      "scale(1.05)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (
+                      e.currentTarget as HTMLButtonElement
+                    ).style.backgroundColor = "rgba(0,0,0,0.45)";
+                    (e.currentTarget as HTMLButtonElement).style.transform =
+                      "scale(1)";
+                  }}
+                  title="View Player Summary"
+                >
+                  <strong className="fs-4 mb-1">Summary</strong>
+                  <small className="text-white-50">View Profile Summary</small>
+                </button>
+              </div>
+            )}
           </div>
 
           <div

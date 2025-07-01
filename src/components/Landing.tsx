@@ -145,7 +145,7 @@ export default function Landing() {
                   className="btn angled-btn"
                   onClick={() => gotoLivePage(game.link!)}
                 >
-                  Learn More
+                  Start Now
                 </button>
               ) : (
                 <button className="btn btn-secondary px-4 py-2" disabled>

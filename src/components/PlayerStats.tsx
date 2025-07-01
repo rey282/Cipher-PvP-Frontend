@@ -266,6 +266,17 @@ export default function PlayerStats() {
                           key={p.discord_id}
                           style={{ cursor: "pointer" }}
                           onClick={() => openPlayer(p.discord_id)}
+                          title={`${
+                            p.username || p.nickname || "Unknown"
+                          } details`}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.backgroundColor =
+                              "rgba(255,255,255,0.1)")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.backgroundColor =
+                              "transparent")
+                          }
                         >
                           <td
                             style={{
