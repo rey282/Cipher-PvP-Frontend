@@ -98,7 +98,7 @@ export default function BalancePage() {
 
       setSumm(compareCosts(originalChars, chars));
       setOrig(chars);
-      toast.success("✅ Balance costs updated successfully!");
+      toast.success("Balance costs updated successfully!");
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "❌ Save failed");
@@ -209,20 +209,79 @@ export default function BalancePage() {
                 >
                   Show Summary of Changes
                 </button>
-                <div className="collapse mt-2" id="changesSummary">
-                  <div
-                    className="text-white text-start p-3 mt-2 rounded"
-                    style={{
-                      backgroundColor: "rgba(255,255,255,0.05)",
-                      maxWidth: 800,
-                      margin: "0 auto",
-                    }}
-                  >
-                    <ul className="mb-0 small">
-                      {changesSummary.map((line, idx) => (
-                        <li key={idx}>{line}</li>
-                      ))}
-                    </ul>
+                <div
+                  className="collapse text-white text-start p-3 mt-2 rounded"
+                  id="changesSummary"
+                  style={{
+                    background: "rgba(0, 0, 0, 0.5)",
+                    backdropFilter: "blur(6px)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "12px",
+                    boxShadow: "0 0 18px rgba(0,0,0,0.4)",
+                    maxWidth: "1000px",
+                    margin: "0 auto",
+                  }}
+                >
+                  <div className="row">
+                    {/* Column 1 */}
+                    <div className="col-md-4">
+                      {changesSummary
+                        .slice(0, Math.ceil(changesSummary.length / 3))
+                        .map((line, idx) => (
+                          <div
+                            key={idx}
+                            className="small"
+                            style={{
+                              background: "transparent",
+                              padding: "0.25rem 0.5rem",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {line}
+                          </div>
+                        ))}
+                    </div>
+
+                    {/* Column 2 */}
+                    <div className="col-md-4">
+                      {changesSummary
+                        .slice(
+                          Math.ceil(changesSummary.length / 3),
+                          Math.ceil(changesSummary.length / 3) * 2
+                        )
+                        .map((line, idx) => (
+                          <div
+                            key={idx + Math.ceil(changesSummary.length / 3)}
+                            className="small"
+                            style={{
+                              background: "transparent",
+                              padding: "0.25rem 0.5rem",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {line}
+                          </div>
+                        ))}
+                    </div>
+
+                    {/* Column 3 */}
+                    <div className="col-md-4">
+                      {changesSummary
+                        .slice(Math.ceil(changesSummary.length / 3) * 2)
+                        .map((line, idx) => (
+                          <div
+                            key={idx + Math.ceil(changesSummary.length / 3) * 2}
+                            className="small"
+                            style={{
+                              background: "transparent",
+                              padding: "0.25rem 0.5rem",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {line}
+                          </div>
+                        ))}
+                    </div>
                   </div>
                 </div>
               </div>
