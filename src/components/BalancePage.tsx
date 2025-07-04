@@ -178,7 +178,7 @@ export default function BalancePage() {
             style={{ paddingLeft: "10rem", paddingRight: "10rem" }}
           >
             <div className="d-flex flex-column flex-md-row justify-content-between w-100 align-items-start align-items-md-center gap-2">
-              <h2 className="fw-bold mb-0">Balance Cost</h2>
+              <h2 className="fw-bold mb-0">Cipher Balance Cost</h2>
               <div className="d-flex gap-2">
                 <button
                   className="back-button-glass btn"
