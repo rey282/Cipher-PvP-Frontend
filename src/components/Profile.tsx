@@ -269,8 +269,8 @@ export default function Profile() {
         <Navbar />
         <div className="w-100 d-flex justify-content-end mb-3 pe-4">
           <button
+            onClick={() => navigate(-1)}
             className="btn back-button-glass"
-            onClick={() => navigate("/hsr")}
           >
             ← Back
           </button>

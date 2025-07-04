@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useLayoutEffect } from "react";
-import { Link, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { toast } from "react-toastify";
 
@@ -78,6 +78,7 @@ export default function PlayerProfile() {
   const location = useLocation();
   const query = new URLSearchParams(location.search);
   const season = query.get("season") || "players";
+  const navigate = useNavigate();
 
   const [charMap, setCharMap] = useState<CharMap>({});
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -301,9 +302,12 @@ export default function PlayerProfile() {
         <Navbar />
 
         <div className="w-100 d-flex justify-content-end mb-3 pe-4">
-          <Link to="/players" className="btn back-button-glass">
+          <button
+            onClick={() => navigate(-1)}
+            className="btn back-button-glass"
+          >
             ← Back
-          </Link>
+          </button>
         </div>
 
         <div className="container">

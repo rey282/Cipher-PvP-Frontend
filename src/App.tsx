@@ -11,13 +11,16 @@ const HsrHome = lazy(() => import("./components/HsrHome"));
 const CharacterStats = lazy(() => import("./components/CharacterStats"));
 const PlayerStats = lazy(() => import("./components/PlayerStats"));
 const PlayerProfile = lazy(() => import("./components/PlayerProfile"));
-const Profile = lazy(() => import("./components/Profile")); // your own profile
+const Profile = lazy(() => import("./components/Profile"));
 const TermsOfService = lazy(() => import("./components/TermsOfService"));
 const AdminPage = lazy(() => import("./components/AdminPage"));
 const BalancePage = lazy(() => import("./components/BalancePage"));
 const BalancePreview = lazy(() => import("./components/BalancePreview"));
 const AdminMatchHistory = lazy(() => import("./components/AdminMatchHistory"));
 const HsrInsights = lazy(() => import("./components/HsrInsights"));
+const HsrHome2 = lazy(() => import("./components2/HsrHome2"));
+const BalancePage2 = lazy(() => import("./components2/BalancePage2"));
+const BalancePreview2 = lazy(() => import("./components2/BalancePreview2"));
 
 /* ─────────── Layout wrapper (footer + toast + back-to-top) ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
@@ -83,6 +86,17 @@ export default function App() {
           <Suspense fallback={<LoadingSplash />}>
             <PageWithFooter>
               <HsrHome />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
+      <Route
+        path="/hsr2"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <HsrHome2 />
             </PageWithFooter>
           </Suspense>
         }
@@ -192,6 +206,16 @@ export default function App() {
         }
       />
       <Route
+        path="/admin/cerydra-balance"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <BalancePage2 />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
         path="/admin/match-history"
         element={
           <Suspense fallback={<LoadingSplash />}>
@@ -209,6 +233,16 @@ export default function App() {
           <Suspense fallback={<LoadingSplash />}>
             <PageWithFooter>
               <BalancePreview />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/cerydra-balance-cost"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <BalancePreview2 />
             </PageWithFooter>
           </Suspense>
         }

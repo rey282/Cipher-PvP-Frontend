@@ -1,9 +1,8 @@
-// src/pages/BalancePage.tsx
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
-import "./Landing.css";
+import "../components/Landing.css";
 import { toast } from "react-toastify";
 
 /* ---------- types ---------- */
@@ -13,45 +12,70 @@ type CharacterCost = {
   costs: number[]; // E0-E6
 };
 
-export default function BalancePage() {
+type LightConeCost = {
+  id: string;
+  name: string;
+  costs: number[]; // S1-S5
+  imageUrl: string;
+  subname: string;
+  rarity: string;
+};
+
+export default function BalancePage2() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [leaving] = useState(false);
 
   const [chars, setChars] = useState<CharacterCost[]>([]);
-  const [originalChars, setOrig] = useState<CharacterCost[]>([]);
+  const [cones, setCones] = useState<LightConeCost[]>([]);
+  const [originalChars, setOrigChars] = useState<CharacterCost[]>([]);
+  const [originalCones, setOrigCones] = useState<LightConeCost[]>([]);
   const [changesSummary, setSumm] = useState<string[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetched, setFetched] = useState(false);
 
-  /* ───────── guard ───────── */
   useEffect(() => {
     if (!loading && (!user || !user.isAdmin)) navigate("/");
   }, [user, loading, navigate]);
 
-  /* ───────── fetch balance ───────── */
   useEffect(() => {
     if (loading || fetched) return;
 
-    fetch(`${import.meta.env.VITE_API_BASE}/api/balance`, {
-      credentials: "include",
-    })
-      .then((r) => r.json())
-      .then((j: { characters: CharacterCost[] }) => {
-        setChars(j.characters);
-        setOrig(j.characters);
+    Promise.all([
+      fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/balance`, {
+        credentials: "include",
+      }),
+      fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/cone-balance`, {
+        credentials: "include",
+      }),
+    ])
+      .then(async ([charRes, coneRes]) => {
+        const charData = await charRes.json();
+        const coneData = await coneRes.json();
+
+        if (!charRes.ok)
+          throw new Error(charData.error || "Character balance failed");
+        if (!coneRes.ok)
+          throw new Error(coneData.error || "Light cone balance failed");
+
+        return { charData, coneData };
+      })
+      .then(({ charData, coneData }) => {
+        setChars(charData.characters);
+        setCones(coneData.cones);
+        setOrigChars(charData.characters);
+        setOrigCones(coneData.cones);
         setFetched(true);
       })
       .catch((err) => {
         console.error(err);
-        setError("Failed to load balance sheet.");
+        setError("Failed to load balance data.");
       });
   }, [loading, fetched]);
 
-  /* ───────── helpers ───────── */
-  const updateCost = (charIdx: number, eidolon: number, value: number) => {
+  const updateCharCost = (charIdx: number, eidolon: number, value: number) => {
     setChars((prev) =>
       prev.map((c, i) =>
         i === charIdx
@@ -64,10 +88,29 @@ export default function BalancePage() {
     );
   };
 
-  const compareCosts = (before: CharacterCost[], after: CharacterCost[]) => {
+  const updateConeCost = (
+    coneIdx: number,
+    superimpose: number,
+    value: number
+  ) => {
+    setCones((prev) =>
+      prev.map((c, i) =>
+        i === coneIdx
+          ? {
+              ...c,
+              costs: c.costs.map((v, si) => (si === superimpose ? value : v)),
+            }
+          : c
+      )
+    );
+  };
+
+  const compareCosts = () => {
     const out: string[] = [];
-    for (const oldChar of before) {
-      const newChar = after.find((c) => c.id === oldChar.id);
+
+    // Character changes
+    for (const oldChar of originalChars) {
+      const newChar = chars.find((c) => c.id === oldChar.id);
       if (!newChar) continue;
       for (let e = 0; e < 7; e++) {
         if (oldChar.costs[e] !== newChar.costs[e]) {
@@ -77,16 +120,31 @@ export default function BalancePage() {
         }
       }
     }
+
+    // Light Cone changes
+    for (const oldCone of originalCones) {
+      const newCone = cones.find((c) => c.id === oldCone.id);
+      if (!newCone) continue;
+      for (let s = 0; s < 5; s++) {
+        if (oldCone.costs[s] !== newCone.costs[s]) {
+          out.push(
+            `${oldCone.name} S${s + 1} ${oldCone.costs[s]} → ${
+              newCone.costs[s]
+            }`
+          );
+        }
+      }
+    }
     return out;
   };
 
-  /* ───────── save ───────── */
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE}/api/admin/balance`,
+      // Save characters
+      const charRes = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/admin/cerydra-balance`,
         {
           method: "PUT",
           credentials: "include",
@@ -94,10 +152,25 @@ export default function BalancePage() {
           body: JSON.stringify({ characters: chars }),
         }
       );
-      if (!res.ok) throw new Error(`Save failed (${res.status})`);
+      if (!charRes.ok)
+        throw new Error(`Character save failed (${charRes.status})`);
 
-      setSumm(compareCosts(originalChars, chars));
-      setOrig(chars);
+      // Save light cones
+      const coneRes = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/admin/cerydra-cone-balance`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cones }),
+        }
+      );
+      if (!coneRes.ok)
+        throw new Error(`Light cone save failed (${coneRes.status})`);
+
+      setSumm(compareCosts());
+      setOrigChars(chars);
+      setOrigCones(cones);
       toast.success("Balance costs updated successfully!");
     } catch (err: any) {
       console.error(err);
@@ -107,23 +180,33 @@ export default function BalancePage() {
     }
   };
 
-  /* ───────── CSV export ───────── */
   const exportToCSV = () => {
-    const headers = ["Character", "E0", "E1", "E2", "E3", "E4", "E5", "E6"];
-    const rows = chars.map((c) => [c.name, ...c.costs]);
-    const csv = [headers, ...rows]
+    // Character CSV
+    const charHeaders = ["Character", "E0", "E1", "E2", "E3", "E4", "E5", "E6"];
+    const charRows = chars.map((c) => [c.name, ...c.costs]);
+    const charCsv = [charHeaders, ...charRows]
       .map((r) => r.map((v) => `"${v}"`).join(","))
       .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+    // Light Cone CSV
+    const coneHeaders = ["Light Cone", "Rarity", "S1", "S2", "S3", "S4", "S5"];
+    const coneRows = cones.map((c) => [c.name, c.rarity, ...c.costs]);
+    const coneCsv = [coneHeaders, ...coneRows]
+      .map((r) => r.map((v) => `"${v}"`).join(","))
+      .join("\n");
+
+    // Combine both CSVs
+    const combinedCsv = `Characters\n${charCsv}\n\nLight Cones\n${coneCsv}`;
+
+    const blob = new Blob([combinedCsv], { type: "text/csv;charset=utf-8;" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "balance_costs.csv";
+    a.download = "cerydra_balance_costs.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   };
 
-  /* ───────── render ───────── */
   if (loading || !user) {
     return (
       <div
@@ -191,7 +274,7 @@ export default function BalancePage() {
                   className="back-button-glass btn btn-sm"
                   onClick={exportToCSV}
                 >
-                  Import to CSV
+                  Export to CSV
                 </button>
               </div>
             </div>
@@ -290,9 +373,9 @@ export default function BalancePage() {
 
           {error && <div className="alert alert-danger py-2">{error}</div>}
 
-          {/* ───────── scrollable table wrapper ───────── */}
+          {/* ───────── Character Table ───────── */}
           <div
-            className="mx-auto mb-4"
+            className="mx-auto mb-5"
             style={{
               background: "rgba(0,0,0,0.5)",
               backdropFilter: "blur(6px)",
@@ -394,7 +477,142 @@ export default function BalancePage() {
                             onChange={(e) => {
                               const val = Number(e.target.value);
                               if (!Number.isNaN(val) && val >= 0) {
-                                updateCost(ci, ei, val);
+                                updateCharCost(ci, ei, val);
+                              }
+                            }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ───────── Light Cone Table ───────── */}
+          <div
+            className="mx-auto mb-4"
+            style={{
+              background: "rgba(0,0,0,0.5)",
+              backdropFilter: "blur(6px)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "12px",
+              boxShadow: "0 0 18px rgba(0,0,0,0.4)",
+              padding: "1rem",
+              maxWidth: "100%",
+              overflowX: "auto",
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            <div style={{ minWidth: "950px" }}>
+              <table
+                className="table table-hover mb-0 text-white text-center"
+                style={{
+                  backgroundColor: "transparent",
+                  color: "white",
+                  tableLayout: "fixed",
+                  width: "100%",
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th
+                      className="text-start"
+                      style={{
+                        backgroundColor: "transparent",
+                        color: "#fff",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        minWidth: "200px",
+                      }}
+                    >
+                      Light Cone
+                    </th>
+                    <th
+                      style={{
+                        backgroundColor: "transparent",
+                        color: "#fff",
+                        minWidth: "70px",
+                      }}
+                    >
+                      Rarity
+                    </th>
+                    {[...Array(5)].map((_, i) => (
+                      <th
+                        key={i}
+                        style={{
+                          backgroundColor: "transparent",
+                          color: "#fff",
+                          minWidth: "85px",
+                        }}
+                      >
+                        S{i + 1}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {cones.map((c, ci) => (
+                    <tr key={c.id}>
+                      {/* name cell */}
+                      <td
+                        className="text-start"
+                        title={c.name}
+                        style={{
+                          backgroundColor: "transparent",
+                          color: "#fff",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          minWidth: "200px",
+                        }}
+                      >
+                        <img
+                          src={c.imageUrl}
+                          alt={c.name}
+                          title={c.name}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            objectFit: "cover",
+                            borderRadius: 4,
+                            marginRight: 6,
+                          }}
+                        />
+                        {c.name} {c.subname && `(${c.subname})`}
+                      </td>
+                      <td
+                        style={{
+                          backgroundColor: "transparent",
+                          color: c.rarity === "5" ? "#ffd700" : "#c0c0c0",
+                          minWidth: "70px",
+                        }}
+                      >
+                        {c.rarity}★
+                      </td>
+
+                      {/* editable cost cells */}
+                      {c.costs.map((v, si) => (
+                        <td
+                          key={si}
+                          style={{
+                            backgroundColor: "transparent",
+                            color: "#fff",
+                            minWidth: "85px",
+                          }}
+                        >
+                          <input
+                            type="number"
+                            min={0}
+                            className="form-control form-control-sm bg-dark text-white border-secondary"
+                            style={{ width: 80 }}
+                            value={v}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              if (!Number.isNaN(val) && val >= 0) {
+                                updateConeCost(ci, si, val);
                               }
                             }}
                           />

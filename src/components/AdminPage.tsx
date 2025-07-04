@@ -91,9 +91,14 @@ export default function AdminPage() {
   /* ────────── card definitions ────────── */
   const cards = [
     {
-      title: "Balance Cost Changes",
-      desc: "Adjust cost values for each character and Eidolon",
+      title: "Cipher PvP Balance Cost",
+      desc: "Adjust cost values for Cipher PvP characters",
       url: "/admin/balance",
+    },
+    {
+      title: "Cerydra PvP Balance Cost",
+      desc: "Adjust cost values for Cerydra PvP characters",
+      url: "/admin/cerydra-balance",
     },
     {
       title: "Match History",
@@ -107,9 +112,7 @@ export default function AdminPage() {
     },
     { title: "Coming Soon", desc: "Coming Soon", url: null },
     { title: "Coming Soon", desc: "Coming Soon", url: null },
-    { title: "Coming Soon", desc: "Coming Soon", url: null },
   ] as const;
-
   /* ────────── access-check loader ────────── */
   if (loading || !user) {
     return (
@@ -127,7 +130,7 @@ export default function AdminPage() {
     <div
       className="page-fade-in"
       style={{
-        backgroundImage: "url('/background.webp')",
+        backgroundImage: "url('/admin.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         minHeight: "100vh",
@@ -151,14 +154,17 @@ export default function AdminPage() {
 
         {/* back */}
         <div className="w-100 d-flex justify-content-end mb-3 pe-4">
-          <Link to="/hsr" className="btn back-button-glass">
+          <button
+            onClick={() => navigate("/")}
+            className="btn back-button-glass"
+          >
             ← Back
-          </Link>
+          </button>
         </div>
 
         {/* hero */}
         <div className="text-center py-5 animate__animated animate__fadeInDown">
-          <h1 className="display-4 fw-bold mb-3">Cipher PvP Admin</h1>
+          <h1 className="display-4 fw-bold mb-3">Cipher Admin</h1>
           <p className="lead text-white-50">
             Welcome, {user.global_name || user.username}!
           </p>
@@ -202,7 +208,7 @@ export default function AdminPage() {
                           borderRadius: 8,
                           backgroundColor: "rgba(255, 255, 255, 0.15)",
                           color: "#fff",
-                          border: "1px solid rgba(255, 255, 255, 0.3)", 
+                          border: "1px solid rgba(255, 255, 255, 0.3)",
                         }}
                       />
 

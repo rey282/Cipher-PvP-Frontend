@@ -88,7 +88,7 @@ export default function BalanceView() {
             className="fw-bold mb-4 text-center"
             style={{ paddingLeft: "10rem", paddingRight: "10rem" }}
           >
-            Balance Cost
+            Cipher Balance Cost
           </h2>
 
           {/* ── responsive scrollable wrapper ── */}

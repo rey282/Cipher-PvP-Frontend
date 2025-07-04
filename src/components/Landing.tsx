@@ -8,20 +8,21 @@ const games = [
     id: "hsr",
     name: "Cipher PvP",
     bg: "/HsrBackground.webp",
-    icon: "/hsr-icon.png",
+    icon: "/cipher-icon.webp",
     live: true,
     link: "/hsr",
   },
   {
-    id: "genshin",
-    name: "Coming Soon",
-    bg: "/GiBackground.webp",
-    icon: "/genshin-icon.png",
-    live: false,
+    id: "hsr2",
+    name: "Cerydra PvP",
+    bg: "/cerydra-bg.webp",
+    icon: "/cerydra-icon.jpg",
+    live: true,
+    link: "/hsr2",
   },
 ];
 
-const team = [
+const hsrTeam = [
   {
     name: "Markistador",
     role: "Server Owner / Balancer",
@@ -34,6 +35,19 @@ const team = [
   { name: "Toscap", role: "Moderator", avatar: "/avatars/toscap.png" },
   { name: "frog detective", role: "Moderator", avatar: "/avatars/frog.png" },
 ];
+
+const genshinTeam = [
+  {
+    name: "Markistador",
+    role: "Server Owner / Balancer",
+    avatar: "/avatars/mark.png",
+  },
+  { name: "YanYan", role: "Developer", avatar: "/avatars/yanyan.png" },
+  { name: "Haya", role: "Developer", avatar: "/avatars/haya.png" },
+  { name: "risa", role: "Balancer", avatar: "/avatars/risa.png" },
+  { name: "Arkeyy", role: "Balancer", avatar: "/avatars/arkeyy.png" },
+];
+
 
 export default function Landing() {
   const [selected, setSelected] = useState(0);
@@ -69,6 +83,7 @@ export default function Landing() {
   };
 
   const game = games[selected];
+  const team = game.id === "hsr" ? hsrTeam : genshinTeam;
 
   return (
     <div className={`landing-wrapper ${leaving ? "fade-out" : ""}`}>
@@ -97,7 +112,7 @@ export default function Landing() {
             <h2 className="game-title mb-4">{game.name}</h2>
 
             {/* Our Team hover button */}
-            {game.id === "hsr" && (
+            {team.length > 0 && (
               <div
                 className="team-button-wrapper position-relative"
                 onMouseEnter={() => setShowTeam(true)}
@@ -126,32 +141,33 @@ export default function Landing() {
             )}
 
             {/* CTA */}
-            {game.id === "hsr" && (
-              <div
-                className="animate__animated animate__fadeInUp mt-4 px-3"
-                style={{ maxWidth: 700, margin: "0 auto" }}
-              >
-                <p className="lead text-white mb-4">
-                  Cipher PvP is a custom Honkai: Star Rail PvP mode featuring
-                  strategic drafts and preban mechanics. Players are given bans
-                  based on their account's cost, ensuring fairness and balance.
-                </p>
-              </div>
-            )}
+            <div
+              className="animate__animated animate__fadeInUp mt-4 px-3"
+              style={{ maxWidth: 700, margin: "0 auto" }}
+            >
+              <p className="lead text-white mb-4">
+                {game.id === "hsr" ? (
+                  <>
+                    Cipher PvP is a custom Honkai: Star Rail PvP mode featuring
+                    strategic drafts and preban mechanics. Players are given
+                    bans based on their account's cost, ensuring fairness and
+                    balance.
+                  </>
+                ) : (
+                  <>
+                    Another one to come.
+                  </>
+                )}
+              </p>
+            </div>
 
             <div className="mt-3">
-              {game.live ? (
-                <button
-                  className="btn angled-btn"
-                  onClick={() => gotoLivePage(game.link!)}
-                >
-                  Start Now
-                </button>
-              ) : (
-                <button className="btn btn-secondary px-4 py-2" disabled>
-                  Coming soon…
-                </button>
-              )}
+              <button
+                className="btn angled-btn"
+                onClick={() => gotoLivePage(game.link!)}
+              >
+                Start Now
+              </button>
             </div>
           </div>
         </div>
