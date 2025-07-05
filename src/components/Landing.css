@@ -411,4 +411,59 @@
 .edit-roster-btn:hover {
   transform: scale(1.2);
 }
+/* Custom scrollbar for the character list */
+::-webkit-scrollbar {
+  width: 10px;
+}
 
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #000;
+  border-radius: 6px;
+}
+.custom-black-modal {
+  background-color: #111 !important;
+  color: #fff;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.custom-black-modal .modal-header,
+.custom-black-modal .modal-footer {
+  background-color: #111 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.custom-black-modal .modal-body {
+  background-color: #111 !important;
+}
+
+.custom-black-modal select,
+.custom-black-modal input {
+  background-color: #222;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.custom-black-modal .list-group-item {
+  background-color: #1a1a1a;
+  color: white;
+}
+
+.custom-black-modal .list-group-item.active {
+  background-color: #333 !important;
+  border-color: #444;
+}
+
+.custom-black-modal .btn-primary {
+  background-color: #444;
+  border: none;
+}
+
+.custom-black-modal .btn-secondary {
+  background-color: #222;
+  border: none;
+}

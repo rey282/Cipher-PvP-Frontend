@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
 
 export default function Navbar() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, login, logout } = useAuth();
 
   return (
     <nav className="w-100 px-2 py-3 d-flex justify-content-between align-items-center">
@@ -87,20 +87,21 @@ export default function Navbar() {
         ) : (
           <button
             className="btn back-button-glass"
-            disabled
-            style={{ cursor: "not-allowed", opacity: 0.5 }}
+            onClick={() => login(window.location.href)}
           >
-            <img
-              src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
-              alt="Discord"
-              width={20}
-              height={20}
-              style={{
-                filter: "brightness(0) saturate(100%) invert(100%)",
-                marginBottom: 4,
-              }}
-            />{" "}
-            &nbsp; Login temporarily disabled
+            {
+              <img
+                src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
+                alt="Discord"
+                width={20}
+                height={20}
+                style={{
+                  filter: "brightness(0) saturate(100%) invert(100%)",
+                  marginBottom: 4,
+                }}
+              />
+            }{" "}
+            &nbsp; Login with Discord
           </button>
         )}
       </div>

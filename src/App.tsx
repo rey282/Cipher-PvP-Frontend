@@ -21,6 +21,7 @@ const HsrInsights = lazy(() => import("./components/HsrInsights"));
 const HsrHome2 = lazy(() => import("./components2/HsrHome2"));
 const BalancePage2 = lazy(() => import("./components2/BalancePage2"));
 const BalancePreview2 = lazy(() => import("./components2/BalancePreview2"));
+const CostTest = lazy(() => import("./components2/CostTest"));
 
 /* ─────────── Layout wrapper (footer + toast + back-to-top) ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
@@ -243,6 +244,16 @@ export default function App() {
           <Suspense fallback={<LoadingSplash />}>
             <PageWithFooter>
               <BalancePreview2 />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/cost-test"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <CostTest />
             </PageWithFooter>
           </Suspense>
         }

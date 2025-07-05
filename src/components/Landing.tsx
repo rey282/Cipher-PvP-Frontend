@@ -45,6 +45,7 @@ const genshinTeam = [
   { name: "YanYan", role: "Developer", avatar: "/avatars/yanyan.png" },
   { name: "Haya", role: "Developer", avatar: "/avatars/haya.png" },
   { name: "risa", role: "Balancer", avatar: "/avatars/risa.png" },
+  { name: "Lexi", role: "Balancer", avatar: "/avatars/lexi.png" },
   { name: "Arkeyy", role: "Balancer", avatar: "/avatars/arkeyy.png" },
 ];
 
@@ -59,6 +60,42 @@ export default function Landing() {
   const [showTeam, setShowTeam] = useState(false);
 
   const navigate = useNavigate();
+
+  /* ───────── Ko-fi floating widget ───────── */
+  useEffect(() => {
+    
+    if (document.getElementById("kofi-widget-script")) {
+  
+      const w = (window as any).kofiWidgetOverlay;
+      if (w) {
+        w.draw("haya28", {
+          type: "floating-chat",
+          "floating-chat.donateButton.text": "Support Us",
+          "floating-chat.donateButton.background-color": "#8b5cf6",
+          "floating-chat.donateButton.text-color": "#ffffff",
+        });
+      }
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "kofi-widget-script"; // 👈 ID for duplicate protection
+    script.src = "https://storage.ko-fi.com/cdn/scripts/overlay-widget.js";
+    script.async = true;
+    script.onload = () => {
+      const w = (window as any).kofiWidgetOverlay;
+      if (w) {
+        w.draw("haya28", {
+          type: "floating-chat",
+          "floating-chat.donateButton.text": "Support Us",
+          "floating-chat.donateButton.background-color": "#8b5cf6",
+          "floating-chat.donateButton.text-color": "#ffffff",
+        });
+      }
+    };
+    document.body.appendChild(script);
+  }, []);
+  
 
   /* ───────── background cross-fade ───────── */
   useEffect(() => {
@@ -155,7 +192,9 @@ export default function Landing() {
                   </>
                 ) : (
                   <>
-                    Another one to come.
+                    Cerydra PvP is a custom Honkai: Star Rail PvP mode with unit
+                    and Eidolon costs. Lower-cost drafts gain cycle advantages,
+                    keeping matches fair and F2P-friendly even with E0 teams.
                   </>
                 )}
               </p>

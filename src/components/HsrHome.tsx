@@ -10,25 +10,6 @@ export default function HsrHome() {
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const { user } = useAuth();
 
-  /* ───────── Ko-fi floating widget ───────── */
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://storage.ko-fi.com/cdn/scripts/overlay-widget.js";
-    script.async = true;
-    script.onload = () => {
-      const w = (window as any).kofiWidgetOverlay;
-      if (w) {
-        w.draw("haya28", {
-          type: "floating-chat",
-          "floating-chat.donateButton.text": "Support Us",
-          "floating-chat.donateButton.background-color": "#8b5cf6",
-          "floating-chat.donateButton.text-color": "#ffffff",
-        });
-      }
-    };
-    document.body.appendChild(script);
-  }, []);
-
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_BASE}/api/announcement`)
       .then((res) => res.json())
