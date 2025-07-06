@@ -63,6 +63,17 @@ export default function CostTestPage() {
   const [superSlotIndex, setSuperSlotIndex] = useState<number | null>(null);
   const [selectedSuper, setSelectedSuper] = useState<number>(1);
 
+  const clearTeam = () => {
+    setTeam(
+      Array(4).fill({
+        characterId: "",
+        eidolon: 0,
+        lightConeId: "",
+        superimpose: 1,
+      })
+    );
+  };
+
   useEffect(() => {
     Promise.all([
       fetch(`${import.meta.env.VITE_API_BASE}/api/characters`, {
@@ -131,8 +142,17 @@ export default function CostTestPage() {
   
 
   const assignCharacterToSlot = (char: CharacterInfo) => {
+    const alreadyInTeam = team.some(
+      (member) => member.characterId === char.code
+    );
+    if (alreadyInTeam) {
+      alert(`${char.name} is already in the team.`);
+      return;
+    }
+
     const firstEmpty = team.findIndex((m) => !m.characterId);
     if (firstEmpty === -1) return;
+
     setTeam((prev) => {
       const newTeam = [...prev];
       newTeam[firstEmpty] = {
@@ -146,16 +166,18 @@ export default function CostTestPage() {
       return newTeam;
     });
   };
+  
 
   const removeSlot = (index: number) => {
-    const newTeam = [...team];
-    newTeam[index] = {
+    const filtered = team.filter((_, i) => i !== index); 
+    const compacted = filtered.filter((m) => m.characterId); 
+    const emptySlots = Array(4 - compacted.length).fill({
       characterId: "",
       eidolon: 0,
       lightConeId: "",
       superimpose: 1,
-    };
-    setTeam(newTeam);
+    });
+    setTeam([...compacted, ...emptySlots]);
   };
 
   const openConeModal = (index: number) => {
@@ -200,7 +222,6 @@ export default function CostTestPage() {
         position: "relative",
       }}
     >
-      {/* overlay */}
       <div
         style={{
           backgroundColor: "rgba(0,0,0,.6)",
@@ -210,9 +231,8 @@ export default function CostTestPage() {
         }}
       />
 
-      {/* content wrapper */}
       <div
-        className="position-relative z-2 text-white d-flex flex-column px-4"
+        className="position-relative z-2 text-white d-flex flex-column px-2 px-md-4"
         style={{ minHeight: "100vh" }}
       >
         <Navbar />
@@ -224,168 +244,203 @@ export default function CostTestPage() {
         </div>
 
         <div
-          className="d-flex align-items-start justify-content-center gap-5"
-          style={{ maxWidth: "1400px", margin: "0 auto" }}
+          className="flex-grow-1 px-2"
+          style={{ maxWidth: "1600px", margin: "0 auto" }}
         >
-          {/* Left panel */}
-          <div style={{ minWidth: 260, maxWidth: 320 }}>
+          {/* Team slots and cost info */}
+          <div
+            className="d-flex flex-column flex-md-row gap-4 mb-4 align-items-start"
+            style={{ width: "100%" }}
+          >
+            {/* Team Info Box on the left */}
             <div
               className="p-3 rounded"
               style={{
                 background: "rgba(0,0,0,0.6)",
                 border: "1px solid rgba(255,255,255,0.1)",
                 backdropFilter: "blur(6px)",
+                minWidth: 260,
+                flexShrink: 0,
               }}
             >
-              <h5 className="mb-3">Team Cost</h5>
-
-              <label className="form-label small mb-1">Cycles Taken</label>
+              <h5 className="mb-3">Team Info</h5>
+              <label className="form-label small mb-1">Cycles</label>
               <input
                 type="number"
-                className="form-control form-control-sm bg-dark text-white mb-3"
+                className="form-control form-control-sm bg-dark text-white mb-2"
                 value={clearSpeed}
                 min={0}
                 onChange={(e) => setClearSpeed(parseFloat(e.target.value))}
               />
-
-              <div className="small">
+              <div className="small mb-2">
                 <strong>Total Cost:</strong> {totalCost.toFixed(1)}
               </div>
+              <button
+                className="btn btn-outline-light btn-sm w-100"
+                onClick={clearTeam}
+              >
+                Clear
+              </button>
             </div>
-          </div>
 
-          {/* Center panel */}
-          <div className="d-flex gap-3 justify-content-center flex-grow-1">
-            {team.map((member, index) => {
-              const char = member.characterInfo;
-              const cone = member.lightConeData;
+            {/* Team Character Cards */}
+            <div
+              className="d-flex justify-content-between gap-2"
+              style={{
+                flexWrap: "nowrap",
+                overflowX: "auto",
+                width: "100%",
+              }}
+            >
+              {team.map((member, index) => {
+                const char = member.characterInfo;
+                const cone = member.lightConeData;
+                const extractImageId = (url: string) => {
+                  const match = url.match(/\/(\d+)\.png$/);
+                  return match ? match[1] : "";
+                };
+                const charCost = char
+                  ? charCosts.find(
+                      (c) => c.id === extractImageId(char.image_url)
+                    )?.costs[member.eidolon] ?? 0
+                  : 0;
+                const coneCost = cone
+                  ? cone.costs[member.superimpose - 1] ?? 0
+                  : 0;
 
-              // Helper to extract numeric ID from image_url
-              const extractImageId = (url: string) => {
-                const match = url.match(/\/(\d+)\.png$/);
-                return match ? match[1] : "";
-              };
-
-              const charCost = char
-                ? charCosts.find((c) => c.id === extractImageId(char.image_url))
-                    ?.costs[member.eidolon] ?? 0
-                : 0;
-
-              const coneCost = cone
-                ? cone.costs[member.superimpose - 1] ?? 0
-                : 0;
-
-              return (
-                <div
-                  key={index}
-                  onClick={() => char && openConeModal(index)}
-                  style={{
-                    width: "120px",
-                    borderRadius: "12px",
-                    background: "rgba(0,0,0,0.7)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    cursor: char ? "pointer" : "default",
-                    overflow: "hidden",
-                    padding: 0,
-                    margin: 0,
-                    display: "inline-block",
-                  }}
-                >
-                  {char && (
-                    <div style={{ position: "relative" }}>
-                      <img
-                        src={char.image_url}
-                        alt={char.name}
+                return (
+                  <div
+                    key={index}
+                    onClick={() => char && openConeModal(index)}
+                    style={{
+                      flex: "0 0 auto", 
+                      width: "22vw", 
+                      maxWidth: "120px", 
+                      minWidth: "80px", 
+                      height: "220px",
+                      borderRadius: "12px",
+                      background: "rgba(0,0,0,0.7)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      cursor: char ? "pointer" : "default",
+                      overflow: "hidden",
+                      padding: 0,
+                      margin: 0,
+                      display: "inline-block",
+                    }}
+                  >
+                    {char ? (
+                      <div style={{ position: "relative" }}>
+                        <img
+                          src={char.image_url}
+                          alt={char.name}
+                          style={{
+                            width: "100%",
+                            height: "140px",
+                            objectFit: "cover",
+                          }}
+                        />
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEidolonSlotIndex(index);
+                            setSelectedEidolon(member.eidolon);
+                            setShowEidolonModal(true);
+                          }}
+                          style={{
+                            position: "absolute",
+                            top: 4,
+                            left: 4,
+                            background: "#000",
+                            color: "#fff",
+                            fontSize: "0.75rem",
+                            padding: "2px 6px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          E{member.eidolon} | {charCost}
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeSlot(index);
+                          }}
+                          className="btn btn-sm btn-danger position-absolute"
+                          style={{
+                            top: 4,
+                            right: 4,
+                            padding: "2px 6px",
+                            fontSize: "0.75rem",
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      // Placeholder if no character is assigned
+                      <div
                         style={{
                           width: "100%",
                           height: "140px",
-                          objectFit: "cover",
+                          background: "rgba(255,255,255,0.05)",
                         }}
                       />
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEidolonSlotIndex(index);
-                          setSelectedEidolon(member.eidolon);
-                          setShowEidolonModal(true);
-                        }}
-                        style={{
-                          position: "absolute",
-                          top: 4,
-                          left: 4,
-                          background: "#000",
-                          color: "#fff",
-                          fontSize: "0.75rem",
-                          padding: "2px 6px",
-                          borderRadius: "6px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        E{member.eidolon} | {charCost}
+                    )}
+
+                    {cone ? (
+                      <div style={{ position: "relative" }}>
+                        <img
+                          src={cone.imageUrl}
+                          alt={cone.name}
+                          style={{
+                            width: "100%",
+                            height: "80px",
+                            objectFit: "cover",
+                          }}
+                        />
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSuperSlotIndex(index);
+                            setSelectedSuper(member.superimpose);
+                            setShowSuperModal(true);
+                          }}
+                          style={{
+                            position: "absolute",
+                            bottom: 4,
+                            left: 4,
+                            background: "#000",
+                            color: "#fff",
+                            fontSize: "0.75rem",
+                            padding: "2px 6px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          S{member.superimpose} | {coneCost}
+                        </div>
                       </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeSlot(index);
-                        }}
-                        className="btn btn-sm btn-danger position-absolute"
-                        style={{
-                          top: 4,
-                          right: 4,
-                          padding: "2px 6px",
-                          fontSize: "0.75rem",
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-
-                  {cone && (
-                    <div style={{ position: "relative" }}>
-                      <img
-                        src={cone.imageUrl}
-                        alt={cone.name}
+                    ) : (
+                      // Empty cone space
+                      <div
                         style={{
                           width: "100%",
                           height: "80px",
-                          objectFit: "cover",
+                          background: "rgba(255,255,255,0.05)",
                         }}
                       />
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSuperSlotIndex(index);
-                          setSelectedSuper(member.superimpose);
-                          setShowSuperModal(true);
-                        }}
-                        style={{
-                          position: "absolute",
-                          bottom: 4,
-                          left: 4,
-                          background: "#000",
-                          color: "#fff",
-                          fontSize: "0.75rem",
-                          padding: "2px 6px",
-                          borderRadius: "6px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        S{member.superimpose} | {coneCost}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Right panel */}
-          <div style={{ minWidth: 300, maxWidth: 420 }}>
+          {/* Character Pool */}
+          <div className="mb-5">
             <input
               type="text"
-              className="form-control form-control-sm mb-2 bg-dark text-white"
+              className="form-control form-control-sm mb-3 bg-dark text-white"
               placeholder="Search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -393,34 +448,53 @@ export default function CostTestPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(70px, 1fr))",
-                gap: "8px",
-                maxHeight: "70vh",
-                overflowY: "auto",
-                padding: "4px",
+                gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))",
+                gap: "4px",
+                justifyContent: "center",
               }}
             >
               {charInfos
                 .filter((c) =>
                   c.name.toLowerCase().includes(search.toLowerCase())
                 )
-                .map((char) => (
-                  <div
-                    key={char.code}
-                    onClick={() => assignCharacterToSlot(char)}
-                    title={char.name}
-                    style={{
-                      width: "70px",
-                      height: "70px",
-                      borderRadius: "8px",
-                      border: "2px solid #555",
-                      backgroundImage: `url(${char.image_url})`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                      cursor: "pointer",
-                    }}
-                  />
-                ))}
+                .map((char) => {
+                  const isInTeam = team.some(
+                    (member) => member.characterId === char.code
+                  );
+                  return (
+                    <div
+                      key={char.code}
+                      onClick={() => !isInTeam && assignCharacterToSlot(char)}
+                      title={char.name}
+                      style={{
+                        width: "70px",
+                        height: "70px",
+                        borderRadius: "8px",
+                        border: isInTeam ? "2px solid #888" : "2px solid #555",
+                        backgroundImage: `url(${char.image_url})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        cursor: isInTeam ? "not-allowed" : "pointer",
+                        opacity: isInTeam ? 0.4 : 1,
+                        pointerEvents: isInTeam ? "none" : "auto",
+                        transition:
+                          "transform 0.15s ease, box-shadow 0.15s ease",
+                        boxShadow: "none",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isInTeam) {
+                          e.currentTarget.style.transform = "scale(1.1)";
+                          e.currentTarget.style.boxShadow =
+                            "0 0 8px rgba(255,255,255,0.4)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "scale(1)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    />
+                  );
+                })}
             </div>
           </div>
         </div>
