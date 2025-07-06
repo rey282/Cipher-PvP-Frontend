@@ -139,7 +139,6 @@ export default function CostTestPage() {
 
     setTotalCost(cost);
   }, [team, charCosts, cones]);
-  
 
   const assignCharacterToSlot = (char: CharacterInfo) => {
     const alreadyInTeam = team.some(
@@ -165,12 +164,12 @@ export default function CostTestPage() {
       };
       return newTeam;
     });
+    setSearch("");
   };
-  
 
   const removeSlot = (index: number) => {
-    const filtered = team.filter((_, i) => i !== index); 
-    const compacted = filtered.filter((m) => m.characterId); 
+    const filtered = team.filter((_, i) => i !== index);
+    const compacted = filtered.filter((m) => m.characterId);
     const emptySlots = Array(4 - compacted.length).fill({
       characterId: "",
       eidolon: 0,
