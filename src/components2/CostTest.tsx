@@ -313,10 +313,10 @@ export default function CostTestPage() {
                     key={index}
                     onClick={() => char && openConeModal(index)}
                     style={{
-                      flex: "0 0 auto", 
-                      width: "22vw", 
-                      maxWidth: "120px", 
-                      minWidth: "80px", 
+                      flex: "0 0 auto",
+                      width: "22vw",
+                      maxWidth: "120px",
+                      minWidth: "80px",
                       height: "220px",
                       borderRadius: "12px",
                       background: "rgba(0,0,0,0.7)",
@@ -457,6 +457,7 @@ export default function CostTestPage() {
                 .filter((c) =>
                   c.name.toLowerCase().includes(search.toLowerCase())
                 )
+                .sort((a, b) => a.name.localeCompare(b.name))
                 .map((char) => {
                   const isInTeam = team.some(
                     (member) => member.characterId === char.code
