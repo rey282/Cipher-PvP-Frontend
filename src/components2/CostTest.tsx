@@ -197,6 +197,7 @@ export default function CostTestPage() {
     };
     setTeam(newTeam);
     setShowModal(false);
+    setConeSearch(""); 
   };
 
   if (loading || error) {
