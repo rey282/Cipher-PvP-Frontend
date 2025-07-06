@@ -23,7 +23,7 @@ export default function HsrHome() {
       title: "Play Now",
       desc: "Draft and Play Matches",
       btnText: "Play now",
-      url: "https://draft.cipher.uno/draft",
+      url: "https://draft.cipher.uno/draft?mode=cipher ",
     },
     {
       title: "Roster Setup",

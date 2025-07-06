@@ -24,7 +24,7 @@ export default function HsrHome() {
       title: "Play Now",
       desc: "Draft and Play Matches",
       btnText: "Play now",
-      url: "https://draft.cipher.uno/draft",
+      url: "https://draft.cipher.uno/draft?mode=cerydra",
     },
     {
       title: "Balance Cost",
@@ -36,7 +36,7 @@ export default function HsrHome() {
       title: "Cost Test",
       desc: "Test your team's cost",
       btnText: "Cost Test",
-      url: "/cost-test", 
+      url: "/cost-test",
     },
     {
       title: "Player Statistics",
