@@ -165,6 +165,7 @@ export default function CostTestPage() {
       return newTeam;
     });
     setSearch("");
+    setConeSearch("");
   };
 
   const removeSlot = (index: number) => {
