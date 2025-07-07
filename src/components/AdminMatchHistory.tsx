@@ -214,7 +214,7 @@ export default function AdminMatchHistory() {
     <div
       className="page-fade-in"
       style={{
-        background: "url('/background.webp') center/cover fixed",
+        background: "url('/admin.webp') center/cover fixed",
         minHeight: "100vh",
         position: "relative",
       }}

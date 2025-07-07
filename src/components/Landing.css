@@ -467,3 +467,11 @@
   background-color: #222;
   border: none;
 }
+/* Remove white box in table headers */
+.table thead th,
+.table td {
+  background-color: transparent !important;
+  color: white !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}

@@ -22,6 +22,7 @@ const HsrHome2 = lazy(() => import("./components2/HsrHome2"));
 const BalancePage2 = lazy(() => import("./components2/BalancePage2"));
 const BalancePreview2 = lazy(() => import("./components2/BalancePreview2"));
 const CostTest = lazy(() => import("./components2/CostTest"));
+const RosterLog = lazy(() => import("./components/RosterLog"));
 
 /* ─────────── Layout wrapper (footer + toast + back-to-top) ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
@@ -222,6 +223,16 @@ export default function App() {
           <Suspense fallback={<LoadingSplash />}>
             <PageWithFooter>
               <AdminMatchHistory />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/admin/roster-log"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <RosterLog />
             </PageWithFooter>
           </Suspense>
         }

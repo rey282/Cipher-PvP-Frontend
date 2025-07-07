@@ -106,11 +106,15 @@ export default function AdminPage() {
       url: "/admin/match-history",
     },
     {
+      title: "Roster Log",
+      desc: "View roster logs",
+      url: "/admin/roster-log",
+    },
+    {
       title: "Edit Any Profile",
       desc: "Jump to a player's editable profile",
       url: "internal-edit",
     },
-    { title: "Coming Soon", desc: "Coming Soon", url: null },
     { title: "Coming Soon", desc: "Coming Soon", url: null },
   ] as const;
   /* ────────── access-check loader ────────── */
