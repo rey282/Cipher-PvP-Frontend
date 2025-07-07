@@ -12,7 +12,7 @@ interface RosterLogEntry {
   global_name: string;
   old_points: number;
   new_points: number;
-  timestamp: string;
+  submitted_at: string; 
 }
 
 export default function RosterLogPage() {
@@ -48,6 +48,28 @@ export default function RosterLogPage() {
       </div>
     );
   }
+
+  function formatTimestamp(raw?: string): string {
+    if (!raw || typeof raw !== "string") return "Invalid Date";
+
+    const iso = raw.replace(" ", "T");
+    const date = new Date(iso);
+
+    if (isNaN(date.getTime())) return "Invalid Date";
+
+    return date
+      .toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      })
+      .replace(",", "");
+  }
+  
 
   const filtered = logs.filter(
     (log) =>
@@ -160,7 +182,7 @@ export default function RosterLogPage() {
                       <td>{log.old_points}</td>
                       <td>{log.new_points}</td>
                       <td style={{ whiteSpace: "nowrap" }}>
-                        {new Date(log.timestamp).toLocaleString()}
+                        {formatTimestamp(log.submitted_at)}
                       </td>
                     </tr>
                   ))}
