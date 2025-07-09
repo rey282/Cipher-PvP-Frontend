@@ -1,5 +1,5 @@
 // src/pages/CostTestPage.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Modal, Button } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -57,13 +57,10 @@ export default function CostTestPage() {
   const [selectedConeId, setSelectedConeId] = useState<string>("");
   const [coneSearch, setConeSearch] = useState("");
 
-  const [showEidolonModal, setShowEidolonModal] = useState(false);
-  const [eidolonSlotIndex, setEidolonSlotIndex] = useState<number | null>(null);
-  const [selectedEidolon, setSelectedEidolon] = useState<number>(0);
-
-  const [showSuperModal, setShowSuperModal] = useState(false);
-  const [superSlotIndex, setSuperSlotIndex] = useState<number | null>(null);
-  const [selectedSuper, setSelectedSuper] = useState<number>(1);
+  const [eidolonOpenIndex, setEidolonOpenIndex] = useState<number | null>(null);
+  const [superOpenIndex, setSuperOpenIndex] = useState<number | null>(null);
+  const eidolonRef = useRef<HTMLDivElement | null>(null);
+  const superRef = useRef<HTMLDivElement | null>(null);
 
   const isSignatureCone = (
     cone: LightCone,
@@ -105,6 +102,30 @@ export default function CostTestPage() {
       })
     );
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        eidolonRef.current &&
+        !eidolonRef.current.contains(event.target as Node)
+      ) {
+        setEidolonOpenIndex(null);
+      }
+
+      if (
+        superRef.current &&
+        !superRef.current.contains(event.target as Node)
+      ) {
+        setSuperOpenIndex(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+  
 
   useEffect(() => {
     Promise.all([
@@ -317,6 +338,7 @@ export default function CostTestPage() {
               style={{
                 flexWrap: "nowrap",
                 overflowX: "auto",
+                overflowY: "hidden",
                 width: "100%",
               }}
             >
@@ -346,10 +368,11 @@ export default function CostTestPage() {
                       background: "rgba(0,0,0,0.7)",
                       border: "1px solid rgba(255,255,255,0.1)",
                       cursor: char ? "pointer" : "default",
-                      overflow: "hidden",
+                      overflow: "visible",
                       padding: 0,
                       margin: 0,
                       display: "inline-block",
+                      position: "relative",
                     }}
                   >
                     {char ? (
@@ -359,31 +382,122 @@ export default function CostTestPage() {
                           alt={char.name}
                           style={{
                             width: "100%",
-                            height: "140px",
+                            height: cone ? "140px" : "220px",
                             objectFit: "cover",
+                            transition: "height 0.3s ease",
                           }}
                         />
+
                         <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEidolonSlotIndex(index);
-                            setSelectedEidolon(member.eidolon);
-                            setShowEidolonModal(true);
-                          }}
                           style={{
                             position: "absolute",
                             top: 4,
                             left: 4,
-                            background: "#000",
-                            color: "#fff",
-                            fontSize: "0.75rem",
-                            padding: "2px 6px",
-                            borderRadius: "6px",
-                            cursor: "pointer",
+                            zIndex: 10,
                           }}
                         >
-                          E{member.eidolon} | {charCost}
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEidolonOpenIndex(
+                                eidolonOpenIndex === index ? null : index
+                              );
+                            }}
+                            style={{
+                              position: "relative",
+                              display: "inline-block",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div
+                              style={{
+                                background: "#000",
+                                color: "#fff",
+                                fontSize: "0.75rem",
+                                padding: "2px 6px",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              E{member.eidolon} | {charCost}
+                            </div>
+
+                            {eidolonOpenIndex === index && (
+                              <div
+                                ref={eidolonRef}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  position: "absolute",
+                                  top: "calc(100% - 1px)",
+                                  left: index === team.length - 1 ? "auto" : 0,
+                                  right: index === team.length - 1 ? 0 : "auto",
+                                  width: "180px",
+                                  background: "rgba(0,0,0,0.85)",
+                                  padding: "8px",
+                                  borderRadius: "10px",
+                                  boxShadow: "0 0 6px rgba(0,0,0,0.6)",
+                                  backdropFilter: "blur(4px)",
+                                  zIndex: 999,
+                                }}
+                              >
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={6}
+                                  step={1}
+                                  value={member.eidolon}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    const updated = [...team];
+                                    updated[index].eidolon = Number(
+                                      e.target.value
+                                    );
+                                    setTeam(updated);
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    accentColor: "#0af",
+                                    cursor: "pointer",
+                                  }}
+                                />
+                                <div
+                                  className="d-flex justify-content-between text-white mt-1"
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    fontWeight: 500,
+                                    color: "#ccc",
+                                  }}
+                                >
+                                  {[
+                                    "E0",
+                                    "E1",
+                                    "E2",
+                                    "E3",
+                                    "E4",
+                                    "E5",
+                                    "E6",
+                                  ].map((label, i) => (
+                                    <span
+                                      key={i}
+                                      style={{
+                                        color:
+                                          member.eidolon === i
+                                            ? "#0af"
+                                            : "#ccc",
+                                        fontWeight:
+                                          member.eidolon === i
+                                            ? "bold"
+                                            : "normal",
+                                      }}
+                                    >
+                                      {label}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
+
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -401,7 +515,6 @@ export default function CostTestPage() {
                         </button>
                       </div>
                     ) : (
-                      // Placeholder if no character is assigned
                       <div
                         style={{
                           width: "100%",
@@ -423,29 +536,110 @@ export default function CostTestPage() {
                           }}
                         />
                         <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSuperSlotIndex(index);
-                            setSelectedSuper(member.superimpose);
-                            setShowSuperModal(true);
-                          }}
                           style={{
                             position: "absolute",
                             bottom: 4,
                             left: 4,
-                            background: "#000",
-                            color: "#fff",
-                            fontSize: "0.75rem",
-                            padding: "2px 6px",
-                            borderRadius: "6px",
-                            cursor: "pointer",
+                            zIndex: 10,
                           }}
                         >
-                          S{member.superimpose} | {coneCost}
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSuperOpenIndex(
+                                superOpenIndex === index ? null : index
+                              );
+                            }}
+                            style={{
+                              position: "relative",
+                              display: "inline-block",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div
+                              style={{
+                                background: "#000",
+                                color: "#fff",
+                                fontSize: "0.75rem",
+                                padding: "2px 6px",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              S{member.superimpose} | {coneCost}
+                            </div>
+
+                            {superOpenIndex === index && (
+                              <div
+                                ref={superRef}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  position: "absolute",
+                                  bottom: "calc(100% - 1px)",
+                                  left: index === team.length - 1 ? "auto" : 0,
+                                  right: index === team.length - 1 ? 0 : "auto",
+                                  width: "180px",
+                                  background: "rgba(0,0,0,0.85)",
+                                  padding: "8px",
+                                  borderRadius: "10px",
+                                  boxShadow: "0 0 6px rgba(0,0,0,0.6)",
+                                  backdropFilter: "blur(4px)",
+                                  zIndex: 999,
+                                }}
+                              >
+                                <input
+                                  type="range"
+                                  min={1}
+                                  max={5}
+                                  step={1}
+                                  value={member.superimpose}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    const updated = [...team];
+                                    updated[index].superimpose = Number(
+                                      e.target.value
+                                    );
+                                    setTeam(updated);
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    accentColor: "#0af",
+                                    cursor: "pointer",
+                                  }}
+                                />
+                                <div
+                                  className="d-flex justify-content-between text-white mt-1"
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    fontWeight: 500,
+                                    color: "#ccc",
+                                  }}
+                                >
+                                  {["S1", "S2", "S3", "S4", "S5"].map(
+                                    (label, i) => (
+                                      <span
+                                        key={i}
+                                        style={{
+                                          color:
+                                            member.superimpose === i + 1
+                                              ? "#0af"
+                                              : "#ccc",
+                                          fontWeight:
+                                            member.superimpose === i + 1
+                                              ? "bold"
+                                              : "normal",
+                                        }}
+                                      >
+                                        {label}
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ) : (
-                      // Empty cone space
                       <div
                         style={{
                           width: "100%",
@@ -529,94 +723,6 @@ export default function CostTestPage() {
         </div>
 
         {/* Modal */}
-        <Modal
-          show={showSuperModal}
-          onHide={() => setShowSuperModal(false)}
-          centered
-          contentClassName="custom-black-modal"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Select Superimpose Level</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <select
-              className="form-select"
-              value={selectedSuper}
-              onChange={(e) => setSelectedSuper(Number(e.target.value))}
-            >
-              {[1, 2, 3, 4, 5].map((level) => (
-                <option key={level} value={level}>
-                  S{level}
-                </option>
-              ))}
-            </select>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowSuperModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                if (superSlotIndex === null) return;
-                const updated = [...team];
-                updated[superSlotIndex].superimpose = selectedSuper;
-                setTeam(updated);
-                setShowSuperModal(false);
-              }}
-            >
-              Confirm
-            </Button>
-          </Modal.Footer>
-        </Modal>
-
-        <Modal
-          show={showEidolonModal}
-          onHide={() => setShowEidolonModal(false)}
-          centered
-          contentClassName="custom-black-modal"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Select Eidolon Level</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <select
-              className="form-select"
-              value={selectedEidolon}
-              onChange={(e) => setSelectedEidolon(Number(e.target.value))}
-            >
-              {[0, 1, 2, 3, 4, 5, 6].map((level) => (
-                <option key={level} value={level}>
-                  E{level}
-                </option>
-              ))}
-            </select>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowEidolonModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                if (eidolonSlotIndex === null) return;
-                const updated = [...team];
-                updated[eidolonSlotIndex].eidolon = selectedEidolon;
-                setTeam(updated);
-                setShowEidolonModal(false);
-              }}
-            >
-              Confirm
-            </Button>
-          </Modal.Footer>
-        </Modal>
-
         <Modal
           show={showModal}
           onHide={() => setShowModal(false)}
@@ -749,8 +855,6 @@ export default function CostTestPage() {
                       </li>
                     );
                   });
-                  
-                  
                 })()}
               </ul>
             </div>
