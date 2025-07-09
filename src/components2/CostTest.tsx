@@ -70,14 +70,10 @@ export default function CostTestPage() {
 
     const coneSub = cone.subname?.toLowerCase() || "";
     const charName = char.name.toLowerCase();
-    const charSub = char.subname?.toLowerCase() || "";
 
     return (
-      coneSub === charName ||
-      coneSub === charSub ||
-      coneSub.startsWith(charName)
+      coneSub === charName
     );
-    
   };
 
   const extractImageId = (url: string) => {
