@@ -9,11 +9,13 @@ import "../components/Landing.css";
 interface CharacterInfo {
   code: string;
   name: string;
+  subname: string;
   rarity: number;
   image_url: string;
   path: string;
   element: string;
 }
+
 
 interface CharacterCost {
   id: string;
@@ -63,6 +65,36 @@ export default function CostTestPage() {
   const [superSlotIndex, setSuperSlotIndex] = useState<number | null>(null);
   const [selectedSuper, setSelectedSuper] = useState<number>(1);
 
+  const isSignatureCone = (
+    cone: LightCone,
+    char: CharacterInfo | undefined
+  ) => {
+    if (!char) return false;
+
+    const coneSub = cone.subname?.toLowerCase() || "";
+    const charName = char.name.toLowerCase();
+    const charSub = char.subname?.toLowerCase() || "";
+
+    return (
+      coneSub === charName ||
+      coneSub === charSub ||
+      coneSub.startsWith(charName)
+    );
+    
+  };
+
+  const extractImageId = (url: string) => {
+    const match = url.match(/\/(\d+)\.png$/);
+    return match ? match[1] : "";
+  };
+
+  const subnameToCharacterName = new Map<string, string>();
+  charInfos.forEach((char) => {
+    if (char.subname) {
+      subnameToCharacterName.set(char.subname.toLowerCase(), char.name);
+    }
+  });
+
   const clearTeam = () => {
     setTeam(
       Array(4).fill({
@@ -76,7 +108,7 @@ export default function CostTestPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${import.meta.env.VITE_API_BASE}/api/characters`, {
+      fetch(`${import.meta.env.VITE_API_BASE}/api/characters/all`, {
         credentials: "include",
       }),
       fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/balance`, {
@@ -116,11 +148,6 @@ export default function CostTestPage() {
   }, []);
 
   useEffect(() => {
-    const extractImageId = (url: string) => {
-      const match = url.match(/\/(\d+)\.png$/);
-      return match ? match[1] : "";
-    };
-
     const cost = team.reduce((total, member) => {
       const charCost = member.characterInfo
         ? charCosts.find(
@@ -296,10 +323,6 @@ export default function CostTestPage() {
               {team.map((member, index) => {
                 const char = member.characterInfo;
                 const cone = member.lightConeData;
-                const extractImageId = (url: string) => {
-                  const match = url.match(/\/(\d+)\.png$/);
-                  return match ? match[1] : "";
-                };
                 const charCost = char
                   ? charCosts.find(
                       (c) => c.id === extractImageId(char.image_url)
@@ -455,9 +478,13 @@ export default function CostTestPage() {
               }}
             >
               {charInfos
-                .filter((c) =>
-                  c.name.toLowerCase().includes(search.toLowerCase())
-                )
+                .filter((c) => {
+                  const lowerSearch = search.toLowerCase();
+                  return (
+                    c.name.toLowerCase().includes(lowerSearch) ||
+                    c.subname?.toLowerCase().includes(lowerSearch)
+                  );
+                })
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((char) => {
                   const isInTeam = team.some(
@@ -619,26 +646,112 @@ export default function CostTestPage() {
                 >
                   None
                 </li>
-                {cones
-                  .filter((cone) => {
+                {(() => {
+                  const searchLower = coneSearch.toLowerCase();
+
+                  const activeChar =
+                    activeSlotIndex !== null
+                      ? team[activeSlotIndex].characterInfo
+                      : undefined;
+                  const activeCharName = activeChar?.name.toLowerCase();
+                  const activeCharSubname = activeChar?.subname?.toLowerCase();
+                  const filteredCones = cones.filter((cone) => {
                     const name = cone.name?.toLowerCase() || "";
-                    const subname = cone.subname?.toLowerCase() || "";
-                    const search = coneSearch.toLowerCase();
-                    return name.includes(search) || subname.includes(search);
-                  })
-                  .map((cone) => (
-                    <li
-                      key={cone.id}
-                      className={`list-group-item list-group-item-action ${
-                        selectedConeId === cone.id ? "active" : ""
-                      }`}
-                      onClick={() => setSelectedConeId(cone.id)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <strong>{cone.name}</strong>{" "}
-                      {cone.subname ? `– ${cone.subname}` : ""} ({cone.rarity}★)
-                    </li>
-                  ))}
+                    const sub = cone.subname?.toLowerCase() || "";
+
+                    if (name.includes(searchLower) || sub.includes(searchLower))
+                      return true;
+
+                    for (const [
+                      subname,
+                      charName,
+                    ] of subnameToCharacterName.entries()) {
+                      if (
+                        subname.includes(searchLower) &&
+                        (name.includes(charName.toLowerCase()) ||
+                          sub.includes(charName.toLowerCase()))
+                      ) {
+                        return true;
+                      }
+                    }
+
+                    return false;
+                  });
+
+                  // Sort to show character's signature first
+                  filteredCones.sort((a, b) => {
+                    if (!activeCharName && !activeCharSubname) return 0;
+
+                    const aSub = a.subname?.toLowerCase() || "";
+                    const bSub = b.subname?.toLowerCase() || "";
+
+                    const aMatches =
+                      (activeCharName && aSub.includes(activeCharName)) ||
+                      (activeCharSubname && aSub.includes(activeCharSubname));
+                    const bMatches =
+                      (activeCharName && bSub.includes(activeCharName)) ||
+                      (activeCharSubname && bSub.includes(activeCharSubname));
+
+                    if (aMatches && !bMatches) return -1;
+                    if (!aMatches && bMatches) return 1;
+                    return 0;
+                  });
+
+                  return filteredCones.map((cone) => {
+                    const isSig =
+                      !!activeChar && isSignatureCone(cone, activeChar);
+
+                    return (
+                      <li
+                        key={cone.id}
+                        className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${
+                          selectedConeId === cone.id ? "active" : ""
+                        }`}
+                        onClick={() => setSelectedConeId(cone.id)}
+                        style={{
+                          cursor: "pointer",
+                          padding: "6px 10px",
+                          gap: "10px",
+                        }}
+                      >
+                        <div className="d-flex align-items-center gap-2">
+                          <img
+                            src={cone.imageUrl}
+                            alt={cone.name}
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              objectFit: "cover",
+                              borderRadius: "4px",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                            }}
+                          />
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{cone.name}</div>
+                            <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                              {cone.subname} ({cone.rarity}★)
+                            </div>
+                          </div>
+                        </div>
+                        {isSig && (
+                          <span
+                            className="badge bg-warning text-dark"
+                            style={{
+                              fontSize: "0.65rem",
+                              fontWeight: 600,
+                              borderRadius: "6px",
+                              padding: "2px 6px",
+                            }}
+                          >
+                            💠 Signature
+                          </span>
+                        )}
+                      </li>
+                    );
+                  });
+                  
+                  
+                })()}
               </ul>
             </div>
           </Modal.Body>
