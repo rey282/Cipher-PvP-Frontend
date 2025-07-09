@@ -23,7 +23,7 @@ export default function HsrHome() {
       title: "Play Now",
       desc: "Draft and Play Matches",
       btnText: "Play now",
-      url: "https://draft.cipher.uno/draft?mode=cipher ",
+      url: "https://draft.cipher.uno/draft?mode=cipher",
     },
     {
       title: "Roster Setup",
@@ -35,27 +35,28 @@ export default function HsrHome() {
       title: "Balance Cost",
       desc: "View current character account costs",
       btnText: "View Balance Cost",
-      url: "/balance-cost",
+      url: "/cipher/balance-cost",
     },
     {
       title: "Player Statistics",
       desc: "View statistics for any player",
       btnText: "View player stats",
-      url: "/players",
+      url: "/cipher/players",
     },
     {
       title: "Season statistics",
       desc: "View overall statistics for each season",
       btnText: "View Insights",
-      url: "/hsr-insights",
+      url: "/cipher/insights",
     },
     {
       title: "Character Statistics",
       desc: "All time Character statistics from all moc cycles",
       btnText: "View MOC Stats",
-      url: "/characters",
+      url: "/cipher/characters",
     },
   ];
+  
   /* ───────── markup ───────── */
   return (
     <div

@@ -287,7 +287,7 @@ export default function CostTestPage() {
         <Navbar />
 
         <div className="d-flex justify-content-end mb-3 pe-4">
-          <Link to="/hsr2" className="btn back-button-glass">
+          <Link to="/cerydra" className="btn back-button-glass">
             ← Back
           </Link>
         </div>

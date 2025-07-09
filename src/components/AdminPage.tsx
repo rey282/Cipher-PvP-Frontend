@@ -101,6 +101,11 @@ export default function AdminPage() {
       url: "/admin/cerydra-balance",
     },
     {
+      title: "Edit Any Profile",
+      desc: "Jump to a player's editable profile",
+      url: "internal-edit",
+    },
+    {
       title: "Match History",
       desc: "View and rollback submitted matches",
       url: "/admin/match-history",
@@ -109,11 +114,6 @@ export default function AdminPage() {
       title: "Roster Log",
       desc: "View roster logs",
       url: "/admin/roster-log",
-    },
-    {
-      title: "Edit Any Profile",
-      desc: "Jump to a player's editable profile",
-      url: "internal-edit",
     },
     { title: "Coming Soon", desc: "Coming Soon", url: null },
   ] as const;
@@ -190,7 +190,7 @@ export default function AdminPage() {
                     style={{
                       height: "100%",
                       position: "relative",
-                      zIndex: 5,
+                      zIndex: 4,
                     }}
                   >
                     <div className="feature-title mb-2">{title}</div>
@@ -233,7 +233,7 @@ export default function AdminPage() {
                             overflowY: "auto",
                             backgroundColor: "#111",
                             borderRadius: 8,
-                            zIndex: 999,
+                            zIndex: 3000,
                             border: "1px solid rgba(255,255,255,0.2)",
                             boxShadow: "0 0 8px rgba(0,0,0,0.5)",
                           }}
@@ -305,6 +305,8 @@ export default function AdminPage() {
               borderRadius: 12,
               backdropFilter: "blur(6px)",
               border: "1px solid rgba(255,255,255,0.1)",
+              position: "relative",
+              zIndex: 1,
             }}
           >
             <h5 className="fw-bold mb-3">Admin Notes</h5>

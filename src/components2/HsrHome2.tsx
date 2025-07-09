@@ -30,13 +30,13 @@ export default function HsrHome() {
       title: "Balance Cost",
       desc: "View current character account costs",
       btnText: "View Balance Cost",
-      url: "/cerydra-balance-cost",
+      url: "/cerydra/balance-cost",
     },
     {
       title: "Cost Test",
       desc: "Test your team's cost",
       btnText: "Cost Test",
-      url: "/cost-test",
+      url: "/cerydra/cost-test",
     },
     {
       title: "Player Statistics",

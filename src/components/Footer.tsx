@@ -2,27 +2,29 @@ import "./Footer.css";
 import { Link } from "react-router-dom";
 
 export default function Footer() {
+  // Smooth scroll to top on internal navigation
+  const handleInternalClick = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <footer className="footer-glass px-3 py-5 text-white position-relative overflow-hidden">
       <div className="container">
         <div className="row gy-4 align-items-start">
           {/* Brand / Description */}
           <div className="col-12 col-md-4">
-            {/* Logo Image */}
             <a href="/" className="d-inline-block mb-2">
               <img
                 src="/cipher.png"
                 alt="Cipher Logo"
                 style={{
-                  width: "200px", // or match whatever you use in the navbar
+                  width: "200px",
                   height: "auto",
                   objectFit: "contain",
                   verticalAlign: "middle",
                 }}
               />
             </a>
-
-            {/* Description */}
             <p className="text-white-50 small mb-3">
               Cipher is a competitive Honkai platform built for stats
               enthusiasts and passionate players.
@@ -37,32 +39,76 @@ export default function Footer() {
 
           {/* Site Navigation */}
           <div className="col-6 col-md-3">
-            <h6 className="fw-bold mb-3">Explore</h6>
+            <h6 className="fw-bold mb-3">Cipher Format</h6>
             <ul className="list-unstyled small">
               <li>
-                <Link to="/hsr" className="footer-link">
+                <Link
+                  to="/cipher"
+                  className="footer-link"
+                  onClick={handleInternalClick}
+                >
                   Home
                 </Link>
               </li>
               <li>
-                <Link to="/characters" className="footer-link">
+                <Link
+                  to="/cipher/characters"
+                  className="footer-link"
+                  onClick={handleInternalClick}
+                >
                   Character Stats
                 </Link>
               </li>
               <li>
-                <Link to="/players" className="footer-link">
+                <Link
+                  to="/cipher/players"
+                  className="footer-link"
+                  onClick={handleInternalClick}
+                >
                   Player Rankings
                 </Link>
               </li>
               <li>
-                <a
-                  href="https://discord.gg/MHzc5GRDQW"
+                <Link
+                  to="/cipher/insights"
                   className="footer-link"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={() =>
+                    window.scrollTo({ top: 0, behavior: "smooth" })
+                  }
                 >
-                  Discord
-                </a>
+                  Season Statistics
+                </Link>
+              </li>
+            </ul>
+
+            <h6 className="fw-bold mb-3 mt-4">Cerydra Format</h6>
+            <ul className="list-unstyled small">
+              <li>
+                <Link
+                  to="/cerydra"
+                  className="footer-link"
+                  onClick={handleInternalClick}
+                >
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/cerydra/balance-cost"
+                  className="footer-link"
+                  onClick={handleInternalClick}
+                >
+                  Balance Cost
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/cerydra/cost-test"
+                  className="footer-link"
+                  onClick={handleInternalClick}
+                >
+                  Cost Test
+                </Link>
               </li>
             </ul>
           </div>
@@ -90,9 +136,23 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <Link to="/terms" className="footer-link">
+                <Link
+                  to="/terms"
+                  className="footer-link"
+                  onClick={handleInternalClick}
+                >
                   Terms of Service
                 </Link>
+              </li>
+              <li>
+                <a
+                  href="https://discord.gg/MHzc5GRDQW"
+                  className="footer-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Discord
+                </a>
               </li>
             </ul>
           </div>
@@ -167,6 +227,7 @@ export default function Footer() {
               </div>
             </div>
           </div>
+
           <hr className="footer-divider my-4" />
           <p className="text-center text-white-50 small mb-0">
             © {new Date().getFullYear()} Cipher. All rights reserved.

@@ -69,7 +69,7 @@ export default function Profile() {
   const MAX_DESC_LEN = 512;
   const tidy = (s: string) => s.trim();
 
-  const openPlayer = (id: string) => navigate(`/player/${id}?season=${season}`);
+  const openPlayer = (id: string) => navigate(`/cipher/player/${id}?season=${season}`);
 
 
   useEffect(() => {

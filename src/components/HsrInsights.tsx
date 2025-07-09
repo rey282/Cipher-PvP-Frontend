@@ -166,7 +166,7 @@ export default function HsrInsights() {
 
         <div className="d-flex justify-content-end mt-3 mb-4">
           <div className="d-flex flex-column align-items-end gap-2">
-            <Link to="/hsr" className="btn back-button-glass">
+            <Link to="/cipher" className="btn back-button-glass">
               ← Back
             </Link>
             <select

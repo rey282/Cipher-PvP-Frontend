@@ -1,27 +1,74 @@
-// src/components/Navbar.tsx
 import { useAuth } from "../context/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 export default function Navbar() {
   const { user, loading, login, logout } = useAuth();
+  const location = useLocation();
+
+  const isCerydra = location.pathname.startsWith("/cerydra");
+  const isCipher = location.pathname.startsWith("/cipher");
+  const isLanding = location.pathname === "/";
+
+  const cipherNav = [
+    { label: "Home", path: "/cipher" },
+    { label: "Balance Cost", path: "/cipher/balance-cost" },
+    { label: "Player Stats", path: "/cipher/players" },
+    { label: "Insights", path: "/cipher/insights" },
+    { label: "MOC Stats", path: "/cipher/characters" },
+  ];
+
+  const cerydraNav = [
+    { label: "Home", path: "/cerydra" },
+    { label: "Balance Cost", path: "/cerydra/balance-cost" },
+    { label: "Cost Test", path: "/cerydra/cost-test" },
+  ];
+
+  const navLinks = isLanding
+    ? [
+        { label: "Cipher Format", path: "/cipher" },
+        { label: "Cerydra Format", path: "/cerydra" },
+      ]
+    : isCipher
+    ? cipherNav
+    : isCerydra
+    ? cerydraNav
+    : [];
 
   return (
     <nav className="w-100 px-2 py-3 d-flex justify-content-between align-items-center">
-      <a href="/" className="logo-title d-inline-block">
-        <img
-          src="/cipher.png"
-          alt="Cipher Logo"
-          style={{
-            width: "160px",
-            height: "auto",
-            objectFit: "contain",
-            verticalAlign: "middle",
-          }}
-        />
-      </a>
+      {/* Left: Logo */}
+      <div className="d-flex align-items-center gap-4 flex-wrap">
+        {/* Logo */}
+        <a href="/" className="logo-title d-inline-block">
+          <img
+            src="/cipher.png"
+            alt="Cipher Logo"
+            style={{
+              width: "160px",
+              height: "auto",
+              objectFit: "contain",
+              verticalAlign: "middle",
+            }}
+          />
+        </a>
+      </div>
 
-      <div className="d-flex align-items-center gap-3">
-        {/* Admin link (only if user is admin) */}
+      {/* Desktop Nav Links + Right side (hidden on mobile) */}
+      <div className="d-none d-md-flex align-items-center gap-4">
+        {/* Nav Links */}
+        <div className="d-flex align-items-center gap-4">
+          {navLinks.map((link) => (
+            <Link
+              key={link.path}
+              to={link.path}
+              className="admin-link fw-semibold text-decoration-none"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+
+        {/* Admin Link */}
         {user?.isAdmin && (
           <Link
             to="/admin"
@@ -31,7 +78,7 @@ export default function Navbar() {
           </Link>
         )}
 
-        {/* Avatar / Login button */}
+        {/* Login / Avatar */}
         {loading ? (
           <span className="text-white-50">…</span>
         ) : user ? (
@@ -89,21 +136,161 @@ export default function Navbar() {
             className="btn back-button-glass"
             onClick={() => login(window.location.href)}
           >
-            {
-              <img
-                src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
-                alt="Discord"
-                width={20}
-                height={20}
-                style={{
-                  filter: "brightness(0) saturate(100%) invert(100%)",
-                  marginBottom: 4,
-                }}
-              />
-            }{" "}
+            <img
+              src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
+              alt="Discord"
+              width={20}
+              height={20}
+              style={{
+                filter: "brightness(0) saturate(100%) invert(100%)",
+                marginBottom: 4,
+              }}
+            />
             &nbsp; Login with Discord
           </button>
         )}
+      </div>
+
+      {/* Mobile Hamburger (shown only on small screens) */}
+      <div className="d-md-none">
+        <button
+          className="btn btn-outline-light"
+          type="button"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#mobileNav"
+          aria-controls="mobileNav"
+          aria-label="Toggle navigation"
+        >
+          &#9776;
+        </button>
+
+        <div
+          className="offcanvas offcanvas-end text-bg-dark"
+          tabIndex={-1}
+          id="mobileNav"
+          aria-labelledby="mobileNavLabel"
+          style={{ width: "250px" }}
+        >
+          <div className="offcanvas-header">
+            <h5 className="offcanvas-title" id="mobileNavLabel">
+              Menu
+            </h5>
+            <button
+              type="button"
+              className="btn-close btn-close-white"
+              data-bs-dismiss="offcanvas"
+              aria-label="Close"
+            ></button>
+          </div>
+
+          <div className="offcanvas-body d-flex flex-column gap-3">
+            {/* Nav Links */}
+            {navLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className="admin-link fw-semibold text-decoration-none"
+                data-bs-dismiss="offcanvas"
+              >
+                {link.label}
+              </Link>
+            ))}
+
+            {/* Admin Link */}
+            {user?.isAdmin && (
+              <Link
+                to="/admin"
+                className="admin-link fw-semibold text-decoration-none"
+                data-bs-dismiss="offcanvas"
+              >
+                Admin
+              </Link>
+            )}
+
+            {/* Login / Avatar */}
+            {loading ? (
+              <span className="text-white-50">…</span>
+            ) : user ? (
+              <>
+                <div className="d-flex align-items-center gap-2">
+                  <img
+                    src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
+                    alt="avatar"
+                    className="rounded-circle"
+                    width={36}
+                    height={36}
+                  />
+                  <div>
+                    <div
+                      className="text-white fw-bold"
+                      style={{ fontSize: "0.9rem" }}
+                    >
+                      {user.global_name || user.username}
+                    </div>
+                    {user.global_name && (
+                      <div
+                        className="text-white-50"
+                        style={{ fontSize: "0.8rem" }}
+                      >
+                        @{user.username}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <Link
+                  to="/profile"
+                  className="admin-link fw-semibold text-decoration-none mt-3"
+                  data-bs-dismiss="offcanvas"
+                >
+                  Profile
+                </Link>
+                <button
+                  className="btn btn-link text-danger p-0 mt-1 text-start"
+                  onClick={() => {
+                    logout();
+                    // Also close offcanvas after logout
+                    const offcanvasEl = document.getElementById("mobileNav");
+                    if (offcanvasEl) {
+                      const bsOffcanvas = (
+                        window as any
+                      ).bootstrap.Offcanvas.getInstance(offcanvasEl);
+                      if (bsOffcanvas) bsOffcanvas.hide();
+                    }
+                  }}
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn back-button-glass"
+                onClick={() => {
+                  login(window.location.href);
+                  // Close offcanvas after login click
+                  const offcanvasEl = document.getElementById("mobileNav");
+                  if (offcanvasEl) {
+                    const bsOffcanvas = (
+                      window as any
+                    ).bootstrap.Offcanvas.getInstance(offcanvasEl);
+                    if (bsOffcanvas) bsOffcanvas.hide();
+                  }
+                }}
+              >
+                <img
+                  src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
+                  alt="Discord"
+                  width={20}
+                  height={20}
+                  style={{
+                    filter: "brightness(0) saturate(100%) invert(100%)",
+                    marginBottom: 4,
+                  }}
+                />
+                &nbsp; Login with Discord
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </nav>
   );

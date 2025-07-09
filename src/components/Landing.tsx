@@ -10,7 +10,7 @@ const games = [
     bg: "/HsrBackground.webp",
     icon: "/cipher-icon.webp",
     live: true,
-    link: "/hsr",
+    link: "/cipher",
   },
   {
     id: "hsr2",
@@ -18,7 +18,7 @@ const games = [
     bg: "/cerydra-bg.webp",
     icon: "/cerydra-icon.jpg",
     live: true,
-    link: "/hsr2",
+    link: "/cerydra",
   },
 ];
 

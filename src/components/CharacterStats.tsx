@@ -223,7 +223,7 @@ export default function CharacterStats() {
         <Navbar />
 
         <div className="w-100 d-flex justify-content-end mb-3 pe-4">
-          <Link to="/hsr" className="btn back-button-glass">
+          <Link to="/cipher" className="btn back-button-glass">
             ← Back
           </Link>
         </div>

@@ -24,7 +24,7 @@ const BalancePreview2 = lazy(() => import("./components2/BalancePreview2"));
 const CostTest = lazy(() => import("./components2/CostTest"));
 const RosterLog = lazy(() => import("./components/RosterLog"));
 
-/* ─────────── Layout wrapper (footer + toast + back-to-top) ─────────── */
+/* ─────────── Layout wrapper ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
   return (
     <>
@@ -34,12 +34,7 @@ function PageWithFooter({ children }: { children: React.ReactNode }) {
         position="top-right"
         autoClose={3000}
         hideProgressBar={false}
-        closeOnClick
-        pauseOnHover
-        draggable
-        style={{ marginTop: "80px" }}
       />
-
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         className="btn btn-light position-fixed"
@@ -80,78 +75,14 @@ export default function App() {
           </PageWithFooter>
         }
       />
-
-      {/* Game home */}
       <Route
-        path="/hsr"
+        path="/terms"
         element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <HsrHome />
-            </PageWithFooter>
-          </Suspense>
+          <PageWithFooter>
+            <TermsOfService />
+          </PageWithFooter>
         }
       />
-
-      <Route
-        path="/hsr2"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <HsrHome2 />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-
-      <Route
-        path="/hsr-insights"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <HsrInsights />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-
-      {/* Character stats */}
-      <Route
-        path="/characters"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <CharacterStats />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-
-      {/* Player ranking table */}
-      <Route
-        path="/players"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <PlayerStats />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-
-      {/* Public player performance page */}
-      <Route
-        path="/player/:id"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <PlayerProfile />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-
-      {/* Private logged-in profile page */}
       <Route
         path="/profile"
         element={
@@ -162,7 +93,6 @@ export default function App() {
           </Suspense>
         }
       />
-
       <Route
         path="/profile/:id"
         element={
@@ -173,102 +103,157 @@ export default function App() {
           </Suspense>
         }
       />
+      {/* Cipher Format */}
+      <Route path="/cipher">
+        <Route
+          index
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <HsrHome />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="characters"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <CharacterStats />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="players"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <PlayerStats />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="player/:id"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <PlayerProfile />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="insights"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <HsrInsights />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="balance-cost"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <BalancePreview />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+      </Route>
 
-      {/* Terms of Service */}
-      <Route
-        path="/terms"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <TermsOfService />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
+      {/* Cerydra Format */}
+      <Route path="/cerydra">
+        <Route
+          index
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <HsrHome2 />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="balance-cost"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <BalancePreview2 />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="cost-test"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <CostTest />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+      </Route>
 
-      {/* Admin pages */}
-      <Route
-        path="/admin"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <AdminPage />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-      <Route
-        path="/admin/balance"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <BalancePage />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-      <Route
-        path="/admin/cerydra-balance"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <BalancePage2 />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-      <Route
-        path="/admin/match-history"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <AdminMatchHistory />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-      <Route
-        path="/admin/roster-log"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <RosterLog />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-
-      {/* Public read-only balance preview */}
-      <Route
-        path="/balance-cost"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <BalancePreview />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-      <Route
-        path="/cerydra-balance-cost"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <BalancePreview2 />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
-      <Route
-        path="/cost-test"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <CostTest />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
+      {/* Admin Pages */}
+      <Route path="/admin">
+        <Route
+          index
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <AdminPage />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="balance"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <BalancePage />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="cerydra-balance"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <BalancePage2 />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="match-history"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <AdminMatchHistory />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="roster-log"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <RosterLog />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+      </Route>
 
       {/* 404 fallback */}
       <Route
