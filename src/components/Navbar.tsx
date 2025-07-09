@@ -1,5 +1,6 @@
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation } from "react-router-dom";
+import "../components/Landing.css";
 
 export default function Navbar() {
   const { user, loading, login, logout } = useAuth();
@@ -33,6 +34,16 @@ export default function Navbar() {
     : isCerydra
     ? cerydraNav
     : [];
+
+  const handleCloseOffcanvas = () => {
+    const offcanvasEl = document.getElementById("mobileNav");
+    if (offcanvasEl) {
+      const bsOffcanvas = (window as any).bootstrap.Offcanvas.getInstance(
+        offcanvasEl
+      );
+      if (bsOffcanvas) bsOffcanvas.hide();
+    }
+  };
 
   return (
     <nav className="w-100 px-2 py-3 d-flex justify-content-between align-items-center">
@@ -190,7 +201,7 @@ export default function Navbar() {
                 key={link.path}
                 to={link.path}
                 className="admin-link fw-semibold text-decoration-none"
-                data-bs-dismiss="offcanvas"
+                onClick={handleCloseOffcanvas}
               >
                 {link.label}
               </Link>
@@ -201,7 +212,7 @@ export default function Navbar() {
               <Link
                 to="/admin"
                 className="admin-link fw-semibold text-decoration-none"
-                data-bs-dismiss="offcanvas"
+                onClick={handleCloseOffcanvas}
               >
                 Admin
               </Link>
@@ -240,7 +251,7 @@ export default function Navbar() {
                 <Link
                   to="/profile"
                   className="admin-link fw-semibold text-decoration-none mt-3"
-                  data-bs-dismiss="offcanvas"
+                  onClick={handleCloseOffcanvas}
                 >
                   Profile
                 </Link>
@@ -248,7 +259,6 @@ export default function Navbar() {
                   className="btn btn-link text-danger p-0 mt-1 text-start"
                   onClick={() => {
                     logout();
-                    // Also close offcanvas after logout
                     const offcanvasEl = document.getElementById("mobileNav");
                     if (offcanvasEl) {
                       const bsOffcanvas = (
@@ -266,7 +276,6 @@ export default function Navbar() {
                 className="btn back-button-glass"
                 onClick={() => {
                   login(window.location.href);
-                  // Close offcanvas after login click
                   const offcanvasEl = document.getElementById("mobileNav");
                   if (offcanvasEl) {
                     const bsOffcanvas = (

@@ -475,3 +475,21 @@
   border-color: rgba(255, 255, 255, 0.1) !important;
   box-shadow: none !important;
 }
+
+#mobileNav a,
+#mobileNav button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  position: relative !important;
+  z-index: 1050 !important;
+}
+.offcanvas {
+  z-index: 1100 !important;
+  /* higher than backdrop */
+}
+
+.offcanvas-backdrop {
+  z-index: 1000 !important;
+  /* behind offcanvas */
+  pointer-events: auto !important;
+}
