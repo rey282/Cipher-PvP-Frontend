@@ -13,8 +13,8 @@ export default function Navbar() {
     { label: "Home", path: "/cipher" },
     { label: "Balance Cost", path: "/cipher/balance-cost" },
     { label: "Player Stats", path: "/cipher/players" },
-    { label: "Insights", path: "/cipher/insights" },
-    { label: "MOC Stats", path: "/cipher/characters" },
+    { label: "Season Stats", path: "/cipher/insights" },
+    { label: "Character Stats", path: "/cipher/characters" },
   ];
 
   const cerydraNav = [
