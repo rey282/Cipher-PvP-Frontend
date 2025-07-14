@@ -38,6 +38,9 @@ type Match = {
   oppCyclePenalty: number;
   myCycles: number[];
   oppCycles: number[];
+  redTeam: { id: string; name: string; cycles: number }[];
+  blueTeam: { id: string; name: string; cycles: number }[];
+  myTeamSide: "red" | "blue";
 };
 
 type CharMap = Record<string, { name: string; image_url: string }>;
@@ -474,7 +477,19 @@ export default function PlayerProfile() {
                       </div>
                       <div className="row">
                         <div className="col-md-6 mb-2">
-                          <h6 className="text-success">Your Team Picks</h6>
+                          <h6 className="text-success">
+                            Your Team Picks{" "}
+                            <span
+                              className={`badge bg-${
+                                m.myTeamSide === "red" ? "danger" : "primary"
+                              }`}
+                              style={{ marginLeft: 6 }}
+                            >
+                              {m.myTeamSide === "red"
+                                ? "Red Team"
+                                : "Blue Team"}
+                            </span>
+                          </h6>
                           {m.myPicks.map((c) => (
                             <CImg key={c} code={c} map={charMap} size={38} />
                           ))}
@@ -494,7 +509,20 @@ export default function PlayerProfile() {
                           )}
                         </div>
                         <div className="col-md-6 mb-2">
-                          <h6 className="text-danger">Opponent Picks</h6>
+                          <h6 className="text-danger">
+                            Opponent Picks{" "}
+                            <span
+                              className={`badge bg-${
+                                m.myTeamSide === "red" ? "primary" : "danger"
+                              }`}
+                              style={{ marginLeft: 6 }}
+                            >
+                              {m.myTeamSide === "red"
+                                ? "Blue Team"
+                                : "Red Team"}
+                            </span>
+                          </h6>
+
                           {m.oppPicks.map((c) => (
                             <CImg key={c} code={c} map={charMap} size={38} />
                           ))}
