@@ -34,6 +34,7 @@ function PageWithFooter({ children }: { children: React.ReactNode }) {
         position="top-right"
         autoClose={3000}
         hideProgressBar={false}
+        style={{ marginTop: "80px" }}
       />
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
