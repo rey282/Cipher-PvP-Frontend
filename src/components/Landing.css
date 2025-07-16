@@ -515,3 +515,13 @@
   transform: scale(1.1);
   opacity: 1;
 }
+
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 1050;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  border-bottom: none;
+}
