@@ -61,6 +61,18 @@
   -webkit-text-fill-color: transparent;
   color: transparent;
   text-shadow: 0 0 6px rgba(255, 255, 255, 0.25);
+  transition:
+    text-shadow 0.3s ease,
+    transform 0.2s ease;
+  display: inline-block;
+}
+
+.admin-link:hover {
+  transform: scale(1.06);
+  text-shadow:
+    0 0 6px rgba(168, 85, 247, 0.5),
+    0 0 12px rgba(236, 72, 153, 0.5),
+    0 0 18px rgba(255, 255, 255, 0.4);
 }
 
 /* ───────── hero title ───────── */
@@ -492,4 +504,14 @@
   z-index: 1000 !important;
   /* behind offcanvas */
   pointer-events: auto !important;
+}
+
+.navbar-logo-img {
+  opacity: 0.85;
+  transition: transform 0.2s ease;
+}
+
+.navbar-logo-img:hover {
+  transform: scale(1.1);
+  opacity: 1;
 }

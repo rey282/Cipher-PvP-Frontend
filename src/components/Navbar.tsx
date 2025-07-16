@@ -50,10 +50,11 @@ export default function Navbar() {
       {/* Left: Logo */}
       <div className="d-flex align-items-center gap-4 flex-wrap">
         {/* Logo */}
-        <a href="/" className="logo-title d-inline-block">
+        <a href="/" className="navbar-logo d-inline-block">
           <img
             src="/cipher.png"
             alt="Cipher Logo"
+            className="navbar-logo-img"
             style={{
               width: "160px",
               height: "auto",
