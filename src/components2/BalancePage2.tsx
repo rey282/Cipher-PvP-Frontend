@@ -557,81 +557,84 @@ export default function BalancePage2() {
                 <tbody>
                   {[...cones]
                     .sort((a, b) => {
-                      const rarityDiff = Number(b.rarity) - Number(a.rarity); // 5★ first
+                      const rarityDiff = Number(b.rarity) - Number(a.rarity);
                       if (rarityDiff !== 0) return rarityDiff;
 
                       const aHasSub = a.subname && a.subname.trim() !== "";
                       const bHasSub = b.subname && b.subname.trim() !== "";
-                      return Number(bHasSub) - Number(aHasSub); // subname first
+                      return Number(bHasSub) - Number(aHasSub);
                     })
-                    .map((c, ci) => (
-                      <tr key={c.id}>
-                        {/* name cell */}
-                        <td
-                          className="text-start"
-                          title={c.name}
-                          style={{
-                            backgroundColor: "transparent",
-                            color: "#fff",
-                            minWidth: "200px",
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "6px",
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          <img
-                            src={c.imageUrl}
-                            alt={c.name}
-                            style={{
-                              width: 28,
-                              height: 28,
-                              objectFit: "cover",
-                              borderRadius: 4,
-                              flexShrink: 0,
-                              marginTop: 2,
-                            }}
-                          />
-                          <div style={{ wordBreak: "break-word" }}>
-                            {c.name} {c.subname && `(${c.subname})`}
-                          </div>
-                        </td>
-                        <td
-                          style={{
-                            backgroundColor: "transparent",
-                            color: c.rarity === "5" ? "#ffd700" : "#c0c0c0",
-                            minWidth: "70px",
-                          }}
-                        >
-                          {c.rarity}★
-                        </td>
-                        {/* editable cost cells */}
-                        {c.costs.map((v, si) => (
+                    .map((c) => {
+                      const coneIdx = cones.findIndex((x) => x.id === c.id);
+                      return (
+                        <tr key={c.id}>
+                          {/* name cell */}
                           <td
-                            key={si}
+                            className="text-start"
+                            title={c.name}
                             style={{
                               backgroundColor: "transparent",
                               color: "#fff",
-                              minWidth: "85px",
+                              minWidth: "200px",
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: "6px",
+                              lineHeight: 1.2,
                             }}
                           >
-                            <input
-                              type="number"
-                              min={0}
-                              className="form-control form-control-sm bg-dark text-white border-secondary"
-                              style={{ width: 80 }}
-                              value={v}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                if (!Number.isNaN(val) && val >= 0) {
-                                  updateConeCost(ci, si, val);
-                                }
+                            <img
+                              src={c.imageUrl}
+                              alt={c.name}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                objectFit: "cover",
+                                borderRadius: 4,
+                                flexShrink: 0,
+                                marginTop: 2,
                               }}
                             />
+                            <div style={{ wordBreak: "break-word" }}>
+                              {c.name} {c.subname && `(${c.subname})`}
+                            </div>
                           </td>
-                        ))}
-                      </tr>
-                    ))}
+                          <td
+                            style={{
+                              backgroundColor: "transparent",
+                              color: c.rarity === "5" ? "#ffd700" : "#c0c0c0",
+                              minWidth: "70px",
+                            }}
+                          >
+                            {c.rarity}★
+                          </td>
+                          {/* editable cost cells */}
+                          {c.costs.map((v, si) => (
+                            <td
+                              key={si}
+                              style={{
+                                backgroundColor: "transparent",
+                                color: "#fff",
+                                minWidth: "85px",
+                              }}
+                            >
+                              <input
+                                type="number"
+                                min={0}
+                                className="form-control form-control-sm bg-dark text-white border-secondary"
+                                style={{ width: 80 }}
+                                value={v}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  if (!Number.isNaN(val) && val >= 0) {
+                                    updateConeCost(coneIdx, si, val);
+                                  }
+                                }}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
