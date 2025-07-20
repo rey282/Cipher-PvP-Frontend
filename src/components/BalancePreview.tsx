@@ -141,7 +141,7 @@ export default function BalanceView() {
                           backgroundColor: "transparent",
                           color: "#fff",
                           fontSize: "0.85rem",
-                          minWidth: "85px", // each E-column fixed width
+                          minWidth: "85px", 
                         }}
                       >
                         E{i}
@@ -159,13 +159,11 @@ export default function BalanceView() {
                         style={{
                           backgroundColor: "transparent",
                           color: "#fff",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
                           minWidth: "160px",
                           fontSize: "0.9rem",
                           display: "flex",
-                          alignItems: "center",
+                          alignItems: "flex-start",
+                          lineHeight: 1.2,
                         }}
                       >
                         <img
@@ -178,9 +176,11 @@ export default function BalanceView() {
                             objectFit: "cover",
                             borderRadius: 4,
                             marginRight: 6,
+                            flexShrink: 0,
+                            marginTop: 2,
                           }}
                         />
-                        {c.name}
+                        <div style={{ wordBreak: "break-word" }}>{c.name}</div>
                       </td>
 
                       {/* cost cells */}
