@@ -60,7 +60,7 @@ const genshinTeam = [
 
 export default function Landing() {
   const [selected, setSelected] = useState(1);
-  const [currentBg, setCurrentBg] = useState(games[0].bg);
+  const [currentBg, setCurrentBg] = useState(games[1].bg);
   const [fadeBg, setFadeBg] = useState("");
   const [bgFading, setBgFading] = useState(false);
 
