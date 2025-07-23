@@ -5,6 +5,14 @@ import Navbar from "../components/Navbar";
 
 const games = [
   {
+    id: "zzz",
+    name: "Coming Soon",
+    bg: "/zzz-bg.jpg",
+    icon: "/zzz-icon.jpg",
+    live: false,
+    link: "/zzz", // placeholder if needed
+  },
+  {
     id: "hsr",
     name: "Cipher PvP",
     bg: "/HsrBackground.webp",
@@ -51,7 +59,7 @@ const genshinTeam = [
 
 
 export default function Landing() {
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState(1);
   const [currentBg, setCurrentBg] = useState(games[0].bg);
   const [fadeBg, setFadeBg] = useState("");
   const [bgFading, setBgFading] = useState(false);
@@ -120,7 +128,9 @@ export default function Landing() {
   };
 
   const game = games[selected];
-  const team = game.id === "hsr" ? hsrTeam : genshinTeam;
+  const team =
+    game.id === "hsr" ? hsrTeam : game.id === "hsr2" ? genshinTeam : [];
+
 
   return (
     <div className={`landing-wrapper ${leaving ? "fade-out" : ""}`}>
@@ -183,30 +193,35 @@ export default function Landing() {
               style={{ maxWidth: 700, margin: "0 auto" }}
             >
               <p className="lead text-white mb-4">
-                {game.id === "hsr" ? (
+                {game.id === "zzz" ? (
+                  <></>
+                ) : game.id === "hsr" ? (
                   <>
                     Cipher PvP is a custom Honkai: Star Rail PvP mode featuring
-                    strategic drafts and preban mechanics. Players are given
-                    bans based on their account's cost, ensuring fairness and
-                    balance.
+                    strategic drafts and preban mechanics...
                   </>
                 ) : (
                   <>
                     Cerydra PvP is a custom Honkai: Star Rail PvP mode with unit
-                    and Eidolon costs. Lower-cost drafts gain cycle advantages,
-                    keeping matches fair and F2P-friendly even with E0 teams.
+                    and Eidolon costs...
                   </>
                 )}
               </p>
             </div>
 
             <div className="mt-3">
-              <button
-                className="btn angled-btn"
-                onClick={() => gotoLivePage(game.link!)}
-              >
-                Start Now
-              </button>
+              {game.live ? (
+                <button
+                  className="btn angled-btn"
+                  onClick={() => gotoLivePage(game.link!)}
+                >
+                  Start Now
+                </button>
+              ) : (
+                <button className="btn angled-btn disabled" disabled>
+                  Coming Soon
+                </button>
+              )}
             </div>
           </div>
         </div>
