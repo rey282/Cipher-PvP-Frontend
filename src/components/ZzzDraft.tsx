@@ -636,41 +636,39 @@ export default function ZzzDraftPage() {
               </div>
             ));
           })()}
-          <div className="text-center mb-3">
-            <button
-              className="btn back-button-glass"
-              onClick={handleUndo}
-              disabled={currentTurn === 0}
-            >
-              ⟲ Undo
-            </button>
-          </div>
         </div>
 
-        {/* Character Pool */}
+        {/* Search Bar + Undo (always visible) */}
+        <div className="mb-3 w-100 d-flex justify-content-center align-items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search characters..."
+            value={keyboardSearch}
+            onChange={(e) => setKeyboardSearch(e.target.value)}
+            style={{
+              maxWidth: "300px",
+              backgroundColor: "rgba(255,255,255,0.08)",
+              color: "white",
+              border: "1px solid rgba(255,255,255,0.25)",
+            }}
+          />
+          <button
+            className="btn back-button-glass"
+            onClick={handleUndo}
+            disabled={currentTurn === 0}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            ⟲ Undo
+          </button>
+        </div>
+
+        {/* Character Grid (only if draft not complete) */}
         {!draftComplete && (
           <div
             className="mb-5 px-2"
             style={{ maxWidth: "1000px", margin: "0 auto" }}
           >
-            {/* Search Bar */}
-            <div className="mb-3 w-100 d-flex justify-content-center">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search characters..."
-                value={keyboardSearch}
-                onChange={(e) => setKeyboardSearch(e.target.value)}
-                style={{
-                  maxWidth: "300px",
-                  backgroundColor: "rgba(255,255,255,0.08)",
-                  color: "white",
-                  border: "1px solid rgba(255,255,255,0.25)",
-                }}
-              />
-            </div>
-
-            {/* Grid */}
             <div
               style={{
                 display: "grid",
