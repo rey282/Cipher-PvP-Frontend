@@ -8,11 +8,11 @@ import { toast } from "react-toastify";
 const games = [
   {
     id: "zzz",
-    name: "Coming Soon",
-    bg: "/zzz-bg.jpg",
-    icon: "/zzz-icon.jpg",
+    name: "Vivian PvP",
+    bg: "/zzz-bg.webp",
+    icon: "/zzz-icon.jpeg",
     live: true,
-    link: "/zzz", 
+    link: "/zzz",
   },
   {
     id: "hsr",
@@ -284,7 +284,9 @@ export default function Landing() {
             >
               <p className="lead text-white mb-4">
                 {game.id === "zzz" ? (
-                  <></>
+                  <>Vivian PvP is a custom Zenless Zone Zero PvP mode for 2v2 and 3v3 on 
+                  Deadly Assault...
+                  </>
                 ) : game.id === "hsr" ? (
                   <>
                     Cipher PvP is a custom Honkai: Star Rail PvP mode featuring

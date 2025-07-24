@@ -561,3 +561,16 @@ nav {
   background-color: #0af;
   border: none;
 }
+
+span.beta-badge {
+  background: #ffcc00 !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  padding: 3px 8px !important;
+  border-radius: 4px !important;
+  letter-spacing: 0.5px !important;
+  display: inline-block !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+}

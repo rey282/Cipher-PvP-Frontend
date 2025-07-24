@@ -355,12 +355,6 @@ export default function ZzzDraftPage() {
 
       <div className="position-relative z-2 text-white px-4">
         <Navbar />
-
-        <div className="my-3 text-end">
-          <a href="/" className="btn back-button-glass">
-            ← Back
-          </a>
-        </div>
       </div>
 
       <div
