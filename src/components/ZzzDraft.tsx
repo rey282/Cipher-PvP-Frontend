@@ -187,6 +187,7 @@ export default function ZzzDraftPage() {
     };
     setDraftPicks(updated);
     setCurrentTurn((prev) => prev + 1);
+    setKeyboardSearch("");
   };
 
   const handleUndo = () => {
