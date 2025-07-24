@@ -313,8 +313,7 @@ export default function ZzzDraftPage() {
       fontSize: "0.9rem",
       color: "#ccc",
       boxShadow:
-        isActive && !draftComplete ? `0 0 10px 2px ${borderColor}` : "none",
-      animation: isActive && !draftComplete ? "pulse 1s infinite" : "none",
+        isActive && !draftComplete ? `0 0 10px 4px ${borderColor}` : "none",
       overflow: "hidden",
       position: "relative" as const,
       flexDirection: "column" as const,
@@ -346,14 +345,6 @@ export default function ZzzDraftPage() {
           WebkitBackdropFilter: "blur(12px)",
         }}
       />
-      <style>{`
-        @keyframes pulse {
-          0% { box-shadow: 0 0 5px 2px rgba(255,255,255,0.4); }
-          50% { box-shadow: 0 0 10px 4px rgba(255,255,255,0.8); }
-          100% { box-shadow: 0 0 5px 2px rgba(255,255,255,0.4); }
-        }
-      `}</style>
-
       <div className="position-relative z-2 text-white px-4">
         <Navbar />
       </div>
