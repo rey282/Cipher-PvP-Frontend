@@ -525,3 +525,39 @@ nav {
   box-shadow: none;
   border-bottom: none;
 }
+
+.custom-dark-modal {
+  background-color: #121212;
+  color: white;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.custom-dark-modal .form-control {
+  background-color: #1e1e1e;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.custom-dark-modal .form-control::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.custom-dark-modal .form-check-label {
+  color: white;
+}
+
+.custom-dark-modal .modal-header,
+.custom-dark-modal .modal-footer {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.custom-dark-modal .btn-secondary {
+  background-color: #333;
+  border: none;
+}
+
+.custom-dark-modal .btn-primary {
+  background-color: #0af;
+  border: none;
+}

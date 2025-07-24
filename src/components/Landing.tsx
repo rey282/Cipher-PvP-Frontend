@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Landing.css";
 import Navbar from "../components/Navbar";
+import { Modal, Button, Form } from "react-bootstrap";
+import { toast } from "react-toastify";
 
 const games = [
   {
@@ -9,8 +11,8 @@ const games = [
     name: "Coming Soon",
     bg: "/zzz-bg.jpg",
     icon: "/zzz-icon.jpg",
-    live: false,
-    link: "/zzz", // placeholder if needed
+    live: true,
+    link: "/zzz", 
   },
   {
     id: "hsr",
@@ -67,7 +69,30 @@ export default function Landing() {
   const [leaving, setLeaving] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
 
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [team1Name, setTeam1Name] = useState("");
+  const [team2Name, setTeam2Name] = useState("");
+  const [mode, setMode] = useState("2v2");
   const navigate = useNavigate();
+
+  const handleStart = () => {
+    if (!team1Name.trim() || !team2Name.trim()) {
+      toast.warn("Please enter both team names.");
+      return;
+    }
+
+    const names = [team1Name.trim(), team2Name.trim()];
+    const [team1, team2] = Math.random() < 0.5 ? names : [names[1], names[0]];
+
+    const query = new URLSearchParams({
+      team1,
+      team2,
+      mode,
+    });
+
+    navigate(`/zzz/draft?${query.toString()}`);
+  };
+
 
   /* ───────── Ko-fi floating widget ───────── */
   useEffect(() => {
@@ -153,6 +178,71 @@ export default function Landing() {
         {/* ───────── top nav ───────── */}
         <Navbar />
 
+        <Modal
+          show={showDraftModal}
+          onHide={() => setShowDraftModal(false)}
+          centered
+          contentClassName="custom-dark-modal"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Start Draft</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label>Team 1 Name</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter Team 1 name"
+                  value={team1Name}
+                  onChange={(e) => setTeam1Name(e.target.value)}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Team 2 Name</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter Team 2 name"
+                  value={team2Name}
+                  onChange={(e) => setTeam2Name(e.target.value)}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Mode</Form.Label>
+                <div className="d-flex gap-3">
+                  <Form.Check
+                    inline
+                    label="2v2"
+                    name="mode"
+                    type="radio"
+                    checked={mode === "2v2"}
+                    onChange={() => setMode("2v2")}
+                  />
+                  <Form.Check
+                    inline
+                    label="3v3"
+                    name="mode"
+                    type="radio"
+                    checked={mode === "3v3"}
+                    onChange={() => setMode("3v3")}
+                  />
+                </div>
+              </Form.Group>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowDraftModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleStart}>
+              Start
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
         {/* ───────── hero section ───────── */}
         <div className="flex-grow-1 d-flex flex-column justify-content-center align-items-center text-center">
           <div className="hero animate__animated animate__fadeInDown text-white">
@@ -210,7 +300,14 @@ export default function Landing() {
             </div>
 
             <div className="mt-3">
-              {game.live ? (
+              {game.id === "zzz" ? (
+                <button
+                  className="btn angled-btn"
+                  onClick={() => setShowDraftModal(true)}
+                >
+                  Start Now
+                </button>
+              ) : game.live ? (
                 <button
                   className="btn angled-btn"
                   onClick={() => gotoLivePage(game.link!)}
