@@ -16,7 +16,6 @@ interface CharacterInfo {
   element: string;
 }
 
-
 interface CharacterCost {
   id: string;
   name: string;
@@ -71,9 +70,7 @@ export default function CostTestPage() {
     const coneSub = cone.subname?.toLowerCase() || "";
     const charName = char.name.toLowerCase();
 
-    return (
-      coneSub === charName
-    );
+    return coneSub === charName;
   };
 
   const extractImageId = (url: string) => {
@@ -121,7 +118,6 @@ export default function CostTestPage() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-  
 
   useEffect(() => {
     Promise.all([
@@ -185,14 +181,6 @@ export default function CostTestPage() {
   }, [team, charCosts, cones]);
 
   const assignCharacterToSlot = (char: CharacterInfo) => {
-    const alreadyInTeam = team.some(
-      (member) => member.characterId === char.code
-    );
-    if (alreadyInTeam) {
-      alert(`${char.name} is already in the team.`);
-      return;
-    }
-
     const firstEmpty = team.findIndex((m) => !m.characterId);
     if (firstEmpty === -1) return;
 
@@ -208,9 +196,11 @@ export default function CostTestPage() {
       };
       return newTeam;
     });
+
     setSearch("");
     setConeSearch("");
   };
+
 
   const removeSlot = (index: number) => {
     const filtered = team.filter((_, i) => i !== index);
@@ -241,7 +231,7 @@ export default function CostTestPage() {
     };
     setTeam(newTeam);
     setShowModal(false);
-    setConeSearch(""); 
+    setConeSearch("");
   };
 
   if (loading || error) {
@@ -677,35 +667,30 @@ export default function CostTestPage() {
                 })
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((char) => {
-                  const isInTeam = team.some(
-                    (member) => member.characterId === char.code
-                  );
                   return (
                     <div
                       key={char.code}
-                      onClick={() => !isInTeam && assignCharacterToSlot(char)}
+                      onClick={() => assignCharacterToSlot(char)}
                       title={char.name}
                       style={{
                         width: "70px",
                         height: "70px",
                         borderRadius: "8px",
-                        border: isInTeam ? "2px solid #888" : "2px solid #555",
+                        border: "2px solid #555",
                         backgroundImage: `url(${char.image_url})`,
                         backgroundSize: "cover",
                         backgroundPosition: "center",
-                        cursor: isInTeam ? "not-allowed" : "pointer",
-                        opacity: isInTeam ? 0.4 : 1,
-                        pointerEvents: isInTeam ? "none" : "auto",
+                        cursor: "pointer",
+                        opacity: 1,
+                        pointerEvents: "auto",
                         transition:
                           "transform 0.15s ease, box-shadow 0.15s ease",
                         boxShadow: "none",
                       }}
                       onMouseEnter={(e) => {
-                        if (!isInTeam) {
-                          e.currentTarget.style.transform = "scale(1.1)";
-                          e.currentTarget.style.boxShadow =
-                            "0 0 8px rgba(255,255,255,0.4)";
-                        }
+                        e.currentTarget.style.transform = "scale(1.1)";
+                        e.currentTarget.style.boxShadow =
+                          "0 0 8px rgba(255,255,255,0.4)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.transform = "scale(1)";
