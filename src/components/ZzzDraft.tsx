@@ -64,7 +64,7 @@ export default function ZzzDraftPage() {
         "R",
         "B",
       ]
-    : ["B", "R", "R", "B", "RR", "BB", "R", "B", "B", "R", "R", "B", "B", "R"];
+    : ["B", "R", "R", "B", "RR", "BB", "R", "B", "B", "R", "R(ACE)", "B(ACE)", "B", "R"];
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [wengines, setWengines] = useState<WEngine[]>([]);
