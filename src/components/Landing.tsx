@@ -53,13 +53,22 @@ const genshinTeamIds: { id: string; role: string }[] = [
   { id: "693052597812330536", role: "Balancer" },
 ];
 
+const zzzTeamIds: { id: string; role: string }[] = [
+  { id: "663145925807702029", role: "Server Owner" },
+  { id: "371513247641370625", role: "Developer" },
+  { id: "313955497604677633", role: "Staff" },
+  { id: "478408402700206081", role: "Staff" },
+];
+
 // ─── In-memory cache ───
 const teamCache: {
   hsr: any[] | null;
   genshin: any[] | null;
+  zzz: any[] | null;
 } = {
   hsr: null,
   genshin: null,
+  zzz: null,
 };
 
 export default function Landing() {
@@ -75,6 +84,7 @@ export default function Landing() {
   const [mode, setMode] = useState("2v2");
   const [hsrTeamProfiles, setHsrTeamProfiles] = useState<any[]>([]);
   const [genshinTeamProfiles, setGenshinTeamProfiles] = useState<any[]>([]);
+  const [zzzTeamProfiles, setZzzTeamProfiles] = useState<any[]>([]);
 
   const navigate = useNavigate();
 
@@ -151,12 +161,14 @@ export default function Landing() {
       ? hsrTeamProfiles
       : game.id === "hsr2"
       ? genshinTeamProfiles
+      : game.id === "zzz"
+      ? zzzTeamProfiles
       : [];
 
   // Cached fetch
   const fetchProfiles = async (
     teamList: { id: string; role: string }[],
-    cacheKey: "hsr" | "genshin",
+    cacheKey: "hsr" | "genshin" | "zzz",
     setter: (profiles: any[]) => void
   ) => {
     if (teamCache[cacheKey]) {
@@ -196,6 +208,7 @@ export default function Landing() {
   useEffect(() => {
     fetchProfiles(hsrTeamIds, "hsr", setHsrTeamProfiles);
     fetchProfiles(genshinTeamIds, "genshin", setGenshinTeamProfiles);
+    fetchProfiles(zzzTeamIds, "zzz", setZzzTeamProfiles);
   }, []);
 
   return (
