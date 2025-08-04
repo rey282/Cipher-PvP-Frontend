@@ -88,8 +88,15 @@ const mocOptions = [
     bossImages: ["/bosses/alltime.png"],
   },
   {
-    label: "Lupine Moon-Devourer (3.3)",
+    label: "Gambler's Plight (3.4)",
     value: 0,
+    name: "Gambler's Plight",
+    duration: "04 Aug 2025 → 15 Sep 2025",
+    bossImages: ["/bosses/svarog.png", "/bosses/aventurine.png"],
+  },
+  {
+    label: "Lupine Moon-Devourer (3.3)",
+    value: 3,
     name: "Lupine Moon-Devourer",
     duration: "23 Jun 2025 → 04 Aug 2025",
     bossImages: ["/bosses/sting.png", "/bosses/hoolay.png"],

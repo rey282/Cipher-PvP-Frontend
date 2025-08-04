@@ -32,47 +32,50 @@ const games = [
   },
 ];
 
-const hsrTeam = [
-  {
-    name: "Markistador",
-    role: "Server Owner / Balancer",
-    avatar: "/avatars/mark.png",
-  },
-  { name: "YanYan", role: "Developer", avatar: "/avatars/yanyan.png" },
-  { name: "Haya", role: "Developer", avatar: "/avatars/haya.png" },
-  { name: "bonk", role: "Balancer", avatar: "/avatars/bonk.png" },
-  { name: "Scaphism", role: "Balancer", avatar: "/avatars/scappy.png" },
-  { name: "Toscap", role: "Moderator", avatar: "/avatars/toscap.png" },
-  { name: "frog detective", role: "Moderator", avatar: "/avatars/frog.png" },
+// Team member IDs + roles
+const hsrTeamIds: { id: string; role: string }[] = [
+  { id: "663145925807702029", role: "Server Owner / Balancer" },
+  { id: "249042315736252417", role: "Developer" },
+  { id: "371513247641370625", role: "Developer" },
+  { id: "693052597812330536", role: "Balancer" },
+  { id: "478408402700206081", role: "Balancer" },
+  { id: "381948397591986220", role: "Balancer" },
 ];
 
-const genshinTeam = [
-  {
-    name: "Markistador",
-    role: "Server Owner / Balancer",
-    avatar: "/avatars/mark.png",
-  },
-  { name: "YanYan", role: "Developer", avatar: "/avatars/yanyan.png" },
-  { name: "Haya", role: "Developer", avatar: "/avatars/haya.png" },
-  { name: "risa", role: "Balancer", avatar: "/avatars/risa.png" },
-  { name: "Lexi", role: "Balancer", avatar: "/avatars/lexi.png" },
-  { name: "Arkeyy", role: "Balancer", avatar: "/avatars/arkeyy.png" },
+const genshinTeamIds: { id: string; role: string }[] = [
+  { id: "663145925807702029", role: "Server Owner / Balancer" },
+  { id: "249042315736252417", role: "Developer" },
+  { id: "371513247641370625", role: "Developer" },
+  { id: "486164092931932179", role: "Balancer" },
+  { id: "841509164673269792", role: "Balancer" },
+  { id: "115890480813703175", role: "Balancer" },
+  { id: "265624516762271745", role: "Balancer" },
+  { id: "693052597812330536", role: "Balancer" },
 ];
 
+// ─── In-memory cache ───
+const teamCache: {
+  hsr: any[] | null;
+  genshin: any[] | null;
+} = {
+  hsr: null,
+  genshin: null,
+};
 
 export default function Landing() {
   const [selected, setSelected] = useState(1);
   const [currentBg, setCurrentBg] = useState(games[1].bg);
   const [fadeBg, setFadeBg] = useState("");
   const [bgFading, setBgFading] = useState(false);
-
   const [leaving, setLeaving] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
-
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [team1Name, setTeam1Name] = useState("");
   const [team2Name, setTeam2Name] = useState("");
   const [mode, setMode] = useState("2v2");
+  const [hsrTeamProfiles, setHsrTeamProfiles] = useState<any[]>([]);
+  const [genshinTeamProfiles, setGenshinTeamProfiles] = useState<any[]>([]);
+
   const navigate = useNavigate();
 
   const handleStart = () => {
@@ -80,25 +83,15 @@ export default function Landing() {
       toast.warn("Please enter both team names.");
       return;
     }
-
     const names = [team1Name.trim(), team2Name.trim()];
     const [team1, team2] = Math.random() < 0.5 ? names : [names[1], names[0]];
-
-    const query = new URLSearchParams({
-      team1,
-      team2,
-      mode,
-    });
-
+    const query = new URLSearchParams({ team1, team2, mode });
     navigate(`/zzz/draft?${query.toString()}`);
   };
 
-
-  /* ───────── Ko-fi floating widget ───────── */
+  // Ko-fi widget
   useEffect(() => {
-    
     if (document.getElementById("kofi-widget-script")) {
-  
       const w = (window as any).kofiWidgetOverlay;
       if (w) {
         w.draw("haya28", {
@@ -112,7 +105,7 @@ export default function Landing() {
     }
 
     const script = document.createElement("script");
-    script.id = "kofi-widget-script"; // 👈 ID for duplicate protection
+    script.id = "kofi-widget-script";
     script.src = "https://storage.ko-fi.com/cdn/scripts/overlay-widget.js";
     script.async = true;
     script.onload = () => {
@@ -128,9 +121,8 @@ export default function Landing() {
     };
     document.body.appendChild(script);
   }, []);
-  
 
-  /* ───────── background cross-fade ───────── */
+  // Crossfade background
   useEffect(() => {
     if (!bgFading) return;
     const t = setTimeout(() => {
@@ -140,6 +132,7 @@ export default function Landing() {
     return () => clearTimeout(t);
   }, [bgFading, fadeBg]);
 
+  // Change game background
   const changeGame = (i: number) => {
     if (games[i].bg === currentBg) return;
     setFadeBg(games[i].bg);
@@ -154,8 +147,56 @@ export default function Landing() {
 
   const game = games[selected];
   const team =
-    game.id === "hsr" ? hsrTeam : game.id === "hsr2" ? genshinTeam : [];
+    game.id === "hsr"
+      ? hsrTeamProfiles
+      : game.id === "hsr2"
+      ? genshinTeamProfiles
+      : [];
 
+  // Cached fetch
+  const fetchProfiles = async (
+    teamList: { id: string; role: string }[],
+    cacheKey: "hsr" | "genshin",
+    setter: (profiles: any[]) => void
+  ) => {
+    if (teamCache[cacheKey]) {
+      setter(teamCache[cacheKey]!);
+      return;
+    }
+
+    const results = await Promise.all(
+      teamList.map((member) =>
+        fetch(
+          `${import.meta.env.VITE_API_BASE}/api/player/${member.id}/summary`,
+          {
+            credentials: "include",
+          }
+        )
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) =>
+            data
+              ? {
+                  id: member.id,
+                  avatar: data.avatar,
+                  username: data.username,
+                  global_name: data.global_name,
+                  role: member.role,
+                }
+              : null
+          )
+          .catch(() => null)
+      )
+    );
+
+    const filtered = results.filter(Boolean) as any[];
+    teamCache[cacheKey] = filtered;
+    setter(filtered);
+  };
+
+  useEffect(() => {
+    fetchProfiles(hsrTeamIds, "hsr", setHsrTeamProfiles);
+    fetchProfiles(genshinTeamIds, "genshin", setGenshinTeamProfiles);
+  }, []);
 
   return (
     <div className={`landing-wrapper ${leaving ? "fade-out" : ""}`}>
@@ -175,7 +216,6 @@ export default function Landing() {
         className="position-relative z-2 text-white d-flex flex-column px-4"
         style={{ minHeight: "100vh" }}
       >
-        {/* ───────── top nav ───────── */}
         <Navbar />
 
         <Modal
@@ -243,12 +283,11 @@ export default function Landing() {
           </Modal.Footer>
         </Modal>
 
-        {/* ───────── hero section ───────── */}
+        {/* ───── Hero Section ───── */}
         <div className="flex-grow-1 d-flex flex-column justify-content-center align-items-center text-center">
           <div className="hero animate__animated animate__fadeInDown text-white">
             <h2 className="game-title mb-4">{game.name}</h2>
 
-            {/* Our Team hover button */}
             {team.length > 0 && (
               <div
                 className="team-button-wrapper position-relative"
@@ -256,19 +295,22 @@ export default function Landing() {
                 onMouseLeave={() => setShowTeam(false)}
               >
                 <button className="btn btn-team">Our Team</button>
-
-                {/* pop-up */}
                 <div className={`team-popup ${showTeam ? "show" : ""}`}>
                   {team.map((m, idx) => (
                     <div key={idx} className="member-row">
                       <img
-                        src={m.avatar}
-                        alt={m.name}
+                        src={
+                          m.avatar
+                            ? `https://cdn.discordapp.com/avatars/${m.id}/${m.avatar}.png?size=64`
+                            : "/avatars/default.png"
+                        }
+                        alt={m.username}
                         className="member-avatar"
                       />
-                      {/* changed span/small => div so they stack */}
                       <div className="member-info">
-                        <div className="member-name">{m.name}</div>
+                        <div className="member-name">
+                          {m.global_name || m.username}
+                        </div>
                         <div className="member-role">{m.role}</div>
                       </div>
                     </div>
@@ -284,8 +326,9 @@ export default function Landing() {
             >
               <p className="lead text-white mb-4">
                 {game.id === "zzz" ? (
-                  <>Vivian PvP is a custom Zenless Zone Zero PvP mode for 2v2 and 3v3 on 
-                  Deadly Assault...
+                  <>
+                    Vivian PvP is a custom Zenless Zone Zero PvP mode for 2v2
+                    and 3v3 on Deadly Assault...
                   </>
                 ) : game.id === "hsr" ? (
                   <>
@@ -325,7 +368,7 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* ───────── game selector ───────── */}
+        {/* ───── Game Selector ───── */}
         <div className="game-nav d-flex justify-content-center gap-4 pb-5">
           {games.map((g, i) => (
             <img
