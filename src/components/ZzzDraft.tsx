@@ -145,22 +145,28 @@ export default function ZzzDraftPage() {
             will fight.
           </li>
           <li>3v3: Draft, then fight all 3 bosses.</li>
-          <li>The bosses that are picked by each team must not be the same.</li>
+          <li>The bosses picked in 2v2 must be unique for a team.</li>
         </ul>
         <strong>Draft:</strong>
         <p>Three pick types: Bans, Ace(s), Normal Pick.</p>
+        <p>
+          During draft, select agents and wengines up to 8/12 cost for 2v2/3v3
+          respectively. Over cost limit results in score penalty.
+        </p>
+        <p>Drafting phase will proceed as the number shown in the box.</p>
+        <strong>Picks:</strong>
         <ul>
           <li>
-            During draft, select agents and wengines up to 8/12 cost for 2v2/3v3
-            respectively.
+            <strong>Normal pick (blank boxes):</strong> pick unpicked/unbanned
+            agents.
           </li>
-          <li>Over cost limit results in score penalty.</li>
-          <li>Blue team always starts first.</li>
-          <li>Normal pick: pick unpicked/unbanned agents.</li>
-          <li>Ban: elect an agent to ban (cannot ban first 4 picks).</li>
           <li>
-            Ace pick: select any unbanned agent, including opponent's picks;
-            only one copy per team allowed.
+            <strong>Ban (red boxes):</strong> elect an agent to ban (cannot ban
+            first 4 picks).
+          </li>
+          <li>
+            <strong>Ace pick (orange/yellow boxes):</strong> select any unbanned
+            agent, including opponent's picks; only one copy per team allowed.
           </li>
         </ul>
         <strong>Cost:</strong>
@@ -196,7 +202,8 @@ export default function ZzzDraftPage() {
         <strong>Play:</strong>
         <p>
           After draft, players select bosses and test teams. Runs must be live
-          streamed for fairness.
+          streamed for fairness. If you are unable to stream the run, ask your
+          opponents' consent for screenshot submission.
         </p>
         <strong>Discord Server:</strong>{" "}
         <a
@@ -210,6 +217,7 @@ export default function ZzzDraftPage() {
       </Popover.Body>
     </Popover>
   );
+
 
 
   const bannedCodes = draftPicks
