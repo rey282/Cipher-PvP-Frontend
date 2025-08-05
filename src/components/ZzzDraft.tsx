@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import "../components/Landing.css";
 import { useLocation } from "react-router-dom";
 import { Modal, Button } from "react-bootstrap";
+import { Popover, OverlayTrigger } from "react-bootstrap";
 
 
 type Character = {
@@ -98,6 +99,121 @@ export default function ZzzDraftPage() {
     is3v3 ? [0, 0, 0] : [0, 0]
   );
 
+  const pvpRulesPopover = (
+    <Popover
+      id="pvp-rules-popover"
+      style={{
+        maxWidth: 350,
+        backgroundColor: "#1e1e2f",
+        color: "#ddd", 
+        border: "1px solid #444",
+      }}
+    >
+      <Popover.Header
+        as="h3"
+        style={{
+          fontSize: "1.1rem",
+          fontWeight: "bold",
+          backgroundColor: "#2c2c44",
+          color: "#eee",
+          borderBottom: "1px solid #444",
+        }}
+      >
+        PvP Rules
+      </Popover.Header>
+      <Popover.Body
+        style={{
+          maxHeight: 300,
+          overflowY: "auto",
+          fontSize: 12,
+          textAlign: "left",
+          whiteSpace: "normal",
+          paddingRight: 10,
+          backgroundColor: "#1e1e2f",
+          color: "#ddd",
+        }}
+      >
+        <strong>Rules:</strong>
+        <p>
+          For ZZZ PvP you can fight in either of 2 modes, 2v2 or 3v3 in Deadly
+          Assault boss stages where you compete for the highest total score.
+        </p>
+        <strong>Match Procedure:</strong>
+        <ul>
+          <li>
+            2v2: Make teams, draft, then select 2 out of the 3 bosses your team
+            will fight.
+          </li>
+          <li>3v3: Draft, then fight all 3 bosses.</li>
+          <li>
+            The bosses picked in 2v2 must be unique for a team. Each team has 2
+            resets.
+          </li>
+        </ul>
+        <strong>Draft:</strong>
+        <p>Three pick types: Bans, Ace(s), Normal Pick.</p>
+        <ul>
+          <li>
+            During draft, select agents and wengines up to 8/12 cost for 2v2/3v3
+            respectively.
+          </li>
+          <li>Over cost limit results in score penalty.</li>
+          <li>Blue team always starts first.</li>
+          <li>Normal pick: pick unpicked/unbanned agents.</li>
+          <li>Ban: elect an agent to ban (cannot ban first 4 picks).</li>
+          <li>
+            Ace pick: select any unbanned agent, including opponent's picks;
+            only one copy per team allowed.
+          </li>
+        </ul>
+        <strong>Cost:</strong>
+        <ul>
+          <li>
+            Limited S Rank agent: starts at 1 cost, increases by 0.5 per unique
+            mindscape (except M3 & M5).
+          </li>
+          <li>Standard S Rank agent: starts at 1, 1.5 cost at M6.</li>
+          <li>All A Rank agents: 0.5 cost all mindscapes.</li>
+          <li>
+            Limited S Rank wengines: 0.25 starting cost, 0.5 at W3+ refinements.
+          </li>
+          <li>
+            Standard S Rank wengines: 0 starting cost, 0.25 at W3+ refinements.
+          </li>
+          <li>A & B Rank wengines: 0 cost at all refinements.</li>
+          <li>Bangboos do not cost points.</li>
+        </ul>
+        <strong>Penalty and Resets:</strong>
+        <ul>
+          <li>
+            Every 0.25 points above limit (8 for 2v2, 12 for 3v3) reduces team
+            score by 2500.
+          </li>
+          <li>Each team has 2 resets per match.</li>
+          <li>Resets must be used before battle end screen.</li>
+          <li>
+            Battle starts when boss appears; resets after consume one reset.
+          </li>
+          <li>Previous runs voided; only latest run counts.</li>
+        </ul>
+        <strong>Play:</strong>
+        <p>
+          After draft, players select bosses and test teams. Runs must be live
+          streamed for fairness.
+        </p>
+        <strong>Discord Server:</strong>{" "}
+        <a
+          href="https://discord.gg/your-invite-code"
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: "#57a6ff", textDecoration: "underline" }}
+        >
+          Join Discord Server
+        </a>
+      </Popover.Body>
+    </Popover>
+  );
+
 
   const bannedCodes = draftPicks
     .map((pick, i) =>
@@ -133,7 +249,6 @@ export default function ZzzDraftPage() {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
 
-      // Ignore clicks inside the W-Engine modal
       const modal = document.querySelector(".modal-content");
       if (modal && modal.contains(target)) return;
 
@@ -144,7 +259,6 @@ export default function ZzzDraftPage() {
       ) {
         setSuperOpenIndex(null);
       }
-
 
       if (
         eidolonOpenIndex !== null &&
@@ -159,7 +273,7 @@ export default function ZzzDraftPage() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [activeSlotIndex, eidolonOpenIndex]);
+  }, [superOpenIndex, eidolonOpenIndex]);
 
   const handleCharacterPick = (char: Character) => {
     if (draftComplete) return;
@@ -630,7 +744,7 @@ export default function ZzzDraftPage() {
           })()}
         </div>
 
-        {/* Search Bar + Undo (always visible) */}
+        {/* Search Bar + Undo + PvP Rules (always visible) */}
         <div className="mb-3 w-100 d-flex justify-content-center align-items-center gap-2 flex-wrap">
           <input
             type="text"
@@ -645,6 +759,7 @@ export default function ZzzDraftPage() {
               border: "1px solid rgba(255,255,255,0.25)",
             }}
           />
+
           <button
             className="btn back-button-glass"
             onClick={handleUndo}
@@ -653,6 +768,22 @@ export default function ZzzDraftPage() {
           >
             ⟲ Undo
           </button>
+
+          <OverlayTrigger
+            trigger="click"
+            placement="right"
+            overlay={pvpRulesPopover}
+            rootClose
+          >
+            <button
+              type="button"
+              className="btn back-button-glass"
+              style={{ whiteSpace: "nowrap" }}
+              aria-label="PvP Rules"
+            >
+              ℹ️ PvP Rules
+            </button>
+          </OverlayTrigger>
         </div>
 
         {/* Character Grid (only if draft not complete) */}
@@ -686,7 +817,6 @@ export default function ZzzDraftPage() {
                   const currentStep = draftSequence[currentTurn];
                   if (!currentStep) return null;
 
-                  const isAce = currentStep.includes("ACE");
                   const mySide = currentStep.startsWith("B") ? "B" : "R";
                   const opponentSide = mySide === "B" ? "R" : "B";
 
@@ -706,12 +836,15 @@ export default function ZzzDraftPage() {
 
                   const isBanned = bannedCodes.includes(char.code);
 
+                  const isAcePickStep = currentStep.includes("ACE");
+                  const isOpponentPicked = alreadyPickedByOpponent;
+
                   const isDisabled =
                     draftComplete ||
                     isBanned ||
-                    (!isAce &&
+                    (!isAcePickStep &&
                       (alreadyPickedByMe || alreadyPickedByOpponent)) ||
-                    (isAce && alreadyPickedByMe);
+                    (isAcePickStep && alreadyPickedByMe);
 
                   return (
                     <div
@@ -722,11 +855,14 @@ export default function ZzzDraftPage() {
                         width: "70px",
                         height: "70px",
                         borderRadius: "8px",
-                        border: isBanned
-                          ? "2px dashed #888"
-                          : alreadyPickedByMe || alreadyPickedByOpponent
-                          ? "2px solid #aaa"
-                          : "2px solid #555",
+                        border:
+                          isAcePickStep && isOpponentPicked
+                            ? "2px solid gold"
+                            : isBanned
+                            ? "2px dashed #888"
+                            : alreadyPickedByMe || alreadyPickedByOpponent
+                            ? "2px solid #aaa"
+                            : "2px solid #555",
                         backgroundImage: `url(${char.image_url})`,
                         backgroundSize: "cover",
                         backgroundPosition: "center",
