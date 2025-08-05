@@ -105,7 +105,7 @@ export default function ZzzDraftPage() {
       style={{
         maxWidth: 350,
         backgroundColor: "#1e1e2f",
-        color: "#ddd", 
+        color: "#ddd",
         border: "1px solid #444",
       }}
     >
@@ -145,10 +145,7 @@ export default function ZzzDraftPage() {
             will fight.
           </li>
           <li>3v3: Draft, then fight all 3 bosses.</li>
-          <li>
-            The bosses picked in 2v2 must be unique for a team. Each team has 2
-            resets.
-          </li>
+          <li>The bosses that are picked by each team must not be the same.</li>
         </ul>
         <strong>Draft:</strong>
         <p>Three pick types: Bans, Ace(s), Normal Pick.</p>
@@ -203,7 +200,7 @@ export default function ZzzDraftPage() {
         </p>
         <strong>Discord Server:</strong>{" "}
         <a
-          href="https://discord.gg/your-invite-code"
+          href="https://discord.gg/MHzc5GRDQW"
           target="_blank"
           rel="noreferrer"
           style={{ color: "#57a6ff", textDecoration: "underline" }}
