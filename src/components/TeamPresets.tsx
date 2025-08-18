@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "./Navbar";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
-import { Modal, Button } from "react-bootstrap";
+import { Modal } from "react-bootstrap";
 
 /* ───────────── Types ───────────── */
 interface CharacterInfo {
