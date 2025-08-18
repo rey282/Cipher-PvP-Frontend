@@ -1,5 +1,5 @@
 // src/pages/CostTestPage.tsx
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Button } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -60,125 +60,128 @@ export default function CostTestPage() {
   const [superOpenIndex, setSuperOpenIndex] = useState<number | null>(null);
   const eidolonRef = useRef<HTMLDivElement | null>(null);
   const superRef = useRef<HTMLDivElement | null>(null);
+  const slotsRef = useRef<HTMLDivElement | null>(null);
 
-  const isSignatureCone = (
-    cone: LightCone,
-    char: CharacterInfo | undefined
-  ) => {
-    if (!char) return false;
+  const isSignatureCone = (cone: LightCone, char: CharacterInfo | undefined) => {
+   if (!char) return false;
+   const coneSub = (cone.subname || "").toLowerCase();
+   const charName = char.name.toLowerCase();
+   const charSub  = (char.subname || "").toLowerCase();
+   return coneSub === charName || (charSub && coneSub === charSub);
+ };
 
-    const coneSub = cone.subname?.toLowerCase() || "";
-    const charName = char.name.toLowerCase();
-
-    return coneSub === charName;
-  };
-
-  const extractImageId = (url: string) => {
-    const match = url.match(/\/(\d+)\.png$/);
-    return match ? match[1] : "";
-  };
-
-  const subnameToCharacterName = new Map<string, string>();
-  charInfos.forEach((char) => {
-    if (char.subname) {
-      subnameToCharacterName.set(char.subname.toLowerCase(), char.name);
-    }
+  const emptyMember = () => ({
+    characterId: "",
+    eidolon: 0,
+    lightConeId: "",
+    superimpose: 1,
   });
 
-  const clearTeam = () => {
-    setTeam(
-      Array(4).fill({
-        characterId: "",
-        eidolon: 0,
-        lightConeId: "",
-        superimpose: 1,
-      })
-    );
+  const makeEmptyTeam = () => Array.from({ length: 4 }, () => emptyMember());
+
+  const extractImageId = (url: string) => {
+    try {
+      const path = new URL(url, window.location.origin).pathname;
+      const file = path.split("/").pop() ?? "";
+      return file.split(".")[0]; // handles .png/.webp/.jpg and strips query strings
+    } catch {
+      return url.match(/\/(\d+)\.(png|webp|jpg|jpeg)(\?.*)?$/i)?.[1] ?? "";
+    }
   };
 
+  const subnameToCharacterName = useMemo(() => {
+   const m = new Map<string, string>();
+   for (const char of charInfos) {
+     if (char.subname) m.set(char.subname.toLowerCase(), char.name);
+   }
+   return m;
+ }, [charInfos]);
+
+  const clearTeam = () => setTeam(makeEmptyTeam());
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        eidolonRef.current &&
-        !eidolonRef.current.contains(event.target as Node)
-      ) {
-        setEidolonOpenIndex(null);
-      }
-
-      if (
-        superRef.current &&
-        !superRef.current.contains(event.target as Node)
-      ) {
-        setSuperOpenIndex(null);
-      }
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (slotsRef.current?.contains(t)) return; 
+      setEidolonOpenIndex(null);
+      setSuperOpenIndex(null);
     };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+
   useEffect(() => {
-    Promise.all([
-      fetch(`${import.meta.env.VITE_API_BASE}/api/characters/all`, {
-        credentials: "include",
-      }),
-      fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/balance`, {
-        credentials: "include",
-      }),
-      fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/cone-balance`, {
-        credentials: "include",
-      }),
-    ])
-      .then(async ([charRes, costRes, coneRes]) => {
-        const charData = await charRes.json();
-        const costData = await costRes.json();
-        const coneData = await coneRes.json();
+    const ac = new AbortController();
+
+    (async () => {
+      try {
+        const [charRes, costRes, coneRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_BASE}/api/characters/all`, {
+            credentials: "include",
+            signal: ac.signal,
+          }),
+          fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/balance`, {
+            credentials: "include",
+            signal: ac.signal,
+          }),
+          fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/cone-balance`, {
+            credentials: "include",
+            signal: ac.signal,
+          }),
+        ]);
 
         if (!charRes.ok) throw new Error("Failed to fetch characters");
         if (!costRes.ok) throw new Error("Failed to fetch character costs");
         if (!coneRes.ok) throw new Error("Failed to fetch cones");
 
+        const [charData, costData, coneData] = await Promise.all([
+          charRes.json(),
+          costRes.json(),
+          coneRes.json(),
+        ]);
+
         setCharInfos(charData.data);
         setCharCosts(costData.characters);
         setCones(coneData.cones);
-        setTeam(
-          Array(4).fill({
-            characterId: "",
-            eidolon: 0,
-            lightConeId: "",
-            superimpose: 1,
-          })
-        );
+        setTeam(makeEmptyTeam());
         setLoad(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setError("Failed to load data");
-        setLoad(false);
-      });
+      } catch (err: any) {
+        if (err?.name !== "AbortError") {
+          console.error(err);
+          setError("Failed to load data");
+          setLoad(false);
+        }
+      }
+    })();
+
+    return () => ac.abort();
   }, []);
 
+  const charCostMap = useMemo(() => {
+    const m = new Map<string, number[]>();
+    for (const c of charCosts) m.set(c.id, c.costs);
+    return m;
+  }, [charCosts]);
+
+  const coneMap = useMemo(() => {
+    const m = new Map<string, LightCone>();
+    for (const c of cones) m.set(c.id, c);
+    return m;
+  }, [cones]);
+
   useEffect(() => {
-    const cost = team.reduce((total, member) => {
-      const charCost = member.characterInfo
-        ? charCosts.find(
-            (c) => c.id === extractImageId(member.characterInfo!.image_url)
-          )?.costs[member.eidolon] ?? 0
-        : 0;
-
-      const coneCost = member.lightConeId
-        ? cones.find((c) => c.id === member.lightConeId)?.costs[
-            member.superimpose - 1
-          ] ?? 0
-        : 0;
-
-      return total + charCost + coneCost;
-    }, 0);
-
-    setTotalCost(cost);
-  }, [team, charCosts, cones]);
+   const cost = team.reduce((total, member) => {
+     const charCost = member.characterInfo
+       ? (charCostMap.get(extractImageId(member.characterInfo.image_url))?.[member.eidolon] ?? 0)
+       : 0;
+     const coneCost = member.lightConeId
+       ? (coneMap.get(member.lightConeId)?.costs[member.superimpose - 1] ?? 0)
+       : 0;
+     return total + charCost + coneCost;
+   }, 0);
+   setTotalCost(cost);
+ }, [team, charCostMap, coneMap]);
 
   const assignCharacterToSlot = (char: CharacterInfo) => {
     const firstEmpty = team.findIndex((m) => !m.characterId);
@@ -199,18 +202,17 @@ export default function CostTestPage() {
 
     setSearch("");
     setConeSearch("");
+    setEidolonOpenIndex(null);
+    setSuperOpenIndex(null);
   };
-
 
   const removeSlot = (index: number) => {
     const filtered = team.filter((_, i) => i !== index);
     const compacted = filtered.filter((m) => m.characterId);
-    const emptySlots = Array(4 - compacted.length).fill({
-      characterId: "",
-      eidolon: 0,
-      lightConeId: "",
-      superimpose: 1,
-    });
+    const emptySlots = Array.from(
+   { length: 4 - compacted.length },
+   () => emptyMember()
+ );
     setTeam([...compacted, ...emptySlots]);
   };
 
@@ -222,7 +224,7 @@ export default function CostTestPage() {
 
   const confirmConeSelection = () => {
     if (activeSlotIndex === null) return;
-    const selectedCone = cones.find((c) => c.id === selectedConeId);
+    const selectedCone = coneMap.get(selectedConeId || "");
     const newTeam = [...team];
     newTeam[activeSlotIndex] = {
       ...newTeam[activeSlotIndex],
@@ -320,6 +322,7 @@ export default function CostTestPage() {
 
             {/* Team Character Cards */}
             <div
+              ref={slotsRef}
               className="d-flex justify-content-between gap-2"
               style={{
                 flexWrap: "nowrap",
@@ -332,9 +335,9 @@ export default function CostTestPage() {
                 const char = member.characterInfo;
                 const cone = member.lightConeData;
                 const charCost = char
-                  ? charCosts.find(
-                      (c) => c.id === extractImageId(char.image_url)
-                    )?.costs[member.eidolon] ?? 0
+                  ? charCostMap.get(extractImageId(char.image_url))?.[
+                      member.eidolon
+                    ] ?? 0
                   : 0;
                 const coneCost = cone
                   ? cone.costs[member.superimpose - 1] ?? 0
@@ -366,6 +369,12 @@ export default function CostTestPage() {
                         <img
                           src={char.image_url}
                           alt={char.name}
+                          loading="lazy"
+                          onError={(e) => {
+                            (
+                              e.currentTarget as HTMLImageElement
+                            ).style.visibility = "hidden";
+                          }}
                           style={{
                             width: "100%",
                             height: cone ? "140px" : "220px",
@@ -428,7 +437,14 @@ export default function CostTestPage() {
                                 <input
                                   type="range"
                                   min={0}
-                                  max={6}
+                                  max={Math.max(
+                                    6,
+                                    ((char &&
+                                      charCostMap.get(
+                                        extractImageId(char.image_url)
+                                      )?.length) ??
+                                      7) - 1
+                                  )}
                                   step={1}
                                   value={member.eidolon}
                                   onChange={(e) => {
@@ -515,12 +531,19 @@ export default function CostTestPage() {
                         <img
                           src={cone.imageUrl}
                           alt={cone.name}
+                          loading="lazy"
+                          onError={(e) => {
+                            (
+                              e.currentTarget as HTMLImageElement
+                            ).style.visibility = "hidden";
+                          }}
                           style={{
                             width: "100%",
                             height: "80px",
                             objectFit: "cover",
                           }}
                         />
+
                         <div
                           style={{
                             position: "absolute",
@@ -575,7 +598,7 @@ export default function CostTestPage() {
                                 <input
                                   type="range"
                                   min={1}
-                                  max={5}
+                                  max={Math.max(5, cone?.costs.length ?? 5)}
                                   step={1}
                                   value={member.superimpose}
                                   onChange={(e) => {

@@ -1,5 +1,5 @@
 // src/pages/Profile.tsx
-import { useEffect, useState} from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
@@ -43,8 +43,6 @@ const glassSelectStyle: React.CSSProperties = {
   outline: "none",
 };
 
-let lastProfileCache: Profile | null = null;
-
 export default function Profile() {
   const { user } = useAuth();
   const { id } = useParams();
@@ -52,7 +50,7 @@ export default function Profile() {
   const isSelf = targetId === user?.id;
   const navigate = useNavigate();
 
-  const [profile, setProfile] = useState<Profile | null>(lastProfileCache);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [descInput, setDescInput] = useState("");
@@ -61,62 +59,60 @@ export default function Profile() {
 
   const [charMap, setCharMap] = useState<Record<string, CharMeta>>({});
   const [ownedRoster, setOwnedRoster] = useState<Record<string, number>>({});
-  const [selectedChar, setSelectedChar] = useState<{ name: string } | null>(
-    null
-  );
-
+  const [selectedChar, setSelectedChar] = useState<CharMeta | null>(null);
 
   const MAX_DESC_LEN = 512;
   const tidy = (s: string) => s.trim();
 
   const openPlayer = (id: string) => navigate(`/cipher/player/${id}?season=${season}`);
 
-
   useEffect(() => {
     if (!user || !targetId) return;
+    const ac = new AbortController();
     setLoading(true);
 
-    fetch(
-      `${
-        import.meta.env.VITE_API_BASE
-      }/api/player/${targetId}?season=${season}`,
-      {
-        credentials: "include",
-      }
-    )
-      .then(async (r) => {
+    (async () => {
+      try {
+        const r = await fetch(
+          `${
+            import.meta.env.VITE_API_BASE
+          }/api/player/${targetId}?season=${season}`,
+          { credentials: "include", signal: ac.signal }
+        );
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || "Fetch failed");
-        return j as Profile;
-      })
-      .then((data) => {
-        setProfile(data);
-        lastProfileCache = data;
-        setDescInput(data.description ?? "");
-        setBannerInput(data.banner_url ?? "");
-      })
-      .catch(() => toast.error("Failed to load profile"))
-      .finally(() => setLoading(false));
+        setProfile(j as Profile);
+        setDescInput(j.description ?? "");
+        setBannerInput(j.banner_url ?? "");
+      } catch (e: any) {
+        if (e?.name !== "AbortError") toast.error("Failed to load profile");
+      } finally {
+        setLoading(false);
+      }
+    })();
+
+    return () => ac.abort();
   }, [user, targetId, season]);
 
   useEffect(() => {
     if (!targetId) return;
+    const ac = new AbortController();
 
-    Promise.all([
-      fetch(`${import.meta.env.VITE_API_BASE}/api/roster/users`).then((r) =>
-        r.json()
-      ),
-      fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`).then(
-        (r) => r.json()
-      ),
-    ])
-      .then(([users, res]: [DraftUser[], { data: any[] }]) => {
+    (async () => {
+      try {
+        const [users, res]: [DraftUser[], { data: any[] }] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_BASE}/api/roster/users`, {
+            signal: ac.signal,
+          }).then((r) => r.json()),
+          fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`, {
+            signal: ac.signal,
+          }).then((r) => r.json()),
+        ]);
+
         const map: Record<string, CharMeta> = {};
         res.data.forEach((c) => {
-          const id = c.image_url.match(/\/(\d+)\.png$/)?.[1];
-          if (id) {
-            map[id] = { ...c, id };
-          }
+          const id = extractImageId(c.image_url);
+          if (id) map[id] = { ...c, id };
         });
         setCharMap(map);
 
@@ -125,15 +121,41 @@ export default function Profile() {
 
         const rosterMap: Record<string, number> = {};
         found.profileCharacters.forEach((pc) => {
-          if (map[pc.id]) {
-            rosterMap[pc.id] = pc.eidolon;
-          }
+          if (map[pc.id]) rosterMap[pc.id] = pc.eidolon;
         });
-
         setOwnedRoster(rosterMap);
-      })
-      .catch(() => console.warn("Failed to load roster or character data"));
+      } catch (e: any) {
+        if (e?.name !== "AbortError") {
+          console.warn("Failed to load roster or character data", e);
+        }
+      }
+    })();
+
+    return () => ac.abort();
   }, [targetId]);
+
+
+  const extractImageId = (url: string): string | undefined => {
+    try {
+      const path = new URL(url, window.location.origin).pathname;
+      const file = path.split("/").pop() ?? "";
+      return file.split(".")[0]; // "1412.png" -> "1412"
+    } catch {
+      // Fallback to regex if URL constructor fails
+      return url.match(/\/(\d+)\.(png|webp|jpg|jpeg)$/i)?.[1];
+    }
+  };
+
+  const sortedChars = useMemo(() => {
+    const list = Object.values(charMap);
+    return list.sort((a, b) => {
+      const ownedA = ownedRoster[a.id] !== undefined;
+      const ownedB = ownedRoster[b.id] !== undefined;
+      if (ownedA !== ownedB) return ownedA ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [charMap, ownedRoster]);
+
 
   const handleSave = async () => {
     if (!user || !targetId) return;
@@ -284,8 +306,14 @@ export default function Profile() {
               className="rounded-circle"
               width={96}
               height={96}
+              loading="lazy"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src =
+                  "/default-avatar.png";
+              }}
               style={{ objectFit: "cover" }}
             />
+
             <div className="me-auto">
               <h2 className="m-0">{profile.display_name}</h2>
               <small className="text-white-50">@{profile.username}</small>
@@ -318,45 +346,92 @@ export default function Profile() {
             ))}
 
             {profile.discord_id && (
-              <div className="col">
-                <button
-                  type="button"
-                  className="btn btn-glass-summary w-100 h-100 d-flex flex-column justify-content-center align-items-center shadow-sm"
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.45)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 12,
-                    color: "#0dcaf0",
-                    cursor: "pointer",
-                    transition:
-                      "background-color 0.25s ease, transform 0.2s ease",
-                    padding: "1rem",
-                    minHeight: "100px",
-                    userSelect: "none",
-                    borderWidth: 1,
-                    borderStyle: "solid",
-                  }}
-                  onClick={() => openPlayer(profile.discord_id)}
-                  onMouseEnter={(e) => {
-                    (
-                      e.currentTarget as HTMLButtonElement
-                    ).style.backgroundColor = "rgba(13,202,240,0.1)";
-                    (e.currentTarget as HTMLButtonElement).style.transform =
-                      "scale(1.05)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (
-                      e.currentTarget as HTMLButtonElement
-                    ).style.backgroundColor = "rgba(0,0,0,0.45)";
-                    (e.currentTarget as HTMLButtonElement).style.transform =
-                      "scale(1)";
-                  }}
-                  title="View Player Summary"
-                >
-                  <strong className="fs-4 mb-1">Summary</strong>
-                  <small className="text-white-50">View Profile Summary</small>
-                </button>
-              </div>
+              <>
+                <div className="col">
+                  <button
+                    type="button"
+                    className="btn btn-glass-summary w-100 h-100 d-flex flex-column justify-content-center align-items-center shadow-sm"
+                    style={{
+                      backgroundColor: "rgba(0,0,0,0.45)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "#0dcaf0",
+                      cursor: "pointer",
+                      transition:
+                        "background-color 0.25s ease, transform 0.2s ease",
+                      padding: "1rem",
+                      minHeight: "100px",
+                      userSelect: "none",
+                      borderWidth: 1,
+                      borderStyle: "solid",
+                    }}
+                    onClick={() => openPlayer(profile.discord_id)}
+                    onMouseEnter={(e) => {
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.backgroundColor = "rgba(13,202,240,0.1)";
+                      (e.currentTarget as HTMLButtonElement).style.transform =
+                        "scale(1.05)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.backgroundColor = "rgba(0,0,0,0.45)";
+                      (e.currentTarget as HTMLButtonElement).style.transform =
+                        "scale(1)";
+                    }}
+                    title="View Player Summary"
+                  >
+                    <strong className="fs-4 mb-1">Summary</strong>
+                    <small className="text-white-50">
+                      View Profile Summary
+                    </small>
+                  </button>
+                </div>
+                <div className="col">
+                  <button
+                    type="button"
+                    className="btn btn-glass-summary w-100 h-100 d-flex flex-column justify-content-center align-items-center shadow-sm"
+                    style={{
+                      backgroundColor: "rgba(0,0,0,0.45)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "#ffc107",
+                      cursor: "pointer",
+                      transition:
+                        "background-color 0.25s ease, transform 0.2s ease",
+                      padding: "1rem",
+                      minHeight: "100px",
+                      userSelect: "none",
+                      borderWidth: 1,
+                      borderStyle: "solid",
+                    }}
+                    onClick={() =>
+                      navigate(`/profile/${profile.discord_id}/presets`)
+                    }
+                    onMouseEnter={(e) => {
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.backgroundColor = "rgba(255,193,7,0.1)";
+                      (e.currentTarget as HTMLButtonElement).style.transform =
+                        "scale(1.05)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.backgroundColor = "rgba(0,0,0,0.45)";
+                      (e.currentTarget as HTMLButtonElement).style.transform =
+                        "scale(1)";
+                    }}
+                    title="Manage Team Presets"
+                  >
+                    <strong className="fs-4 mb-1">Team Presets</strong>
+                    <small className="text-white-50">
+                      Save & edit your comps
+                    </small>
+                  </button>
+                </div>
+              </>
             )}
           </div>
 
@@ -467,7 +542,7 @@ export default function Profile() {
                 <h5 className="m-0">{profile.display_name}&apos;s Roster</h5>
               </div>
               <div className="d-flex flex-wrap gap-2 justify-content-start">
-                {Object.values(charMap)
+                {sortedChars
                   .sort((a, b) => {
                     const ownedA = ownedRoster[a.id] !== undefined;
                     const ownedB = ownedRoster[b.id] !== undefined;
@@ -514,12 +589,18 @@ export default function Profile() {
                         <img
                           src={char.image_url}
                           alt={char.name}
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src =
+                              "/default.png";
+                          }}
                           style={{
                             width: "100%",
                             height: "100%",
                             objectFit: "cover",
                           }}
                         />
+
                         {isOwned && (
                           <span
                             className="position-absolute bottom-0 start-0"

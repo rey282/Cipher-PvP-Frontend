@@ -24,6 +24,7 @@ const BalancePreview2 = lazy(() => import("./components2/BalancePreview2"));
 const CostTest = lazy(() => import("./components2/CostTest"));
 const RosterLog = lazy(() => import("./components/RosterLog"));
 const ZzzDraftPage = lazy(() => import("./components/ZzzDraft"));
+const TeamPresets = lazy(() => import("./components/TeamPresets"));
 
 /* ─────────── Layout wrapper ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
@@ -105,6 +106,28 @@ export default function App() {
           </Suspense>
         }
       />
+      <Route
+        path="/profile/team-presets"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <TeamPresets />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
+      <Route
+        path="/profile/:id/presets"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <TeamPresets />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
       {/* Cipher Format */}
       <Route path="/cipher">
         <Route

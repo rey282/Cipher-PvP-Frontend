@@ -1,14 +1,25 @@
 import { useAuth } from "../context/AuthContext";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../components/Landing.css";
 
 export default function Navbar() {
   const { user, loading, login, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isCerydra = location.pathname.startsWith("/cerydra");
   const isCipher = location.pathname.startsWith("/cipher");
   const isLanding = location.pathname === "/";
+
+  // Treat profile & presets as "landing-like" so we show the home (2 choices) navbar there
+  const isProfile = location.pathname.startsWith("/profile");
+  const isPresets = /\/presets(\/|$)/.test(location.pathname);
+  const isLandingLike = isLanding || isProfile || isPresets;
+
+  const goToTeamPresets = () => {
+    if (!user?.id) return; // not shown if logged out, but guard anyway
+    navigate(`/profile/${user.id}/presets`);
+  };
 
   const cipherNav = [
     { label: "Home", path: "/cipher" },
@@ -24,7 +35,7 @@ export default function Navbar() {
     { label: "Cost Test", path: "/cerydra/cost-test" },
   ];
 
-  const navLinks = isLanding
+  const navLinks = isLandingLike
     ? [
         { label: "Cipher Format", path: "/cipher" },
         { label: "Cerydra Format", path: "/cerydra" },
@@ -34,6 +45,8 @@ export default function Navbar() {
     : isCerydra
     ? cerydraNav
     : [];
+
+  const showTeamPresetsLink = !!user && !isLandingLike; // only logged-in & in cipher/cerydra sections
 
   const handleCloseOffcanvas = () => {
     const offcanvasEl = document.getElementById("mobileNav");
@@ -49,7 +62,6 @@ export default function Navbar() {
     <nav className="w-100 px-2 py-3 d-flex justify-content-between align-items-center">
       {/* Left: Logo */}
       <div className="d-flex align-items-center gap-4 flex-wrap">
-        {/* Logo */}
         <a href="/" className="navbar-logo d-inline-block">
           <img
             src="/cipher.png"
@@ -65,7 +77,7 @@ export default function Navbar() {
         </a>
       </div>
 
-      {/* Desktop Nav Links + Right side (hidden on mobile) */}
+      {/* Desktop Nav + Right side */}
       <div className="d-none d-md-flex align-items-center gap-4">
         {/* Nav Links */}
         <div className="d-flex align-items-center gap-4">
@@ -78,6 +90,17 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+
+          {showTeamPresetsLink && (
+            <button
+              type="button"
+              className="admin-link fw-semibold text-decoration-none btn btn-link p-0"
+              style={{ textDecoration: "none" }}
+              onClick={goToTeamPresets}
+            >
+              Team Presets
+            </button>
+          )}
         </div>
 
         {/* Admin Link */}
@@ -163,7 +186,7 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Mobile Hamburger (shown only on small screens) */}
+      {/* Mobile Hamburger */}
       <div className="d-md-none">
         <button
           className="btn btn-outline-light"
@@ -192,7 +215,7 @@ export default function Navbar() {
               className="btn-close btn-close-white"
               data-bs-dismiss="offcanvas"
               aria-label="Close"
-            ></button>
+            />
           </div>
 
           <div className="offcanvas-body d-flex flex-column gap-3">
@@ -207,6 +230,20 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+
+            {/* Team Presets (mobile) */}
+            {showTeamPresetsLink && (
+              <button
+                type="button"
+                className="admin-link fw-semibold text-decoration-none btn btn-link p-0 text-start"
+                onClick={() => {
+                  handleCloseOffcanvas();
+                  goToTeamPresets();
+                }}
+              >
+                Team Presets
+              </button>
+            )}
 
             {/* Admin Link */}
             {user?.isAdmin && (
@@ -249,6 +286,7 @@ export default function Navbar() {
                     )}
                   </div>
                 </div>
+
                 <Link
                   to="/profile"
                   className="admin-link fw-semibold text-decoration-none mt-3"
@@ -256,6 +294,7 @@ export default function Navbar() {
                 >
                   Profile
                 </Link>
+
                 <button
                   className="btn btn-link text-danger p-0 mt-1 text-start"
                   onClick={() => {
@@ -277,13 +316,7 @@ export default function Navbar() {
                 className="btn back-button-glass"
                 onClick={() => {
                   login(window.location.href);
-                  const offcanvasEl = document.getElementById("mobileNav");
-                  if (offcanvasEl) {
-                    const bsOffcanvas = (
-                      window as any
-                    ).bootstrap.Offcanvas.getInstance(offcanvasEl);
-                    if (bsOffcanvas) bsOffcanvas.hide();
-                  }
+                  handleCloseOffcanvas();
                 }}
               >
                 <img
