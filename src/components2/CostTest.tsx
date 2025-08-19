@@ -4,8 +4,10 @@ import { Modal, Button } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import "../components/Landing.css";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
 
-// Types
+/* ───────────── Types ───────────── */
 interface CharacterInfo {
   code: string;
   name: string;
@@ -40,35 +42,80 @@ interface TeamMember {
   superimpose: number;
 }
 
+/* Presets (shared with TeamPresets) */
+type PresetSlot = {
+  characterId: string;
+  eidolon: number; // 0..6
+  lightConeId: string; // "" allowed
+  superimpose: number; // 1..5
+};
+type TeamPreset = {
+  id: string;
+  name: string;
+  description: string;
+  updated_at: string;
+  slots: PresetSlot[];
+};
+
+/* Cipher backend shapes */
+type CipherCharacter = { code: string; costs: number[] | any[] };
+type CipherCone = { id: string; limited: boolean };
+
+/* ───────────── Component ───────────── */
 export default function CostTestPage() {
+  const { user } = useAuth();
+
+  // Data
   const [charInfos, setCharInfos] = useState<CharacterInfo[]>([]);
   const [charCosts, setCharCosts] = useState<CharacterCost[]>([]);
   const [cones, setCones] = useState<LightCone[]>([]);
+
+  // Cipher data
+  const [cipherChars, setCipherChars] = useState<CipherCharacter[]>([]);
+  const [cipherCones, setCipherCones] = useState<CipherCone[]>([]);
+
+  // Team & UI
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clearSpeed, setClearSpeed] = useState(0);
-  const [totalCost, setTotalCost] = useState(0);
 
+  // Cone modal
   const [showModal, setShowModal] = useState(false);
   const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
   const [selectedConeId, setSelectedConeId] = useState<string>("");
   const [coneSearch, setConeSearch] = useState("");
 
+  // Eidolon/Super popovers
   const [eidolonOpenIndex, setEidolonOpenIndex] = useState<number | null>(null);
   const [superOpenIndex, setSuperOpenIndex] = useState<number | null>(null);
   const eidolonRef = useRef<HTMLDivElement | null>(null);
   const superRef = useRef<HTMLDivElement | null>(null);
   const slotsRef = useRef<HTMLDivElement | null>(null);
 
-  const isSignatureCone = (cone: LightCone, char: CharacterInfo | undefined) => {
-   if (!char) return false;
-   const coneSub = (cone.subname || "").toLowerCase();
-   const charName = char.name.toLowerCase();
-   const charSub  = (char.subname || "").toLowerCase();
-   return coneSub === charName || (charSub && coneSub === charSub);
- };
+  // Presets panel
+  const [presets, setPresets] = useState<TeamPreset[]>([]);
+  const [presetsError, setPresetsError] = useState<string | null>(null);
+  const [showPresetsPanel, setShowPresetsPanel] = useState(false);
+  const [presetSearch, setPresetSearch] = useState("");
+
+  // Export → Save Preset modal
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportName, setExportName] = useState("");
+  const [exportDesc, setExportDesc] = useState("");
+
+  /* ───────────── Helpers ───────────── */
+  const isSignatureCone = (
+    cone: LightCone,
+    char: CharacterInfo | undefined
+  ) => {
+    if (!char) return false;
+    const coneSub = (cone.subname || "").toLowerCase();
+    const charName = char.name.toLowerCase();
+    const charSub = (char.subname || "").toLowerCase();
+    return coneSub === charName || (charSub && coneSub === charSub);
+  };
 
   const emptyMember = () => ({
     characterId: "",
@@ -83,26 +130,24 @@ export default function CostTestPage() {
     try {
       const path = new URL(url, window.location.origin).pathname;
       const file = path.split("/").pop() ?? "";
-      return file.split(".")[0]; // handles .png/.webp/.jpg and strips query strings
+      return file.split(".")[0];
     } catch {
       return url.match(/\/(\d+)\.(png|webp|jpg|jpeg)(\?.*)?$/i)?.[1] ?? "";
     }
   };
 
   const subnameToCharacterName = useMemo(() => {
-   const m = new Map<string, string>();
-   for (const char of charInfos) {
-     if (char.subname) m.set(char.subname.toLowerCase(), char.name);
-   }
-   return m;
- }, [charInfos]);
+    const m = new Map<string, string>();
+    for (const char of charInfos)
+      if (char.subname) m.set(char.subname.toLowerCase(), char.name);
+    return m;
+  }, [charInfos]);
 
-  const clearTeam = () => setTeam(makeEmptyTeam());
-
+  /* ───────────── Outside click to close E/S popups ───────────── */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (slotsRef.current?.contains(t)) return; 
+      if (slotsRef.current?.contains(t)) return;
       setEidolonOpenIndex(null);
       setSuperOpenIndex(null);
     };
@@ -110,40 +155,59 @@ export default function CostTestPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-
+  /* ───────────── Base data fetch (Cerydra + Cipher) ───────────── */
   useEffect(() => {
     const ac = new AbortController();
-
     (async () => {
       try {
-        const [charRes, costRes, coneRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_BASE}/api/characters/all`, {
-            credentials: "include",
-            signal: ac.signal,
-          }),
-          fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/balance`, {
-            credentials: "include",
-            signal: ac.signal,
-          }),
-          fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/cone-balance`, {
-            credentials: "include",
-            signal: ac.signal,
-          }),
-        ]);
+        const [charRes, cerCharCostRes, cerConeRes, cipCharRes, cipConeRes] =
+          await Promise.all([
+            fetch(`${import.meta.env.VITE_API_BASE}/api/characters/all`, {
+              credentials: "include",
+              signal: ac.signal,
+            }),
+            fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/balance`, {
+              credentials: "include",
+              signal: ac.signal,
+            }),
+            fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/cone-balance`, {
+              credentials: "include",
+              signal: ac.signal,
+            }),
+            fetch(`${import.meta.env.VITE_API_BASE}/api/cipher/balance`, {
+              credentials: "include",
+              signal: ac.signal,
+            }),
+            fetch(`${import.meta.env.VITE_API_BASE}/api/cipher/cone-balance`, {
+              credentials: "include",
+              signal: ac.signal,
+            }),
+          ]);
 
         if (!charRes.ok) throw new Error("Failed to fetch characters");
-        if (!costRes.ok) throw new Error("Failed to fetch character costs");
-        if (!coneRes.ok) throw new Error("Failed to fetch cones");
+        if (!cerCharCostRes.ok)
+          throw new Error("Failed to fetch Cerydra char costs");
+        if (!cerConeRes.ok) throw new Error("Failed to fetch Cerydra cones");
+        if (!cipCharRes.ok)
+          throw new Error("Failed to fetch Cipher char costs");
+        if (!cipConeRes.ok)
+          throw new Error("Failed to fetch Cipher cone flags");
 
-        const [charData, costData, coneData] = await Promise.all([
-          charRes.json(),
-          costRes.json(),
-          coneRes.json(),
-        ]);
+        const [charData, cerCostData, cerConeData, cipCharData, cipConeData] =
+          await Promise.all([
+            charRes.json(),
+            cerCharCostRes.json(),
+            cerConeRes.json(),
+            cipCharRes.json(),
+            cipConeRes.json(),
+          ]);
 
         setCharInfos(charData.data);
-        setCharCosts(costData.characters);
-        setCones(coneData.cones);
+        setCharCosts(cerCostData.characters);
+        setCones(cerConeData.cones);
+        setCipherChars(cipCharData.characters || cipCharData || []);
+        setCipherCones(cipConeData.cones || cipConeData || []);
+
         setTeam(makeEmptyTeam());
         setLoad(false);
       } catch (err: any) {
@@ -154,35 +218,114 @@ export default function CostTestPage() {
         }
       }
     })();
-
     return () => ac.abort();
   }, []);
 
-  const charCostMap = useMemo(() => {
+  /* ───────────── Fetch presets (self) ───────────── */
+  useEffect(() => {
+    if (!user?.id) return;
+    const ac = new AbortController();
+    (async () => {
+      try {
+        const r = await fetch(
+          `${import.meta.env.VITE_API_BASE}/api/player/${user.id}/presets`,
+          { credentials: "include", signal: ac.signal }
+        );
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Failed to load presets");
+        setPresets(j.presets || []);
+        setPresetsError(null);
+      } catch (e: any) {
+        if (e?.name !== "AbortError")
+          setPresetsError(e.message || "Failed to load presets");
+      }
+    })();
+    return () => ac.abort();
+  }, [user?.id]);
+
+  /* ───────────── Maps for fast lookups ───────────── */
+  // Cerydra
+  const cerydraCharCostMap = useMemo(() => {
     const m = new Map<string, number[]>();
     for (const c of charCosts) m.set(c.id, c.costs);
     return m;
   }, [charCosts]);
 
-  const coneMap = useMemo(() => {
+  const cerydraConeMap = useMemo(() => {
     const m = new Map<string, LightCone>();
     for (const c of cones) m.set(c.id, c);
     return m;
   }, [cones]);
 
-  useEffect(() => {
-   const cost = team.reduce((total, member) => {
-     const charCost = member.characterInfo
-       ? (charCostMap.get(extractImageId(member.characterInfo.image_url))?.[member.eidolon] ?? 0)
-       : 0;
-     const coneCost = member.lightConeId
-       ? (coneMap.get(member.lightConeId)?.costs[member.superimpose - 1] ?? 0)
-       : 0;
-     return total + charCost + coneCost;
-   }, 0);
-   setTotalCost(cost);
- }, [team, charCostMap, coneMap]);
+  // Cipher
+  const cipherCharCostMap = useMemo(() => {
+    const m = new Map<string, number[]>();
+    for (const c of cipherChars)
+      m.set((c.code || "").toLowerCase(), c.costs as number[]);
+    return m;
+  }, [cipherChars]);
 
+  const cipherConeLimitedMap = useMemo(() => {
+    const m = new Map<string, boolean>();
+    for (const c of cipherCones) m.set(c.id, !!c.limited);
+    return m;
+  }, [cipherCones]);
+
+  /* ───────────── Derived totals (keep hooks before any early return!) ───────────── */
+  // Per-member derived costs (helpers)
+  const cerydraCharCost = (member: TeamMember) =>
+    member.characterInfo
+      ? cerydraCharCostMap.get(
+          extractImageId(member.characterInfo.image_url)
+        )?.[member.eidolon] ?? 0
+      : 0;
+
+  const cerydraConeCost = (member: TeamMember) =>
+    member.lightConeId
+      ? cerydraConeMap.get(member.lightConeId)?.costs[member.superimpose - 1] ??
+        0
+      : 0;
+
+  const cipherCharCost = (member: TeamMember) =>
+    member.characterId
+      ? cipherCharCostMap.get(member.characterId.toLowerCase())?.[
+          member.eidolon
+        ] ?? 0
+      : 0;
+
+  const cipherConeCost = (member: TeamMember) => {
+    if (!member.lightConeId) return 0;
+    const limited = cipherConeLimitedMap.get(member.lightConeId);
+    if (!limited) return 0;
+    const steps = [0.25, 0.25, 0.5, 0.5, 0.75];
+    const idx = Math.min(Math.max(member.superimpose, 1), 5) - 1;
+    return steps[idx];
+  };
+
+  const totalCerydraCost = useMemo(
+    () =>
+      team.reduce((sum, m) => sum + cerydraCharCost(m) + cerydraConeCost(m), 0),
+    [team, cerydraCharCostMap, cerydraConeMap]
+  );
+
+  const totalCipherCost = useMemo(
+    () =>
+      team.reduce((sum, m) => sum + cipherCharCost(m) + cipherConeCost(m), 0),
+    [team, cipherCharCostMap, cipherConeLimitedMap]
+  );
+
+  // Presets panel filtering (keep this useMemo BEFORE the early return as well)
+  const visiblePresets = useMemo(() => {
+    const q = presetSearch.trim().toLowerCase();
+    if (!q) return presets;
+    return presets.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q)
+    );
+  }, [presets, presetSearch]);
+
+  /* ───────────── Character assign/remove & cone modal ───────────── */
   const assignCharacterToSlot = (char: CharacterInfo) => {
     const firstEmpty = team.findIndex((m) => !m.characterId);
     if (firstEmpty === -1) return;
@@ -209,10 +352,9 @@ export default function CostTestPage() {
   const removeSlot = (index: number) => {
     const filtered = team.filter((_, i) => i !== index);
     const compacted = filtered.filter((m) => m.characterId);
-    const emptySlots = Array.from(
-   { length: 4 - compacted.length },
-   () => emptyMember()
- );
+    const emptySlots = Array.from({ length: 4 - compacted.length }, () =>
+      emptyMember()
+    );
     setTeam([...compacted, ...emptySlots]);
   };
 
@@ -224,7 +366,7 @@ export default function CostTestPage() {
 
   const confirmConeSelection = () => {
     if (activeSlotIndex === null) return;
-    const selectedCone = coneMap.get(selectedConeId || "");
+    const selectedCone = cerydraConeMap.get(selectedConeId || "");
     const newTeam = [...team];
     newTeam[activeSlotIndex] = {
       ...newTeam[activeSlotIndex],
@@ -236,6 +378,108 @@ export default function CostTestPage() {
     setConeSearch("");
   };
 
+  const clearTeam = () => setTeam(makeEmptyTeam());
+
+  /* ───────────── Import / Export with TeamPresets ───────────── */
+  const slotToMember = (slot: PresetSlot): TeamMember => {
+    const char = charInfos.find((c) => c.code === slot.characterId);
+    const cone = slot.lightConeId
+      ? cerydraConeMap.get(slot.lightConeId)
+      : undefined;
+    return {
+      characterId: slot.characterId,
+      characterInfo: char,
+      eidolon: Math.max(0, Math.min(6, slot.eidolon | 0)),
+      lightConeId: slot.lightConeId || "",
+      lightConeData: cone,
+      superimpose: Math.max(1, Math.min(5, slot.superimpose | 0)),
+    };
+  };
+
+  const importPreset = (p: TeamPreset) => {
+    const four = [...p.slots].slice(0, 4);
+    while (four.length < 4) {
+      four.push({
+        characterId: "",
+        eidolon: 0,
+        lightConeId: "",
+        superimpose: 1,
+      });
+    }
+    const nextTeam = four.map(slotToMember);
+    setTeam(nextTeam);
+    setSearch("");
+    setConeSearch("");
+    setEidolonOpenIndex(null);
+    setSuperOpenIndex(null);
+    setShowPresetsPanel(false);
+  };
+  const formatCost = (value: number) =>
+    value % 1 === 0 ? value.toString() : value.toFixed(1);
+
+  const canExport = useMemo(() => {
+    const allFilled = team.every((m) => !!m.characterId);
+    const unique = new Set(team.map((m) => m.characterId)).size === 4;
+    return allFilled && unique;
+  }, [team]);
+
+  const exportToTeamPresets = () => {
+    if (!user?.id) {
+      toast.error("Please sign in first.");
+      return;
+    }
+    if (!canExport) {
+      toast.info("Fill 4 unique characters to export.");
+      return;
+    }
+    setExportName("");
+    setExportDesc("");
+    setShowExportModal(true);
+  };
+
+  const handleCreatePreset = async () => {
+    if (!user?.id) return;
+    const name = exportName.trim();
+    const description = exportDesc.trim();
+    if (!name) {
+      toast.info("Please enter a preset name.");
+      return;
+    }
+
+    // Build slots payload from current team
+    const slots = team.map((m) => ({
+      characterId: m.characterId,
+      eidolon: m.eidolon,
+      lightConeId: m.lightConeId,
+      superimpose: m.superimpose,
+    }));
+
+    try {
+      const r = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/player/${user.id}/presets`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, description, slots }),
+        }
+      );
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Create failed");
+
+      // Optional: immediately reflect in the left panel list if it’s open
+      setPresets((prev) => [j.preset, ...prev]);
+
+      toast.success("Preset created");
+      setShowExportModal(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to create preset");
+    }
+  };
+
+
+  /* ───────────── Early error/loading return ───────────── */
   if (loading || error) {
     return (
       <div
@@ -247,6 +491,7 @@ export default function CostTestPage() {
     );
   }
 
+  /* ───────────── Render ───────────── */
   return (
     <div
       className="page-fade-in"
@@ -284,12 +529,12 @@ export default function CostTestPage() {
           className="flex-grow-1 px-2"
           style={{ maxWidth: "1600px", margin: "0 auto" }}
         >
-          {/* Team slots and cost info */}
+          {/* Team + Info */}
           <div
             className="d-flex flex-column flex-md-row gap-4 mb-4 align-items-start"
             style={{ width: "100%" }}
           >
-            {/* Team Info Box on the left */}
+            {/* Team Info */}
             <div
               className="p-3 rounded"
               style={{
@@ -309,18 +554,57 @@ export default function CostTestPage() {
                 min={0}
                 onChange={(e) => setClearSpeed(parseFloat(e.target.value))}
               />
-              <div className="small mb-2">
-                <strong>Total Cost:</strong> {totalCost.toFixed(1)}
+
+              {/* Totals: Cerydra + Cipher */}
+              <div className="d-flex gap-2 flex-wrap mb-2">
+                <span
+                  className="badge"
+                  style={{
+                    background: "rgba(10, 170, 255, 0.2)",
+                    border: "1px solid rgba(10,170,255,0.35)",
+                  }}
+                >
+                  Cerydra: {totalCerydraCost.toFixed(2)}
+                </span>
+                <span
+                  className="badge"
+                  style={{
+                    background: "rgba(255, 170, 20, 0.18)",
+                    border: "1px solid rgba(255,170,20,0.35)",
+                  }}
+                >
+                  Cipher: {totalCipherCost.toFixed(2)}
+                </span>
               </div>
+
               <button
                 className="btn btn-outline-light btn-sm w-100"
                 onClick={clearTeam}
               >
                 Clear
               </button>
+              <button
+                className="btn btn-outline-light btn-sm w-100 mt-2"
+                disabled={!canExport}
+                onClick={exportToTeamPresets}
+                title={
+                  !canExport
+                    ? "Fill 4 unique characters to export"
+                    : "Export to Team Presets"
+                }
+              >
+                Export to Team Presets
+              </button>
+              <button
+                className="btn btn-outline-info btn-sm w-100 mt-2"
+                onClick={() => setShowPresetsPanel(true)}
+                title="Show your saved Team Presets"
+              >
+                Show Team Presets
+              </button>
             </div>
 
-            {/* Team Character Cards */}
+            {/* Team slots */}
             <div
               ref={slotsRef}
               className="d-flex justify-content-between gap-2"
@@ -334,14 +618,9 @@ export default function CostTestPage() {
               {team.map((member, index) => {
                 const char = member.characterInfo;
                 const cone = member.lightConeData;
-                const charCost = char
-                  ? charCostMap.get(extractImageId(char.image_url))?.[
-                      member.eidolon
-                    ] ?? 0
-                  : 0;
-                const coneCost = cone
-                  ? cone.costs[member.superimpose - 1] ?? 0
-                  : 0;
+
+                const eCery = char ? cerydraCharCost(member) : 0;
+                const sCery = cone ? cerydraConeCost(member) : 0;
 
                 return (
                   <div
@@ -383,6 +662,7 @@ export default function CostTestPage() {
                           }}
                         />
 
+                        {/* Eidolon badge with both systems */}
                         <div
                           style={{
                             position: "absolute",
@@ -413,7 +693,7 @@ export default function CostTestPage() {
                                 borderRadius: "6px",
                               }}
                             >
-                              E{member.eidolon} | {charCost}
+                              E{member.eidolon} | {formatCost(eCery)}
                             </div>
 
                             {eidolonOpenIndex === index && (
@@ -437,14 +717,7 @@ export default function CostTestPage() {
                                 <input
                                   type="range"
                                   min={0}
-                                  max={Math.max(
-                                    6,
-                                    ((char &&
-                                      charCostMap.get(
-                                        extractImageId(char.image_url)
-                                      )?.length) ??
-                                      7) - 1
-                                  )}
+                                  max={6}
                                   step={1}
                                   value={member.eidolon}
                                   onChange={(e) => {
@@ -526,6 +799,7 @@ export default function CostTestPage() {
                       />
                     )}
 
+                    {/* Cone area with both systems */}
                     {cone ? (
                       <div style={{ position: "relative" }}>
                         <img
@@ -574,7 +848,7 @@ export default function CostTestPage() {
                                 borderRadius: "6px",
                               }}
                             >
-                              S{member.superimpose} | {coneCost}
+                              S{member.superimpose} | {formatCost(sCery)}
                             </div>
 
                             {superOpenIndex === index && (
@@ -682,51 +956,45 @@ export default function CostTestPage() {
             >
               {charInfos
                 .filter((c) => {
-                  const lowerSearch = search.toLowerCase();
+                  const q = search.toLowerCase();
                   return (
-                    c.name.toLowerCase().includes(lowerSearch) ||
-                    c.subname?.toLowerCase().includes(lowerSearch)
+                    c.name.toLowerCase().includes(q) ||
+                    c.subname?.toLowerCase().includes(q)
                   );
                 })
                 .sort((a, b) => a.name.localeCompare(b.name))
-                .map((char) => {
-                  return (
-                    <div
-                      key={char.code}
-                      onClick={() => assignCharacterToSlot(char)}
-                      title={char.name}
-                      style={{
-                        width: "70px",
-                        height: "70px",
-                        borderRadius: "8px",
-                        border: "2px solid #555",
-                        backgroundImage: `url(${char.image_url})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        cursor: "pointer",
-                        opacity: 1,
-                        pointerEvents: "auto",
-                        transition:
-                          "transform 0.15s ease, box-shadow 0.15s ease",
-                        boxShadow: "none",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "scale(1.1)";
-                        e.currentTarget.style.boxShadow =
-                          "0 0 8px rgba(255,255,255,0.4)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "scale(1)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    />
-                  );
-                })}
+                .map((char) => (
+                  <div
+                    key={char.code}
+                    onClick={() => assignCharacterToSlot(char)}
+                    title={char.name}
+                    style={{
+                      width: "70px",
+                      height: "70px",
+                      borderRadius: "8px",
+                      border: "2px solid #555",
+                      backgroundImage: `url(${char.image_url})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      cursor: "pointer",
+                      transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "scale(1.1)";
+                      e.currentTarget.style.boxShadow =
+                        "0 0 8px rgba(255,255,255,0.4)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  />
+                ))}
             </div>
           </div>
         </div>
 
-        {/* Modal */}
+        {/* Light Cone Modal */}
         <Modal
           show={showModal}
           onHide={() => setShowModal(false)}
@@ -758,17 +1026,16 @@ export default function CostTestPage() {
                 </li>
                 {(() => {
                   const searchLower = coneSearch.toLowerCase();
-
                   const activeChar =
                     activeSlotIndex !== null
                       ? team[activeSlotIndex].characterInfo
                       : undefined;
                   const activeCharName = activeChar?.name.toLowerCase();
                   const activeCharSubname = activeChar?.subname?.toLowerCase();
+
                   const filteredCones = cones.filter((cone) => {
                     const name = cone.name?.toLowerCase() || "";
                     const sub = cone.subname?.toLowerCase() || "";
-
                     if (name.includes(searchLower) || sub.includes(searchLower))
                       return true;
 
@@ -784,24 +1051,19 @@ export default function CostTestPage() {
                         return true;
                       }
                     }
-
                     return false;
                   });
 
-                  // Sort to show character's signature first
                   filteredCones.sort((a, b) => {
                     if (!activeCharName && !activeCharSubname) return 0;
-
                     const aSub = a.subname?.toLowerCase() || "";
                     const bSub = b.subname?.toLowerCase() || "";
-
                     const aMatches =
                       (activeCharName && aSub.includes(activeCharName)) ||
                       (activeCharSubname && aSub.includes(activeCharSubname));
                     const bMatches =
                       (activeCharName && bSub.includes(activeCharName)) ||
                       (activeCharSubname && bSub.includes(activeCharSubname));
-
                     if (aMatches && !bMatches) return -1;
                     if (!aMatches && bMatches) return 1;
                     return 0;
@@ -810,7 +1072,6 @@ export default function CostTestPage() {
                   return filteredCones.map((cone) => {
                     const isSig =
                       !!activeChar && isSignatureCone(cone, activeChar);
-
                     return (
                       <li
                         key={cone.id}
@@ -872,6 +1133,350 @@ export default function CostTestPage() {
             </Button>
           </Modal.Footer>
         </Modal>
+
+        {/* Save Team Preset Modal */}
+        <Modal
+          show={showExportModal}
+          onHide={() => setShowExportModal(false)}
+          centered
+          contentClassName="bg-dark text-white"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Save Team Preset</Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body>
+            {/* Name + Description inputs (same limits as TeamPresets) */}
+            <div className="mb-3">
+              <label className="form-label">Name</label>
+              <input
+                type="text"
+                className="form-control bg-dark text-white"
+                value={exportName}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v.length <= 40) setExportName(v);
+                }}
+                maxLength={40}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <small className="text-white-50">{exportName.length}/40</small>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label">Description</label>
+              <textarea
+                className="form-control bg-dark text-white"
+                rows={3}
+                value={exportDesc}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v.length <= 200) setExportDesc(v);
+                }}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <small className="text-white-50">{exportDesc.length}/200</small>
+            </div>
+
+            {/* Team preview grid (non-editable, shows what will be saved) */}
+            <div className="mb-2 text-white-50 small">Team</div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                gap: 8,
+              }}
+            >
+              {team.map((m, i) => {
+                const char = m.characterInfo;
+                const cone = m.lightConeData;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      borderRadius: 12,
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      background: "rgba(0,0,0,0.7)",
+                      overflow: "hidden",
+                      position: "relative",
+                      height: 190,
+                    }}
+                    title={
+                      char
+                        ? `${char.name} • E${m.eidolon}${
+                            cone
+                              ? ` • ${cone.name} (S${m.superimpose})`
+                              : " • No LC"
+                          }`
+                        : ""
+                    }
+                  >
+                    {/* Character area */}
+                    {char ? (
+                      <img
+                        src={char.image_url}
+                        alt={char.name}
+                        style={{
+                          width: "100%",
+                          height: cone ? 140 : 200,
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: 200,
+                          background: "rgba(255,255,255,0.05)",
+                        }}
+                      />
+                    )}
+
+                    {/* E badge (Cerydra-only style) */}
+                    {char && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 6,
+                          left: 6,
+                          zIndex: 2,
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: "#000",
+                            color: "#fff",
+                            fontSize: "0.75rem",
+                            padding: "2px 6px",
+                            borderRadius: "6px",
+                            border: "1px solid rgba(255,255,255,0.15)",
+                          }}
+                        >
+                          E{m.eidolon}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Light cone area */}
+                    {cone ? (
+                      <div style={{ position: "relative" }}>
+                        <img
+                          src={cone.imageUrl}
+                          alt={cone.name}
+                          style={{
+                            width: "100%",
+                            height: 60,
+                            objectFit: "cover",
+                            display: "block",
+                            borderTop: "1px solid rgba(255,255,255,0.08)",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: 6,
+                            left: 6,
+                            background: "#000",
+                            color: "#fff",
+                            fontSize: "0.75rem",
+                            padding: "2px 6px",
+                            borderRadius: "6px",
+                            border: "1px solid rgba(255,255,255,0.15)",
+                          }}
+                        >
+                          S{m.superimpose}
+                        </div>
+                      </div>
+                    ) : (
+                      char && (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: 60,
+                            background: "rgba(255,255,255,0.05)",
+                            borderTop: "1px solid rgba(255,255,255,0.08)",
+                          }}
+                        />
+                      )
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-white-50 small mt-2">
+              (Edit the team in Cost Test if you want to change members/values.)
+            </div>
+          </Modal.Body>
+
+          <Modal.Footer>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowExportModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={!exportName.trim()}
+              onClick={handleCreatePreset}
+            >
+              Save Preset
+            </button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* === Slide-in Presets Panel === */}
+        {showPresetsPanel && (
+          <div
+            onClick={() => setShowPresetsPanel(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.45)",
+              backdropFilter: "blur(2px)",
+              zIndex: 1050,
+            }}
+          />
+        )}
+
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            height: "100vh",
+            width: "min(92vw, 360px)",
+            maxWidth: "92vw",
+            background: "rgba(10,10,10,0.92)",
+            borderRight: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "4px 0 24px rgba(0,0,0,0.6)",
+            transform: showPresetsPanel ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 260ms ease",
+            zIndex: 1051,
+            display: "flex",
+            flexDirection: "column",
+          }}
+          aria-hidden={!showPresetsPanel}
+        >
+          <div
+            className="d-flex align-items-center px-3 py-3"
+            style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", gap: 8 }}
+          >
+            <strong style={{ fontSize: "1.05rem" }}>Your Team Presets</strong>
+            <button
+              className="btn btn-sm btn-outline-light ms-auto"
+              onClick={() => setShowPresetsPanel(false)}
+              aria-label="Close presets panel"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="px-3 pt-3">
+            <input
+              className="form-control form-control-sm bg-dark text-white"
+              placeholder="Search presets…"
+              value={presetSearch}
+              onChange={(e) => setPresetSearch(e.target.value)}
+            />
+            {presetsError && (
+              <div className="text-danger small mt-2">{presetsError}</div>
+            )}
+          </div>
+
+          <div
+            style={{
+              overflowY: "auto",
+              padding: "12px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            {visiblePresets.length === 0 ? (
+              <div className="text-white-50 small px-2">
+                {presetSearch ? "No results." : "No presets yet."}
+              </div>
+            ) : (
+              visiblePresets.map((p) => (
+                <div
+                  key={p.id}
+                  className="p-2"
+                  style={{
+                    borderRadius: 10,
+                    background: "rgba(0,0,0,0.55)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                >
+                  <div className="d-flex align-items-center mb-2">
+                    <strong
+                      className="text-info"
+                      style={{ textShadow: "0 0 8px rgba(0,170,255,.25)" }}
+                    >
+                      {p.name}
+                    </strong>
+                    <button
+                      className="btn btn-sm btn-outline-light ms-auto"
+                      onClick={() => importPreset(p)}
+                    >
+                      Import
+                    </button>
+                  </div>
+
+                  {p.description && (
+                    <div
+                      className="small text-white-50 mb-2"
+                      style={{ lineHeight: 1.2 }}
+                    >
+                      {p.description}
+                    </div>
+                  )}
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(4, 1fr)",
+                      gap: 4,
+                    }}
+                  >
+                    {p.slots.slice(0, 4).map((s, i) => {
+                      const ch = charInfos.find(
+                        (c) => c.code === s.characterId
+                      );
+                      return (
+                        <div
+                          key={i}
+                          title={
+                            ch
+                              ? `${ch.name} • E${s.eidolon}`
+                              : s.characterId || "Empty"
+                          }
+                          style={{
+                            width: "100%",
+                            height: 52,
+                            borderRadius: 6,
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            backgroundImage: ch
+                              ? `url(${ch.image_url})`
+                              : "none",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundColor: ch
+                              ? "transparent"
+                              : "rgba(255,255,255,0.06)",
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        {/* === /Slide-in Presets Panel === */}
       </div>
     </div>
   );
