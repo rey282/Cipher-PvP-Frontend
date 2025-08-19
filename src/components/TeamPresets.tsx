@@ -570,7 +570,7 @@ export default function TeamPresets() {
     <div
       className="page-fade-in"
       style={{
-        backgroundImage: "url('/background.webp')",
+        backgroundImage: "url('/profile-bg.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed",
