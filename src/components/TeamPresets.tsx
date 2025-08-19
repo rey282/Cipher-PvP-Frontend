@@ -43,6 +43,8 @@ type TeamPreset = {
   slots: PresetSlot[];
 };
 
+const MAX_PRESETS = 50;
+
 /* Cipher backend shapes */
 type CipherCharacter = { code: string; costs: number[] | any[] }; // cost[E0..E6]
 type CipherCone = { id: string; limited: boolean };
@@ -410,6 +412,12 @@ export default function TeamPresets() {
     return slotsState.every((s) => s.characterId);
   }, [nameInput, slotsState]);
 
+  // Before creating in handleSubmit
+  if (!editingId && presets.length >= MAX_PRESETS) {
+    toast.info(`You’ve reached the maximum of ${MAX_PRESETS} presets.`);
+    return;
+  }
+
   const handleSubmit = async () => {
     if (!targetId) return;
     const body = {
@@ -603,15 +611,19 @@ export default function TeamPresets() {
               )}
               <h2 className="m-0">Team Presets</h2>
             </div>
-            <div className="ms-auto d-flex gap-2">
-              <button
-                className="back-button-glass btn-sm d-inline-flex align-items-center gap-2"
-                onClick={openCreate}
-              >
-                <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>＋</span>
-                New Preset
-              </button>
-            </div>
+            <button
+              className="back-button-glass btn-sm d-inline-flex align-items-center gap-2"
+              onClick={openCreate}
+              disabled={presets.length >= MAX_PRESETS}
+              title={
+                presets.length >= MAX_PRESETS
+                  ? `Max ${MAX_PRESETS} presets reached`
+                  : "New Preset"
+              }
+            >
+              <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>＋</span>
+              New Preset
+            </button>
           </div>
 
           {loading ? (
