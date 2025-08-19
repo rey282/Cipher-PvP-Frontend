@@ -577,31 +577,41 @@ export default function CostTestPage() {
                 </span>
               </div>
 
-              <button
-                className="btn btn-outline-light btn-sm w-100"
-                onClick={clearTeam}
-              >
-                Clear
-              </button>
-              <button
-                className="btn btn-outline-light btn-sm w-100 mt-2"
-                disabled={!canExport}
-                onClick={exportToTeamPresets}
-                title={
-                  !canExport
-                    ? "Fill 4 unique characters to export"
-                    : "Export to Team Presets"
-                }
-              >
-                Export to Team Presets
-              </button>
-              <button
-                className="btn btn-outline-info btn-sm w-100 mt-2"
-                onClick={() => setShowPresetsPanel(true)}
-                title="Show your saved Team Presets"
-              >
-                Show Team Presets
-              </button>
+              <div className="row g-2 mt-2">
+                <div className="col">
+                  <button
+                    className="btn btn-outline-light btn-sm w-100"
+                    onClick={clearTeam}
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div className="col">
+                  <button
+                    className="btn btn-outline-light btn-sm w-100"
+                    disabled={!canExport}
+                    onClick={exportToTeamPresets}
+                    title={
+                      !canExport
+                        ? "Fill 4 unique characters to export"
+                        : "Export to Team Presets"
+                    }
+                  >
+                    Export
+                  </button>
+                </div>
+
+                <div className="col">
+                  <button
+                    className="btn btn-outline-info btn-sm w-100"
+                    onClick={() => setShowPresetsPanel(true)}
+                    title="Show your saved Team Presets"
+                  >
+                    Presets
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Team slots */}
