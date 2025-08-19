@@ -39,6 +39,7 @@ export default function Navbar() {
     ? [
         { label: "Cipher Format", path: "/cipher" },
         { label: "Cerydra Format", path: "/cerydra" },
+        { label: "Cost Test", path: "/cerydra/cost-test" },
       ]
     : isCipher
     ? cipherNav
@@ -46,17 +47,21 @@ export default function Navbar() {
     ? cerydraNav
     : [];
 
-  const showTeamPresetsLink = !!user && !isLandingLike; // only logged-in & in cipher/cerydra sections
+  const showTeamPresetsLink = !!user; // show everywhere when logged in
 
   const handleCloseOffcanvas = () => {
     const offcanvasEl = document.getElementById("mobileNav");
-    if (offcanvasEl) {
-      const bsOffcanvas = (window as any).bootstrap.Offcanvas.getInstance(
-        offcanvasEl
-      );
-      if (bsOffcanvas) bsOffcanvas.hide();
+    if (!offcanvasEl) return;
+
+    try {
+      const anyWin = window as any;
+      const inst = anyWin?.bootstrap?.Offcanvas?.getInstance?.(offcanvasEl);
+      inst?.hide?.();
+    } catch {
+      // ignore – we still want navigation to proceed
     }
   };
+
 
   return (
     <nav className="w-100 px-2 py-3 d-flex justify-content-between align-items-center">
@@ -233,16 +238,13 @@ export default function Navbar() {
 
             {/* Team Presets (mobile) */}
             {showTeamPresetsLink && (
-              <button
-                type="button"
-                className="admin-link fw-semibold text-decoration-none btn btn-link p-0 text-start"
-                onClick={() => {
-                  handleCloseOffcanvas();
-                  goToTeamPresets();
-                }}
+              <Link
+                to={`/profile/${user?.id}/presets`}
+                className="admin-link fw-semibold text-decoration-none"
+                onClick={handleCloseOffcanvas}
               >
                 Team Presets
-              </button>
+              </Link>
             )}
 
             {/* Admin Link */}
