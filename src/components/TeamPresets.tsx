@@ -41,6 +41,7 @@ type TeamPreset = {
   description: string;
   updated_at: string;
   slots: PresetSlot[];
+  expectedCycle?: number | null;
 };
 
 const MAX_PRESETS = 50;
@@ -68,6 +69,7 @@ export default function TeamPresets() {
   const [nameInput, setNameInput] = useState("");
   const [descriptionInput, setDescriptionInput] = useState("");
   const [slotsState, setSlotsState] = useState<PresetSlot[]>([]);
+  const [expectedCycleInput, setExpectedCycleInput] = useState<string>("");
 
   // popup state for E/S (like CostTest)
   const [eidolonOpenIndex, setEidolonOpenIndex] = useState<number | null>(null);
@@ -234,6 +236,7 @@ export default function TeamPresets() {
     setEditingId(null);
     setNameInput("");
     setDescriptionInput("");
+    setExpectedCycleInput("");
     setSlotsState([
       makeEmptySlot(),
       makeEmptySlot(),
@@ -246,6 +249,11 @@ export default function TeamPresets() {
     setEditingId(p.id);
     setNameInput(p.name);
     setDescriptionInput(p.description || "");
+    setExpectedCycleInput(
+      p.expectedCycle !== null && p.expectedCycle !== undefined
+        ? String(p.expectedCycle)
+        : ""
+    );
     setSlotsState(p.slots);
     setShowModal(true);
   };
@@ -420,9 +428,14 @@ export default function TeamPresets() {
 
   const handleSubmit = async () => {
     if (!targetId) return;
+    const expectedCycle =
+      expectedCycleInput.trim() === ""
+        ? null
+        : Math.max(0, Math.floor(Number(expectedCycleInput)));
     const body = {
       name: nameInput.trim(),
       description: descriptionInput.trim(),
+      expectedCycle,
       slots: slotsState.map((s) => ({
         characterId: s.characterId,
         eidolon: s.eidolon,
@@ -688,6 +701,19 @@ export default function TeamPresets() {
                       >
                         Cipher: {savedCipherTotal(p.slots).toFixed(2)}
                       </span>
+
+                      {p.expectedCycle !== null &&
+                        p.expectedCycle !== undefined && (
+                          <span
+                            className="badge"
+                            style={{
+                              background: "rgba(255,255,255,0.08)",
+                              border: "1px solid rgba(255,255,255,0.15)",
+                            }}
+                          >
+                            Cycle: {p.expectedCycle}
+                          </span>
+                        )}
                     </div>
 
                     {/* Saved preset slots — force 4 in one row */}
@@ -1288,6 +1314,37 @@ export default function TeamPresets() {
                           </div>
                         );
                       })}
+                      {/* Expected Cycle */}
+                      <div className="mb-3">
+                        <label
+                          htmlFor="preset-expected-cycle"
+                          className="form-label m-0"
+                        >
+                          Expected Cycle
+                        </label>
+                        <input
+                          id="preset-expected-cycle"
+                          type="number"
+                          min={0}
+                          step={1}
+                          className="form-control bg-dark text-white"
+                          value={expectedCycleInput}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            // allow empty string to mean "unset"
+                            if (v === "") return setExpectedCycleInput("");
+                            // only allow non-negative integers
+                            const n = Number(v);
+                            if (!Number.isNaN(n) && n >= 0)
+                              setExpectedCycleInput(String(Math.floor(n)));
+                          }}
+                          placeholder="e.g. 8"
+                        />
+                        <small className="text-white-50">
+                          Optional. Leave blank if you don’t want to set a
+                          target cycle.
+                        </small>
+                      </div>
                     </div>
 
                     {/* Character Pool */}
@@ -1355,13 +1412,13 @@ export default function TeamPresets() {
 
                   <div className="modal-footer">
                     <button
-                      className="btn btn-secondary"
+                      className="btn-glass-muted"
                       onClick={() => setShowModal(false)}
                     >
                       Cancel
                     </button>
                     <button
-                      className="btn btn-primary"
+                      className="btn-glass-primary"
                       disabled={!canSubmit}
                       onClick={handleSubmit}
                     >

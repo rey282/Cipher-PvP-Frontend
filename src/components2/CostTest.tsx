@@ -55,6 +55,7 @@ type TeamPreset = {
   description: string;
   updated_at: string;
   slots: PresetSlot[];
+  expectedCycle?: number | null;
 };
 
 /* Cipher backend shapes */
@@ -104,6 +105,7 @@ export default function CostTestPage() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportName, setExportName] = useState("");
   const [exportDesc, setExportDesc] = useState("");
+  const [exportCycleInput, setExportCycleInput] = useState<string>("");
 
   /* ───────────── Helpers ───────────── */
   const isSignatureCone = (
@@ -378,7 +380,10 @@ export default function CostTestPage() {
     setConeSearch("");
   };
 
-  const clearTeam = () => setTeam(makeEmptyTeam());
+  const clearTeam = () => {
+    setTeam(makeEmptyTeam());
+    setClearSpeed(0); 
+  };
 
   /* ───────────── Import / Export with TeamPresets ───────────── */
   const slotToMember = (slot: PresetSlot): TeamMember => {
@@ -408,12 +413,18 @@ export default function CostTestPage() {
     }
     const nextTeam = four.map(slotToMember);
     setTeam(nextTeam);
+
+    if (typeof p.expectedCycle === "number") {
+      setClearSpeed(p.expectedCycle);
+    }
+
     setSearch("");
     setConeSearch("");
     setEidolonOpenIndex(null);
     setSuperOpenIndex(null);
     setShowPresetsPanel(false);
   };
+
   const formatCost = (value: number) =>
     value % 1 === 0 ? value.toString() : value.toFixed(1);
 
@@ -434,6 +445,9 @@ export default function CostTestPage() {
     }
     setExportName("");
     setExportDesc("");
+    setExportCycleInput(
+      String(Math.max(0, Math.floor(Number(clearSpeed))) || 0)
+    );
     setShowExportModal(true);
   };
 
@@ -446,13 +460,18 @@ export default function CostTestPage() {
       return;
     }
 
-    // Build slots payload from current team
     const slots = team.map((m) => ({
       characterId: m.characterId,
       eidolon: m.eidolon,
       lightConeId: m.lightConeId,
       superimpose: m.superimpose,
     }));
+
+    // ← derive expectedCycle from the modal input
+    const expectedCycle =
+      exportCycleInput === ""
+        ? null
+        : Math.max(0, Math.floor(Number(exportCycleInput)));
 
     try {
       const r = await fetch(
@@ -461,15 +480,13 @@ export default function CostTestPage() {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, description, slots }),
+          body: JSON.stringify({ name, description, slots, expectedCycle }),
         }
       );
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Create failed");
 
-      // Optional: immediately reflect in the left panel list if it’s open
       setPresets((prev) => [j.preset, ...prev]);
-
       toast.success("Preset created");
       setShowExportModal(false);
     } catch (err: any) {
@@ -552,7 +569,18 @@ export default function CostTestPage() {
                 className="form-control form-control-sm bg-dark text-white mb-2"
                 value={clearSpeed}
                 min={0}
-                onChange={(e) => setClearSpeed(parseFloat(e.target.value))}
+                step={1}
+                inputMode="numeric"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") {
+                    setClearSpeed(0);
+                    return;
+                  }
+                  const n = Math.max(0, Math.floor(Number(v)));
+                  if (Number.isFinite(n)) setClearSpeed(n);
+                }}
+                title="Saved to presets as Expected Cycle"
               />
 
               {/* Totals: Cerydra + Cipher */}
@@ -1190,6 +1218,33 @@ export default function CostTestPage() {
               <small className="text-white-50">{exportDesc.length}/200</small>
             </div>
 
+            {/* Expected Cycle (saved to preset) */}
+            <div className="mb-3">
+              <label htmlFor="export-expected-cycle" className="form-label">
+                Expected Cycle
+              </label>
+              <input
+                id="export-expected-cycle"
+                type="number"
+                min={0}
+                step={1}
+                className="form-control bg-dark text-white"
+                value={exportCycleInput}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") return setExportCycleInput("");
+                  const n = Number(v);
+                  if (Number.isFinite(n) && n >= 0)
+                    setExportCycleInput(String(Math.floor(n)));
+                }}
+                placeholder="e.g. 8"
+              />
+              <small className="text-white-50">
+                This starts from Team Info → Cycles and will be saved to the
+                preset.
+              </small>
+            </div>
+
             {/* Team preview grid (non-editable, shows what will be saved) */}
             <div className="mb-2 text-white-50 small">Team</div>
             <div
@@ -1322,13 +1377,13 @@ export default function CostTestPage() {
 
           <Modal.Footer>
             <button
-              className="btn btn-secondary"
+              className="btn-glass-muted"
               onClick={() => setShowExportModal(false)}
             >
               Cancel
             </button>
             <button
-              className="btn btn-primary"
+              className="btn-glass-primary"
               disabled={!exportName.trim()}
               onClick={handleCreatePreset}
             >
@@ -1441,6 +1496,12 @@ export default function CostTestPage() {
                       style={{ lineHeight: 1.2 }}
                     >
                       {p.description}
+                    </div>
+                  )}
+
+                  {typeof p.expectedCycle === "number" && (
+                    <div className="small text-white-50 mb-2">
+                      Cycle: {p.expectedCycle}
                     </div>
                   )}
 
