@@ -106,6 +106,27 @@ export default function TeamPresets() {
     superimpose: 1,
   });
 
+  // mobile + body-unlock helpers
+  const isTouchDevice =
+    typeof window !== "undefined" &&
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+  const unlockBody = () => {
+    document.body.classList.remove("modal-open");
+    document.body.style.removeProperty("overflow");
+    document.querySelectorAll(".modal-backdrop").forEach((el) => el.remove());
+  };
+
+  // ensure body unlocked whenever no modal is open, and on unmount
+  useEffect(() => {
+    if (!showModal && !showConeModal) {
+      const t = setTimeout(unlockBody, 0);
+      return () => clearTimeout(t);
+    }
+  }, [showModal, showConeModal]);
+
+  useEffect(() => () => unlockBody(), []);
+
   /* ───────────── Fetch presets ───────────── */
   useEffect(() => {
     if (!user || !targetId) return;
@@ -233,6 +254,10 @@ export default function TeamPresets() {
 
   /* ───────────── Modal open helpers ───────────── */
   const openCreate = () => {
+    if (presets.length >= MAX_PRESETS) {
+      toast.info(`You’ve reached the maximum of ${MAX_PRESETS} presets.`);
+      return;
+    }
     setEditingId(null);
     setNameInput("");
     setDescriptionInput("");
@@ -420,12 +445,6 @@ export default function TeamPresets() {
     return slotsState.every((s) => s.characterId);
   }, [nameInput, slotsState]);
 
-  // Before creating in handleSubmit
-  if (!editingId && presets.length >= MAX_PRESETS) {
-    toast.info(`You’ve reached the maximum of ${MAX_PRESETS} presets.`);
-    return;
-  }
-
   const handleSubmit = async () => {
     if (!targetId) return;
     const expectedCycle =
@@ -586,8 +605,8 @@ export default function TeamPresets() {
         backgroundImage: "url('/profile-bg.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundAttachment: "fixed",
-        minHeight: "100vh",
+        backgroundAttachment: isTouchDevice ? "initial" : "fixed",
+        minHeight: isTouchDevice ? "100dvh" : "100vh",
         position: "relative",
       }}
     >
@@ -871,6 +890,9 @@ export default function TeamPresets() {
               style={{
                 background: "rgba(0,0,0,0.5)",
                 backdropFilter: "blur(4px)",
+                height: "100dvh",
+                overflowY: "auto",
+                WebkitOverflowScrolling: "touch",
               }}
               onClick={() => {
                 setEidolonOpenIndex(null);
@@ -1348,65 +1370,105 @@ export default function TeamPresets() {
                     </div>
 
                     {/* Character Pool */}
-                    <input
-                      type="text"
-                      className="form-control form-control-sm mb-2 bg-dark text-white"
-                      placeholder="Search"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
+                    {/* Character Pool (self-scrolling inside modal) */}
                     <div
                       style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fill, minmax(60px, 1fr))",
-                        gap: "4px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        background: "rgba(0,0,0,0.45)",
+                        overflow: "hidden",
                       }}
                     >
-                      {charInfos
-                        .filter((c) => {
-                          const q = search.toLowerCase();
-                          return (
-                            c.name.toLowerCase().includes(q) ||
-                            c.subname?.toLowerCase().includes(q)
-                          );
-                        })
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((char) => {
-                          const alreadyPicked = slotsState.some(
-                            (s) => s.characterId === char.code
-                          );
-                          return (
-                            <div
-                              key={char.code}
-                              onClick={() =>
-                                !alreadyPicked && assignCharacterToSlot(char)
-                              }
-                              title={
-                                alreadyPicked
-                                  ? `${char.name} is already selected`
-                                  : char.name
-                              }
-                              style={{
-                                width: 60,
-                                height: 60,
-                                borderRadius: 6,
-                                border: "1px solid #444",
-                                backgroundImage: `url(${char.image_url})`,
-                                backgroundSize: "cover",
-                                backgroundPosition: "center",
-                                cursor: alreadyPicked
-                                  ? "not-allowed"
-                                  : "pointer",
-                                opacity: alreadyPicked ? 0.35 : 1,
-                                pointerEvents: alreadyPicked ? "none" : "auto",
-                                filter: alreadyPicked
-                                  ? "grayscale(80%)"
-                                  : "none",
-                              }}
-                            />
-                          );
-                        })}
+                      <div
+                        style={{
+                          height: "clamp(220px, 42vh, 480px)",
+                          overflowY: "auto",
+                          WebkitOverflowScrolling: "touch",
+                          overscrollBehavior: "contain",
+                          touchAction: "pan-y",
+                        }}
+                      >
+                        {/* Sticky search */}
+                        <div
+                          style={{
+                            position: "sticky",
+                            top: 0,
+                            zIndex: 2,
+                            background: "rgba(0,0,0,.85)",
+                            padding: 10,
+                            borderBottom: "1px solid rgba(255,255,255,0.08)",
+                            backdropFilter: "blur(4px)",
+                          }}
+                        >
+                          <input
+                            type="text"
+                            className="form-control form-control-sm bg-dark text-white"
+                            placeholder="Search"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                          />
+                        </div>
+
+                        {/* Grid */}
+                        <div style={{ padding: 10 }}>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "repeat(auto-fill, minmax(60px, 1fr))",
+                              gap: 6,
+                            }}
+                          >
+                            {charInfos
+                              .filter((c) => {
+                                const q = search.toLowerCase();
+                                return (
+                                  c.name.toLowerCase().includes(q) ||
+                                  c.subname?.toLowerCase().includes(q)
+                                );
+                              })
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .map((char) => {
+                                const alreadyPicked = slotsState.some(
+                                  (s) => s.characterId === char.code
+                                );
+                                return (
+                                  <div
+                                    key={char.code}
+                                    onClick={() =>
+                                      !alreadyPicked &&
+                                      assignCharacterToSlot(char)
+                                    }
+                                    title={
+                                      alreadyPicked
+                                        ? `${char.name} is already selected`
+                                        : char.name
+                                    }
+                                    style={{
+                                      width: 60,
+                                      height: 60,
+                                      borderRadius: 6,
+                                      border: "1px solid #444",
+                                      backgroundImage: `url(${char.image_url})`,
+                                      backgroundSize: "cover",
+                                      backgroundPosition: "center",
+                                      cursor: alreadyPicked
+                                        ? "not-allowed"
+                                        : "pointer",
+                                      opacity: alreadyPicked ? 0.35 : 1,
+                                      pointerEvents: alreadyPicked
+                                        ? "none"
+                                        : "auto",
+                                      filter: alreadyPicked
+                                        ? "grayscale(80%)"
+                                        : "none",
+                                    }}
+                                  />
+                                );
+                              })}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1437,6 +1499,7 @@ export default function TeamPresets() {
               setShowConeModal(false);
               setShowModal(true);
             }}
+            onExited={unlockBody}
             centered
             contentClassName="bg-dark text-white"
           >
@@ -1453,7 +1516,13 @@ export default function TeamPresets() {
                 onChange={(e) => setConeSearch(e.target.value)}
               />
 
-              <div style={{ maxHeight: 300, overflowY: "auto" }}>
+              <div
+                style={{
+                  maxHeight: 300,
+                  overflowY: "auto",
+                  WebkitOverflowScrolling: "touch",
+                }}
+              >
                 <ul className="list-group">
                   {/* None option */}
                   <li

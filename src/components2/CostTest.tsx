@@ -1,6 +1,6 @@
 // src/pages/CostTestPage.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Button } from "react-bootstrap";
+import { Modal } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import "../components/Landing.css";
@@ -106,6 +106,55 @@ export default function CostTestPage() {
   const [exportName, setExportName] = useState("");
   const [exportDesc, setExportDesc] = useState("");
   const [exportCycleInput, setExportCycleInput] = useState<string>("");
+
+  const presetsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const presetsPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const panel = presetsPanelRef.current;
+    if (!panel) return;
+
+    if (showPresetsPanel) {
+      // open: make it interactive + focus close button (or the panel)
+      panel.removeAttribute("inert");
+      panel.removeAttribute("aria-hidden");
+      setTimeout(() => {
+        (
+          panel.querySelector(
+            '[aria-label="Close presets panel"]'
+          ) as HTMLElement
+        )?.focus();
+      }, 0);
+    } else {
+      // close: if focus is still inside, send it back to the opener
+      if (panel.contains(document.activeElement)) {
+        presetsTriggerRef.current?.focus();
+      }
+      panel.setAttribute("aria-hidden", "true");
+      panel.setAttribute("inert", ""); // prevents focus/interaction
+    }
+  }, [showPresetsPanel]);
+
+  // mobile/touch detection + body-unlock (prevents "can't scroll after visiting" on phones)
+  const isTouchDevice =
+    typeof window !== "undefined" &&
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+  const unlockBody = () => {
+    document.body.classList.remove("modal-open");
+    document.body.style.removeProperty("overflow");
+    document.querySelectorAll(".modal-backdrop").forEach((el) => el.remove());
+  };
+
+  // unlock when all modals are closed + on unmount
+  useEffect(() => {
+    if (!showModal && !showExportModal) {
+      const t = setTimeout(unlockBody, 0);
+      return () => clearTimeout(t);
+    }
+  }, [showModal, showExportModal]);
+
+  useEffect(() => () => unlockBody(), []);
 
   /* ───────────── Helpers ───────────── */
   const isSignatureCone = (
@@ -382,7 +431,7 @@ export default function CostTestPage() {
 
   const clearTeam = () => {
     setTeam(makeEmptyTeam());
-    setClearSpeed(0); 
+    setClearSpeed(0);
   };
 
   /* ───────────── Import / Export with TeamPresets ───────────── */
@@ -495,7 +544,6 @@ export default function CostTestPage() {
     }
   };
 
-
   /* ───────────── Early error/loading return ───────────── */
   if (loading || error) {
     return (
@@ -516,8 +564,8 @@ export default function CostTestPage() {
         backgroundImage: "url('/background2.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundAttachment: "fixed",
-        minHeight: "100vh",
+        backgroundAttachment: isTouchDevice ? "initial" : "fixed",
+        minHeight: isTouchDevice ? "100dvh" : "100vh",
         position: "relative",
       }}
     >
@@ -632,6 +680,7 @@ export default function CostTestPage() {
 
                 <div className="col">
                   <button
+                    ref={presetsTriggerRef}
                     className="btn btn-outline-info btn-sm w-100"
                     onClick={() => setShowPresetsPanel(true)}
                     title="Show your saved Team Presets"
@@ -651,6 +700,7 @@ export default function CostTestPage() {
                 overflowX: "auto",
                 overflowY: "hidden",
                 width: "100%",
+                WebkitOverflowScrolling: "touch",
               }}
             >
               {team.map((member, index) => {
@@ -976,58 +1026,100 @@ export default function CostTestPage() {
           </div>
 
           {/* Character Pool */}
+          {/* Character Pool (self-scrolling) */}
           <div className="mb-5">
-            <input
-              type="text"
-              className="form-control form-control-sm mb-3 bg-dark text-white"
-              placeholder="Search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))",
-                gap: "4px",
-                justifyContent: "center",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(0,0,0,0.55)",
+                boxShadow: "0 6px 20px rgba(0,0,0,.35)",
+                overflow: "hidden",
               }}
             >
-              {charInfos
-                .filter((c) => {
-                  const q = search.toLowerCase();
-                  return (
-                    c.name.toLowerCase().includes(q) ||
-                    c.subname?.toLowerCase().includes(q)
-                  );
-                })
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((char) => (
-                  <div
-                    key={char.code}
-                    onClick={() => assignCharacterToSlot(char)}
-                    title={char.name}
-                    style={{
-                      width: "70px",
-                      height: "70px",
-                      borderRadius: "8px",
-                      border: "2px solid #555",
-                      backgroundImage: `url(${char.image_url})`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                      cursor: "pointer",
-                      transition: "transform 0.15s ease, box-shadow 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "scale(1.1)";
-                      e.currentTarget.style.boxShadow =
-                        "0 0 8px rgba(255,255,255,0.4)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "scale(1)";
-                      e.currentTarget.style.boxShadow = "none";
-                    }}
+              {/* Scroll container */}
+              <div
+                style={{
+                  height: "clamp(260px, 46vh, 560px)", // responsive height
+                  overflowY: "auto",
+                  WebkitOverflowScrolling: "touch",
+                  overscrollBehavior: "contain",
+                  touchAction: "pan-y",
+                }}
+              >
+                {/* Sticky search inside the scroller */}
+                <div
+                  style={{
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 2,
+                    background:
+                      "linear-gradient(rgba(0,0,0,.85), rgba(0,0,0,.75))",
+                    padding: "10px",
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                    backdropFilter: "blur(4px)",
+                  }}
+                >
+                  <input
+                    type="text"
+                    className="form-control form-control-sm bg-dark text-white"
+                    placeholder="Search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                   />
-                ))}
+                </div>
+
+                {/* Grid */}
+                <div style={{ padding: 10 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(60px, 1fr))",
+                      gap: 6,
+                      justifyContent: "center",
+                    }}
+                  >
+                    {charInfos
+                      .filter((c) => {
+                        const q = search.toLowerCase();
+                        return (
+                          c.name.toLowerCase().includes(q) ||
+                          c.subname?.toLowerCase().includes(q)
+                        );
+                      })
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((char) => (
+                        <div
+                          key={char.code}
+                          onClick={() => assignCharacterToSlot(char)}
+                          title={char.name}
+                          style={{
+                            width: 70,
+                            height: 70,
+                            borderRadius: 8,
+                            border: "2px solid #555",
+                            backgroundImage: `url(${char.image_url})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            cursor: "pointer",
+                            transition:
+                              "transform 0.15s ease, box-shadow 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = "scale(1.1)";
+                            e.currentTarget.style.boxShadow =
+                              "0 0 8px rgba(255,255,255,0.4)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "scale(1)";
+                            e.currentTarget.style.boxShadow = "none";
+                          }}
+                        />
+                      ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1036,6 +1128,7 @@ export default function CostTestPage() {
         <Modal
           show={showModal}
           onHide={() => setShowModal(false)}
+          onExited={unlockBody}
           centered
           contentClassName="custom-black-modal"
         >
@@ -1163,12 +1256,18 @@ export default function CostTestPage() {
             </div>
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowModal(false)}>
+            <button
+              className="btn-glass-muted"
+              onClick={() => setShowModal(false)}
+            >
               Cancel
-            </Button>
-            <Button variant="primary" onClick={confirmConeSelection}>
+            </button>
+            <button
+              className="btn-glass-primary"
+              onClick={confirmConeSelection}
+            >
               Confirm
-            </Button>
+            </button>
           </Modal.Footer>
         </Modal>
 
@@ -1176,11 +1275,27 @@ export default function CostTestPage() {
         <Modal
           show={showExportModal}
           onHide={() => setShowExportModal(false)}
+          onExited={unlockBody}
           centered
           contentClassName="bg-dark text-white"
         >
           <Modal.Header closeButton>
-            <Modal.Title>Save Team Preset</Modal.Title>
+            <Modal.Title className="d-flex align-items-center gap-2">
+              Save Team Preset
+              {exportCycleInput !== "" && (
+                <span
+                  className="badge"
+                  style={{
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    fontWeight: 600,
+                  }}
+                  title="Will be saved as Expected Cycle"
+                >
+                  Cycle: {exportCycleInput}
+                </span>
+              )}
+            </Modal.Title>
           </Modal.Header>
 
           <Modal.Body>
@@ -1407,23 +1522,21 @@ export default function CostTestPage() {
         )}
 
         <div
+          ref={presetsPanelRef}
           style={{
             position: "fixed",
             top: 0,
             left: 0,
             height: "100vh",
             width: "min(92vw, 360px)",
-            maxWidth: "92vw",
             background: "rgba(10,10,10,0.92)",
-            borderRight: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "4px 0 24px rgba(0,0,0,0.6)",
             transform: showPresetsPanel ? "translateX(0)" : "translateX(-100%)",
             transition: "transform 260ms ease",
             zIndex: 1051,
             display: "flex",
             flexDirection: "column",
+            pointerEvents: showPresetsPanel ? "auto" : "none", // optional
           }}
-          aria-hidden={!showPresetsPanel}
         >
           <div
             className="d-flex align-items-center px-3 py-3"
@@ -1458,6 +1571,7 @@ export default function CostTestPage() {
               display: "flex",
               flexDirection: "column",
               gap: 10,
+              WebkitOverflowScrolling: "touch",
             }}
           >
             {visiblePresets.length === 0 ? (
