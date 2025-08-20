@@ -111,11 +111,18 @@ export default function TeamPresets() {
     typeof window !== "undefined" &&
     window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
+  const anyModalOpen = () =>
+    !!document.querySelector(".modal.show, .modal.d-block");
+
   const unlockBody = () => {
-    document.body.classList.remove("modal-open");
-    document.body.style.removeProperty("overflow");
-    document.querySelectorAll(".modal-backdrop").forEach((el) => el.remove());
+    // Only clean up body styles when no modal of any kind is open.
+    if (!anyModalOpen()) {
+      document.body.classList.remove("modal-open");
+      document.body.style.removeProperty("overflow");
+    }
+    // Do NOT remove .modal-backdrop — React-Bootstrap owns those.
   };
+
 
   // ensure body unlocked whenever no modal is open, and on unmount
   useEffect(() => {

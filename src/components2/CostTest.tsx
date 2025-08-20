@@ -141,10 +141,13 @@ export default function CostTestPage() {
     window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
   const unlockBody = () => {
-    document.body.classList.remove("modal-open");
-    document.body.style.removeProperty("overflow");
-    document.querySelectorAll(".modal-backdrop").forEach((el) => el.remove());
+    // Only clean up body styles if there are no modals still open.
+    if (!document.querySelector(".modal.show")) {
+      document.body.classList.remove("modal-open");
+      document.body.style.removeProperty("overflow");
+    }
   };
+
 
   // unlock when all modals are closed + on unmount
   useEffect(() => {
@@ -197,6 +200,9 @@ export default function CostTestPage() {
   /* ───────────── Outside click to close E/S popups ───────────── */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      // 🚫 Do nothing while the cone modal is open
+      if (showModal) return;
+
       const t = e.target as Node;
       if (slotsRef.current?.contains(t)) return;
       setEidolonOpenIndex(null);
@@ -204,7 +210,8 @@ export default function CostTestPage() {
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [showModal, slotsRef]);
+
 
   /* ───────────── Base data fetch (Cerydra + Cipher) ───────────── */
   useEffect(() => {
