@@ -123,7 +123,6 @@ export default function TeamPresets() {
     // Do NOT remove .modal-backdrop — React-Bootstrap owns those.
   };
 
-
   // ensure body unlocked whenever no modal is open, and on unmount
   useEffect(() => {
     if (!showModal && !showConeModal) {
@@ -580,6 +579,19 @@ export default function TeamPresets() {
     );
   }
 
+  // Search for presets (separate from character-pool `search`)
+  const [presetQuery, setPresetQuery] = useState("");
+
+  const filteredPresets = useMemo(() => {
+    const q = presetQuery.trim().toLowerCase();
+    if (!q) return presets;
+    return presets.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q)
+    );
+  }, [presets, presetQuery]);
+
   // Saved card total calculators (computed on-the-fly)
   const savedCerydraTotal = (slots: PresetSlot[]) =>
     slots.reduce((sum, s) => {
@@ -637,32 +649,74 @@ export default function TeamPresets() {
         </div>
 
         <div className="container">
-          <div className="d-flex align-items-center gap-3 flex-wrap">
-            <div className="d-flex align-items-center gap-2">
-              {user?.avatar && (
-                <img
-                  src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
-                  alt="avatar"
-                  className="rounded-circle"
-                  width={36}
-                  height={36}
-                />
-              )}
-              <h2 className="m-0">Team Presets</h2>
+          <div className="container mb-3">
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+              {/* Avatar + Title */}
+              <div className="d-flex align-items-center gap-2">
+                {user?.avatar && (
+                  <img
+                    src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
+                    alt="avatar"
+                    className="rounded-circle"
+                    width={40}
+                    height={40}
+                  />
+                )}
+                <h2 className="m-0">Team Presets</h2>
+              </div>
+
+              {/* Search + Button unified pill */}
+              <div
+                className="input-group preset-search-group"
+                style={{ maxWidth: 420 }}
+              >
+                {/* WRAP THE INPUT — this is the positioning anchor for the X */}
+                <div className="preset-input-wrap flex-grow-1">
+                  <input
+                    type="text"
+                    className="form-control bg-dark text-white border-secondary preset-search-input"
+                    placeholder="Search presets..."
+                    value={presetQuery}
+                    onChange={(e) => setPresetQuery(e.target.value)}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    style={{ paddingRight: 28 }} // room for the X inside the input
+                  />
+
+                  {/* X sits INSIDE the input now (relative to .preset-input-wrap) */}
+                  {presetQuery && (
+                    <button
+                      type="button"
+                      className="preset-clear-x"
+                      onClick={() => setPresetQuery("")}
+                      title="Clear search"
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  className="btn back-button-glass"
+                  onClick={openCreate}
+                  disabled={presets.length >= MAX_PRESETS}
+                >
+                  ＋ New Preset
+                </button>
+              </div>
             </div>
-            <button
-              className="back-button-glass btn-sm d-inline-flex align-items-center gap-2"
-              onClick={openCreate}
-              disabled={presets.length >= MAX_PRESETS}
-              title={
-                presets.length >= MAX_PRESETS
-                  ? `Max ${MAX_PRESETS} presets reached`
-                  : "New Preset"
-              }
-            >
-              <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>＋</span>
-              New Preset
-            </button>
+
+            {/* Small subtitle / count */}
+            <div className="text-white-50 small mt-1">
+              {presetQuery
+                ? `${filteredPresets.length} result${
+                    filteredPresets.length === 1 ? "" : "s"
+                  }`
+                : `${presets.length} preset${presets.length === 1 ? "" : "s"}`}
+            </div>
           </div>
 
           {loading ? (
@@ -671,174 +725,157 @@ export default function TeamPresets() {
             </div>
           ) : error ? (
             <div className="text-danger mt-4">{error}</div>
-          ) : presets.length === 0 ? (
+          ) : filteredPresets.length === 0 ? (
             <div className="text-white-50 mt-4">
-              No presets yet. Click <em>New Preset</em> to add one.
+              {presetQuery ? (
+                <>
+                  No matches for “<em>{presetQuery}</em>”.
+                </>
+              ) : (
+                <>
+                  No presets yet. Click <em>New Preset</em> to add one.
+                </>
+              )}
             </div>
           ) : (
             <div className="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-3">
-              {presets.map((p) => (
-                <div className="col" key={p.id}>
-                  <div
-                    className="card bg-dark bg-opacity-75 p-3 h-100 shadow-sm"
-                    style={{
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.1)",
-                    }}
-                  >
-                    <div className="d-flex align-items-center">
-                      <strong
-                        className="fs-5"
-                        style={{
-                          color: "#0af",
-                          textShadow: "0 0 8px rgba(0,170,255,.35)",
-                        }}
-                      >
-                        {p.name}
-                      </strong>
-                      <span className="ms-auto text-white-50 small">
-                        {new Date(p.updated_at).toLocaleString()}
-                      </span>
-                    </div>
-
-                    {p.description && (
-                      <div className="mt-2 text-white-50 small">
-                        {p.description}
-                      </div>
-                    )}
-
-                    {/* Totals */}
-                    <div className="mt-2 d-flex gap-2 flex-wrap">
-                      <span
-                        className="badge"
-                        style={{
-                          background: "rgba(10, 170, 255, 0.2)",
-                          border: "1px solid rgba(10,170,255,0.35)",
-                        }}
-                      >
-                        Cerydra: {savedCerydraTotal(p.slots).toFixed(2)}
-                      </span>
-                      <span
-                        className="badge"
-                        style={{
-                          background: "rgba(255, 170, 20, 0.18)",
-                          border: "1px solid rgba(255,170,20,0.35)",
-                        }}
-                      >
-                        Cipher: {savedCipherTotal(p.slots).toFixed(2)}
-                      </span>
-
-                      {p.expectedCycle !== null &&
-                        p.expectedCycle !== undefined && (
-                          <span
-                            className="badge"
-                            style={{
-                              background: "rgba(255,255,255,0.08)",
-                              border: "1px solid rgba(255,255,255,0.15)",
-                            }}
-                          >
-                            Cycle: {p.expectedCycle}
-                          </span>
-                        )}
-                    </div>
-
-                    {/* Saved preset slots — force 4 in one row */}
+              {presets
+                .filter(
+                  (p) =>
+                    p.name.toLowerCase().includes(presetQuery.toLowerCase()) ||
+                    (p.description || "")
+                      .toLowerCase()
+                      .includes(presetQuery.toLowerCase())
+                )
+                .map((p) => (
+                  <div className="col" key={p.id}>
                     <div
-                      className="mt-3"
+                      className="card bg-dark bg-opacity-75 p-3 h-100 shadow-sm"
                       style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                        gap: 8,
+                        borderRadius: 12,
+                        border: "1px solid rgba(255,255,255,0.1)",
                       }}
                     >
-                      {p.slots.map((s, i) => {
-                        const char = charByCode.get(s.characterId);
-                        const cone = s.lightConeId
-                          ? coneById.get(s.lightConeId)
-                          : undefined;
+                      <div className="d-flex align-items-center">
+                        <strong
+                          className="fs-5"
+                          style={{
+                            color: "#0af",
+                            textShadow: "0 0 8px rgba(0,170,255,.35)",
+                          }}
+                        >
+                          {p.name}
+                        </strong>
+                        <span className="ms-auto text-white-50 small">
+                          {new Date(p.updated_at).toLocaleString()}
+                        </span>
+                      </div>
 
-                        return (
-                          <div
-                            key={i}
-                            title={
-                              char
-                                ? `${char.name} • E${s.eidolon}` +
-                                  (cone
-                                    ? ` • ${cone.name} (S${s.superimpose})`
-                                    : " • No LC")
-                                : s.characterId
-                            }
-                            style={{
-                              width: "100%",
-                              height: 190,
-                              borderRadius: 12,
-                              background: "rgba(0,0,0,0.65)",
-                              border: "1px solid rgba(255,255,255,0.1)",
-                              overflow: "hidden",
-                              position: "relative",
-                            }}
-                          >
-                            {/* Character area */}
-                            {char ? (
-                              <img
-                                src={char.image_url}
-                                alt={char.name}
-                                style={{
-                                  width: "100%",
-                                  height: cone ? 140 : 200,
-                                  objectFit: "cover",
-                                  transition: "height .2s ease",
-                                }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: "100%",
-                                  height: 200,
-                                  background: "rgba(255,255,255,0.05)",
-                                }}
-                              />
-                            )}
+                      {p.description && (
+                        <div className="mt-2 text-white-50 small">
+                          {p.description}
+                        </div>
+                      )}
 
-                            {/* E badge */}
-                            {char && (
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  top: 6,
-                                  left: 6,
-                                  background: "#000",
-                                  color: "#fff",
-                                  fontSize: "0.75rem",
-                                  padding: "2px 6px",
-                                  borderRadius: 6,
-                                  border: "1px solid rgba(255,255,255,0.15)",
-                                }}
-                              >
-                                E{s.eidolon}
-                              </div>
-                            )}
+                      {/* Totals */}
+                      <div className="mt-2 d-flex gap-2 flex-wrap">
+                        <span
+                          className="badge"
+                          style={{
+                            background: "rgba(10, 170, 255, 0.2)",
+                            border: "1px solid rgba(10,170,255,0.35)",
+                          }}
+                        >
+                          Cerydra: {savedCerydraTotal(p.slots).toFixed(2)}
+                        </span>
+                        <span
+                          className="badge"
+                          style={{
+                            background: "rgba(255, 170, 20, 0.18)",
+                            border: "1px solid rgba(255,170,20,0.35)",
+                          }}
+                        >
+                          Cipher: {savedCipherTotal(p.slots).toFixed(2)}
+                        </span>
 
-                            {/* Light cone area */}
-                            {cone ? (
-                              <div style={{ position: "relative" }}>
+                        {p.expectedCycle !== null &&
+                          p.expectedCycle !== undefined && (
+                            <span
+                              className="badge"
+                              style={{
+                                background: "rgba(255,255,255,0.08)",
+                                border: "1px solid rgba(255,255,255,0.15)",
+                              }}
+                            >
+                              Cycle: {p.expectedCycle}
+                            </span>
+                          )}
+                      </div>
+
+                      {/* Saved preset slots — force 4 in one row */}
+                      <div
+                        className="mt-3"
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                          gap: 8,
+                        }}
+                      >
+                        {p.slots.map((s, i) => {
+                          const char = charByCode.get(s.characterId);
+                          const cone = s.lightConeId
+                            ? coneById.get(s.lightConeId)
+                            : undefined;
+
+                          return (
+                            <div
+                              key={i}
+                              title={
+                                char
+                                  ? `${char.name} • E${s.eidolon}` +
+                                    (cone
+                                      ? ` • ${cone.name} (S${s.superimpose})`
+                                      : " • No LC")
+                                  : s.characterId
+                              }
+                              style={{
+                                width: "100%",
+                                height: 190,
+                                borderRadius: 12,
+                                background: "rgba(0,0,0,0.65)",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                overflow: "hidden",
+                                position: "relative",
+                              }}
+                            >
+                              {/* Character area */}
+                              {char ? (
                                 <img
-                                  src={cone.imageUrl}
-                                  alt={cone.name}
-                                  loading="lazy"
+                                  src={char.image_url}
+                                  alt={char.name}
                                   style={{
                                     width: "100%",
-                                    height: 60,
+                                    height: cone ? 140 : 200,
                                     objectFit: "cover",
-                                    display: "block",
-                                    borderTop:
-                                      "1px solid rgba(255,255,255,0.08)",
+                                    transition: "height .2s ease",
                                   }}
                                 />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: "100%",
+                                    height: 200,
+                                    background: "rgba(255,255,255,0.05)",
+                                  }}
+                                />
+                              )}
+
+                              {/* E badge */}
+                              {char && (
                                 <div
                                   style={{
                                     position: "absolute",
-                                    bottom: 6,
+                                    top: 6,
                                     left: 6,
                                     background: "#000",
                                     color: "#fff",
@@ -848,43 +885,80 @@ export default function TeamPresets() {
                                     border: "1px solid rgba(255,255,255,0.15)",
                                   }}
                                 >
-                                  S{s.superimpose}
+                                  E{s.eidolon}
                                 </div>
-                              </div>
-                            ) : (
-                              char && (
-                                <div
-                                  style={{
-                                    width: "100%",
-                                    height: 60,
-                                    background: "rgba(255,255,255,0.05)",
-                                    borderTop:
-                                      "1px solid rgba(255,255,255,0.08)",
-                                  }}
-                                />
-                              )
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                              )}
 
-                    <div className="mt-3 d-flex gap-2">
-                      <button className="btn-glass" onClick={() => openEdit(p)}>
-                        <span className="btn-ico">✏️</span>
-                        Edit
-                      </button>
-                      <button
-                        className="btn-glass-danger"
-                        onClick={() => handleDelete(p.id)}
-                      >
-                        <span className="btn-ico">🗑️</span>
-                        Delete
-                      </button>
+                              {/* Light cone area */}
+                              {cone ? (
+                                <div style={{ position: "relative" }}>
+                                  <img
+                                    src={cone.imageUrl}
+                                    alt={cone.name}
+                                    loading="lazy"
+                                    style={{
+                                      width: "100%",
+                                      height: 60,
+                                      objectFit: "cover",
+                                      display: "block",
+                                      borderTop:
+                                        "1px solid rgba(255,255,255,0.08)",
+                                    }}
+                                  />
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      bottom: 6,
+                                      left: 6,
+                                      background: "#000",
+                                      color: "#fff",
+                                      fontSize: "0.75rem",
+                                      padding: "2px 6px",
+                                      borderRadius: 6,
+                                      border:
+                                        "1px solid rgba(255,255,255,0.15)",
+                                    }}
+                                  >
+                                    S{s.superimpose}
+                                  </div>
+                                </div>
+                              ) : (
+                                char && (
+                                  <div
+                                    style={{
+                                      width: "100%",
+                                      height: 60,
+                                      background: "rgba(255,255,255,0.05)",
+                                      borderTop:
+                                        "1px solid rgba(255,255,255,0.08)",
+                                    }}
+                                  />
+                                )
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-3 d-flex gap-2">
+                        <button
+                          className="btn-glass"
+                          onClick={() => openEdit(p)}
+                        >
+                          <span className="btn-ico">✏️</span>
+                          Edit
+                        </button>
+                        <button
+                          className="btn-glass-danger"
+                          onClick={() => handleDelete(p.id)}
+                        >
+                          <span className="btn-ico">🗑️</span>
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
 
