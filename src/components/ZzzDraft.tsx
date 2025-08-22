@@ -2,45 +2,87 @@ import { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import "../components/Landing.css";
 import { useLocation } from "react-router-dom";
-import { Modal, Button } from "react-bootstrap";
-import { Popover, OverlayTrigger } from "react-bootstrap";
+import { Modal, Button, Popover, OverlayTrigger } from "react-bootstrap";
 
-
+/* ───────────── Types ───────────── */
 type Character = {
   code: string;
   name: string;
   subname?: string;
-  rarity: number;
+  rarity: number; // 5 = S, 4 = A
   image_url: string;
+  limited: boolean; // NEW
 };
 
 type WEngine = {
   id: string;
   name: string;
   subname?: string;
-  rarity: number;
+  rarity: number; // 5 = S, 4/A/B below
   image_url: string;
+  limited: boolean; // NEW
 };
 
 type DraftPick = {
   character: Character;
-  eidolon: number;
+  eidolon: number; // Mindscape M0..M6
   wengine?: WEngine;
-  superimpose: number;
+  superimpose: number; // Refinement W1..W5 (0 if none)
 };
 
-const EIDOLON_COSTS_5STAR = [1, 1.5, 2, 2, 2.5, 2.5, 3];
-const EIDOLON_COST_4STAR = 0.5;
-const SUPERIMPOSE_COSTS = [0.25, 0.25, 0.5, 0.5, 0.75];
-const PENALTY_PER_POINT = 2500;
+/* ───────────── Cost Rules Helpers ───────────── */
+/** Mindscape levels are integers 0..6 (M0..M6) */
+function calcAgentCost(agent: Character, mindscape: number): number {
+  const ms = Math.max(0, Math.min(6, mindscape));
 
+  // All A Rank agents: 0.5 at all mindscapes.
+  if (agent.rarity === 4) return 0.5;
+
+  // S Rank
+  if (agent.rarity === 5) {
+    if (agent.limited) {
+      // Limited S Rank agent: starts at 1, +0.5 per unique mindscape (except M3 & M5).
+      // i.e., bumps at M1, M2, M4, M6
+      const bumpMilestones = [1, 2, 4, 6];
+      const bumps = bumpMilestones.filter((m) => ms >= m).length;
+      return 1 + 0.5 * bumps;
+    } else {
+      // Standard S Rank agent: starts at 1, 1.5 cost at M6.
+      return ms >= 6 ? 1.5 : 1;
+    }
+  }
+
+  // Anything else (just in case): free
+  return 0;
+}
+
+/** Refinement levels are integers 0..5 (0 if none, W1..W5 => 1..5). */
+function calcWEngineCost(we: WEngine | undefined, refine: number): number {
+  if (!we) return 0;
+  const r = Math.max(0, Math.min(5, refine));
+
+  // A & B Rank wengines: 0 cost at all refinements.
+  if (we.rarity <= 4) return 0;
+
+  // S Rank wengines
+  if (we.limited) {
+    // Limited S Rank wengines: 0.25 starting cost, 0.5 at W3+ refinements.
+    return r >= 3 ? 0.5 : 0.25;
+  } else {
+    // Standard S Rank wengines: 0 starting cost, 0.25 at W3+ refinements.
+    return r >= 3 ? 0.25 : 0;
+  }
+}
+
+/* ───────────── Penalty ───────────── */
+const PENALTY_PER_POINT = 2500; // per 0.25 above cap
 
 export default function ZzzDraftPage() {
   const location = useLocation();
   const query = new URLSearchParams(location.search);
   const mode = query.get("mode") || "2v2";
   const is3v3 = mode === "3v3";
-  const COST_LIMIT = is3v3 ? 9 : 6;
+  const COST_LIMIT = is3v3 ? 12 : 8; // FIXED to match rules text
 
   const draftSequence: string[] = is3v3
     ? [
@@ -65,7 +107,22 @@ export default function ZzzDraftPage() {
         "R",
         "B",
       ]
-    : ["B", "R", "R", "B", "RR", "BB", "R", "B", "B", "R", "R(ACE)", "B(ACE)", "B", "R"];
+    : [
+        "B",
+        "R",
+        "R",
+        "B",
+        "RR",
+        "BB",
+        "R",
+        "B",
+        "B",
+        "R",
+        "R(ACE)",
+        "B(ACE)",
+        "B",
+        "R",
+      ];
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [wengines, setWengines] = useState<WEngine[]>([]);
@@ -218,8 +275,6 @@ export default function ZzzDraftPage() {
     </Popover>
   );
 
-
-
   const bannedCodes = draftPicks
     .map((pick, i) =>
       draftSequence[i] === "BB" || draftSequence[i] === "RR"
@@ -228,6 +283,19 @@ export default function ZzzDraftPage() {
     )
     .filter(Boolean) as string[];
 
+  function getSlotCost(pick: DraftPick | null | undefined) {
+    if (!pick) return { agentCost: 0, weCost: 0, total: 0 };
+    const agentCost = calcAgentCost(pick.character, pick.eidolon);
+    const weCost = calcWEngineCost(pick.wengine, pick.superimpose);
+    return {
+      agentCost,
+      weCost,
+      total: Number((agentCost + weCost).toFixed(2)),
+    };
+  }
+
+
+  /* ───────────── Data Fetch ───────────── */
   useEffect(() => {
     Promise.all([
       fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/characters`, {
@@ -241,8 +309,11 @@ export default function ZzzDraftPage() {
         const charData = await charRes.json();
         const wengData = await wengRes.json();
         if (!charRes.ok || !wengRes.ok) throw new Error("Failed to fetch data");
-        setCharacters(charData.data || []);
-        setWengines(wengData.data || []);
+
+        // Expecting `limited` to be returned from API; if not, safely default to true for characters, false for engines?
+        // Based on your DB defaults, characters/wengines default to TRUE unless you updated them; keep as-is from API.
+        setCharacters((charData.data || []) as Character[]);
+        setWengines((wengData.data || []) as WEngine[]);
       })
       .catch((err) => {
         console.error(err);
@@ -250,6 +321,7 @@ export default function ZzzDraftPage() {
       });
   }, []);
 
+  /* ───────────── Click-outside sliders ───────────── */
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -280,6 +352,7 @@ export default function ZzzDraftPage() {
     };
   }, [superOpenIndex, eidolonOpenIndex]);
 
+  /* ───────────── Draft actions ───────────── */
   const handleCharacterPick = (char: Character) => {
     if (draftComplete) return;
 
@@ -301,8 +374,8 @@ export default function ZzzDraftPage() {
     const updated = [...draftPicks];
     updated[currentTurn] = {
       character: char,
-      eidolon: 0,
-      superimpose: 1,
+      eidolon: 0, // M0
+      superimpose: 1, // W1 by default (changeable via slider)
     };
     setDraftPicks(updated);
     setCurrentTurn((prev) => prev + 1);
@@ -373,6 +446,7 @@ export default function ZzzDraftPage() {
     }
   };
 
+  /* For signature sort hinting */
   const subnameToCharacterName = new Map<string, string>();
   characters.forEach((char) => {
     if (char.subname) {
@@ -380,7 +454,7 @@ export default function ZzzDraftPage() {
     }
   });
 
-
+  /* ───────────── Team Cost using new rules ───────────── */
   const getTeamCost = (prefix: string) => {
     let total = 0;
     for (let i = 0; i < draftSequence.length; i++) {
@@ -389,17 +463,11 @@ export default function ZzzDraftPage() {
       const pick = draftPicks[i];
       if (!pick) continue;
 
-      const charCost =
-        pick.character.rarity === 5
-          ? EIDOLON_COSTS_5STAR[Math.min(pick.eidolon, 6)]
-          : EIDOLON_COST_4STAR;
+      const charCost = calcAgentCost(pick.character, pick.eidolon);
+      const weCost = calcWEngineCost(pick.wengine, pick.superimpose);
+      // const bbCost = calcBangbooCost(); // no bangboo in UI currently
 
-      const coneCost =
-        pick.wengine && pick.superimpose >= 1 && pick.superimpose <= 5
-          ? SUPERIMPOSE_COSTS[pick.superimpose - 1]
-          : 0;
-
-      total += charCost + coneCost;
+      total += charCost + weCost; // + bbCost
     }
 
     const penalty = Math.max(0, total - COST_LIMIT);
@@ -439,7 +507,7 @@ export default function ZzzDraftPage() {
     };
   };
 
-
+  /* ───────────── Render ───────────── */
   return (
     <div
       className="page-fade-in"
@@ -539,203 +607,238 @@ export default function ZzzDraftPage() {
                       >
                         {draftPicks[i] ? (
                           <>
-                            <img
-                              src={draftPicks[i]!.character.image_url}
-                              alt={draftPicks[i]!.character.name}
-                              style={{
-                                width: "100%",
-                                height: draftPicks[i]?.wengine ? "70%" : "100%",
-                                objectFit: "cover",
-                                cursor: "pointer",
-                                filter:
-                                  side === "BB" || side === "RR"
-                                    ? "grayscale(100%) brightness(0.4)"
-                                    : "none",
-                              }}
-                              onClick={() => openWengineModal(i)}
-                            />
-                            {!(
-                              side === "BB" ||
-                              side === "RR" ||
-                              bannedCodes.includes(
-                                draftPicks[i]?.character.code || ""
-                              )
-                            ) && (
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEidolonOpenIndex(
-                                    eidolonOpenIndex === i ? null : i
-                                  );
-                                }}
-                                style={{
-                                  position: "absolute",
-                                  top: 4,
-                                  left: 4,
-                                  background: "#000",
-                                  padding: "2px 6px",
-                                  fontSize: "0.75rem",
-                                  borderRadius: "6px",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                M{draftPicks[i]!.eidolon}
-                              </div>
-                            )}
+                            {(() => {
+                              const cost = getSlotCost(draftPicks[i]);
 
-                            {eidolonOpenIndex === i && (
-                              <div
-                                ref={(el) => {
-                                  eidolonRefs.current[i] = el;
-                                }}
-                                style={{
-                                  position: "absolute",
-                                  top: "60%",
-                                  left: 0,
-                                  width: "100%",
-                                  background: "rgba(0,0,0,0.85)",
-                                  padding: "6px",
-                                  borderRadius: "6px",
-                                  zIndex: 20,
-                                }}
-                              >
-                                <input
-                                  type="range"
-                                  min={0}
-                                  max={6}
-                                  value={draftPicks[i]!.eidolon}
-                                  onChange={(e) =>
-                                    updateEidolon(i, parseInt(e.target.value))
-                                  }
-                                  style={{
-                                    width: "100%",
-                                    accentColor: "#0af",
-                                  }}
-                                />
-                                <div className="d-flex justify-content-between text-white small mt-1">
-                                  {["0", "1", "2", "3", "4", "5", "6"].map(
-                                    (label, j) => (
-                                      <span
-                                        key={j}
-                                        style={{
-                                          color:
-                                            draftPicks[i]!.eidolon === j
-                                              ? "#0af"
-                                              : "#ccc",
-                                          fontWeight:
-                                            draftPicks[i]!.eidolon === j
-                                              ? "bold"
-                                              : "normal",
-                                        }}
-                                      >
-                                        {label}
-                                      </span>
-                                    )
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {draftPicks[i]?.wengine && (
-                              <div
-                                style={{ position: "relative", width: "100%" }}
-                              >
-                                <img
-                                  key={draftPicks[i]!.wengine!.id}
-                                  src={draftPicks[i]!.wengine!.image_url}
-                                  alt={draftPicks[i]!.wengine!.name}
-                                  style={{
-                                    width: "100%",
-                                    height: "50px",
-                                    objectFit: "cover",
-                                    borderTop:
-                                      "1px solid rgba(255,255,255,0.2)",
-                                    cursor: "pointer",
-                                  }}
-                                  onClick={() => openWengineModal(i)}
-                                />
-
-                                <div
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEidolonOpenIndex(null);
-                                    setSuperOpenIndex(
-                                      superOpenIndex === i ? null : i
-                                    );
-                                  }}
-                                  style={{
-                                    position: "absolute",
-                                    bottom: 4,
-                                    left: 4,
-                                    background: "#000",
-                                    padding: "2px 6px",
-                                    fontSize: "0.75rem",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  S{draftPicks[i]!.superimpose}
-                                </div>
-
-                                {superOpenIndex === i && (
-                                  <div
-                                    ref={(el) => {
-                                      superimposeRefs.current[i] = el;
-                                    }}
+                              return (
+                                <>
+                                  {/* Character Image */}
+                                  <img
+                                    src={draftPicks[i]!.character.image_url}
+                                    alt={draftPicks[i]!.character.name}
                                     style={{
-                                      position: "absolute",
-                                      bottom: "100%",
-                                      left: 0,
                                       width: "100%",
-                                      background: "rgba(0,0,0,0.85)",
-                                      padding: "6px",
-                                      borderRadius: "6px",
-                                      zIndex: 20,
+                                      height: draftPicks[i]?.wengine
+                                        ? "70%"
+                                        : "100%",
+                                      objectFit: "cover",
+                                      cursor: "pointer",
+                                      filter:
+                                        side === "BB" || side === "RR"
+                                          ? "grayscale(100%) brightness(0.4)"
+                                          : "none",
                                     }}
-                                  >
-                                    <input
-                                      type="range"
-                                      min={1}
-                                      max={5}
-                                      value={draftPicks[i]!.superimpose}
-                                      onChange={(e) =>
-                                        updateSuperimpose(
-                                          i,
-                                          parseInt(e.target.value)
-                                        )
-                                      }
-                                      style={{
-                                        width: "100%",
-                                        accentColor: "#0af",
+                                    onClick={() => openWengineModal(i)}
+                                  />
+
+                                  {/* Mindscape pill with cost */}
+                                  {!(
+                                    side === "BB" ||
+                                    side === "RR" ||
+                                    bannedCodes.includes(
+                                      draftPicks[i]?.character.code || ""
+                                    )
+                                  ) && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEidolonOpenIndex(
+                                          eidolonOpenIndex === i ? null : i
+                                        );
                                       }}
-                                    />
-                                    <div className="d-flex justify-content-between text-white small mt-1">
-                                      {["1", "2", "3", "4", "5"].map(
-                                        (label, j) => (
+                                      style={{
+                                        position: "absolute",
+                                        top: 4,
+                                        left: 4,
+                                        background: "#000",
+                                        padding: "2px 6px",
+                                        fontSize: "0.72rem",
+                                        borderRadius: "6px",
+                                        cursor: "pointer",
+                                        lineHeight: 1.15,
+                                        border:
+                                          "1px solid rgba(255,255,255,0.15)",
+                                      }}
+                                      title={`Agent ${cost.agentCost} + W-Eng ${cost.weCost} = ${cost.total}`}
+                                    >
+                                      M{draftPicks[i]!.eidolon} | {cost.total}
+                                    </div>
+                                  )}
+
+                                  {/* Mindscape slider panel */}
+                                  {eidolonOpenIndex === i && (
+                                    <div
+                                      ref={(el) => {
+                                        eidolonRefs.current[i] = el;
+                                      }}
+                                      style={{
+                                        position: "absolute",
+                                        top: "60%",
+                                        left: 0,
+                                        width: "100%",
+                                        background: "rgba(0,0,0,0.85)",
+                                        padding: "6px",
+                                        borderRadius: "6px",
+                                        zIndex: 20,
+                                      }}
+                                    >
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={6}
+                                        value={draftPicks[i]!.eidolon}
+                                        onChange={(e) =>
+                                          updateEidolon(
+                                            i,
+                                            parseInt(e.target.value)
+                                          )
+                                        }
+                                        style={{
+                                          width: "100%",
+                                          accentColor: "#0af",
+                                        }}
+                                      />
+                                      <div className="d-flex justify-content-between text-white small mt-1">
+                                        {[
+                                          "0",
+                                          "1",
+                                          "2",
+                                          "3",
+                                          "4",
+                                          "5",
+                                          "6",
+                                        ].map((label, j) => (
                                           <span
                                             key={j}
                                             style={{
                                               color:
-                                                draftPicks[i]!.superimpose ===
-                                                j + 1
+                                                draftPicks[i]!.eidolon === j
                                                   ? "#0af"
                                                   : "#ccc",
                                               fontWeight:
-                                                draftPicks[i]!.superimpose ===
-                                                j + 1
+                                                draftPicks[i]!.eidolon === j
                                                   ? "bold"
                                                   : "normal",
                                             }}
                                           >
                                             {label}
                                           </span>
-                                        )
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* W-Engine section */}
+                                  {draftPicks[i]?.wengine && (
+                                    <div
+                                      style={{
+                                        position: "relative",
+                                        width: "100%",
+                                      }}
+                                    >
+                                      <img
+                                        key={draftPicks[i]!.wengine!.id}
+                                        src={draftPicks[i]!.wengine!.image_url}
+                                        alt={draftPicks[i]!.wengine!.name}
+                                        style={{
+                                          width: "100%",
+                                          height: "50px",
+                                          objectFit: "cover",
+                                          borderTop:
+                                            "1px solid rgba(255,255,255,0.2)",
+                                          cursor: "pointer",
+                                        }}
+                                        onClick={() => openWengineModal(i)}
+                                      />
+
+                                      {/* Superimpose pill */}
+                                      <div
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEidolonOpenIndex(null);
+                                          setSuperOpenIndex(
+                                            superOpenIndex === i ? null : i
+                                          );
+                                        }}
+                                        style={{
+                                          position: "absolute",
+                                          bottom: 4,
+                                          left: 4,
+                                          background: "#000",
+                                          padding: "2px 6px",
+                                          fontSize: "0.75rem",
+                                          borderRadius: "6px",
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        S{draftPicks[i]!.superimpose}
+                                      </div>
+
+                                      {/* Superimpose slider */}
+                                      {superOpenIndex === i && (
+                                        <div
+                                          ref={(el) => {
+                                            superimposeRefs.current[i] = el;
+                                          }}
+                                          style={{
+                                            position: "absolute",
+                                            bottom: "100%",
+                                            left: 0,
+                                            width: "100%",
+                                            background: "rgba(0,0,0,0.85)",
+                                            padding: "6px",
+                                            borderRadius: "6px",
+                                            zIndex: 20,
+                                          }}
+                                        >
+                                          <input
+                                            type="range"
+                                            min={1}
+                                            max={5}
+                                            value={draftPicks[i]!.superimpose}
+                                            onChange={(e) =>
+                                              updateSuperimpose(
+                                                i,
+                                                parseInt(e.target.value)
+                                              )
+                                            }
+                                            style={{
+                                              width: "100%",
+                                              accentColor: "#0af",
+                                            }}
+                                          />
+                                          <div className="d-flex justify-content-between text-white small mt-1">
+                                            {["1", "2", "3", "4", "5"].map(
+                                              (label, j) => (
+                                                <span
+                                                  key={j}
+                                                  style={{
+                                                    color:
+                                                      draftPicks[i]!
+                                                        .superimpose ===
+                                                      j + 1
+                                                        ? "#0af"
+                                                        : "#ccc",
+                                                    fontWeight:
+                                                      draftPicks[i]!
+                                                        .superimpose ===
+                                                      j + 1
+                                                        ? "bold"
+                                                        : "normal",
+                                                  }}
+                                                >
+                                                  {label}
+                                                </span>
+                                              )
+                                            )}
+                                          </div>
+                                        </div>
                                       )}
                                     </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                  )}
+                                </>
+                              );
+                            })()}
                           </>
                         ) : (
                           `#${i + 1}`
@@ -749,7 +852,7 @@ export default function ZzzDraftPage() {
           })()}
         </div>
 
-        {/* Search Bar + Undo + PvP Rules (always visible) */}
+        {/* Search Bar + Undo + PvP Rules */}
         <div className="mb-3 w-100 d-flex justify-content-center align-items-center gap-2 flex-wrap">
           <input
             type="text"
@@ -791,7 +894,7 @@ export default function ZzzDraftPage() {
           </OverlayTrigger>
         </div>
 
-        {/* Character Grid (only if draft not complete) */}
+        {/* Character Grid */}
         {!draftComplete && (
           <div
             className="mb-5 px-2"
@@ -893,6 +996,7 @@ export default function ZzzDraftPage() {
           </div>
         )}
 
+        {/* Post-draft scoring panels */}
         {draftComplete && (
           <div
             className="d-flex justify-content-between gap-3 px-2 mt-4"
@@ -1094,6 +1198,7 @@ export default function ZzzDraftPage() {
                             <div style={{ fontWeight: 600 }}>{w.name}</div>
                             <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
                               {w.subname || "(no subname)"} ({w.rarity}★)
+                              {w.limited ? " • Limited" : ""}
                             </div>
                           </div>
                         </div>
