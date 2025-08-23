@@ -850,3 +850,60 @@ span.beta-badge {
     max-width: 100% !important;
   }
 }
+
+/* Scroll container (glassmorphic, identical vibe to CostTest) */
+.character-pool-scroll {
+  max-height: 520px;
+  /* tweak to match your CostTest exact height */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 10px;
+  /* room for scrollbar */
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Grid layout */
+.character-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 12px;
+  padding: 12px;
+}
+
+/* Nice scrollbar (matches CostTest look) */
+.character-pool-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.character-pool-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.character-pool-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  border: 2px solid rgba(0, 0, 0, 0);
+  /* keeps rounded look */
+}
+
+.character-pool-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+/* Mobile tweaks like CostTest */
+@media (max-width: 768px) {
+  .character-pool-scroll {
+    max-height: 360px;
+  }
+
+  .character-pool-grid {
+    grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+    gap: 8px;
+    padding: 10px;
+  }
+}

@@ -110,6 +110,8 @@ export default function CostTestPage() {
   const presetsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const presetsPanelRef = useRef<HTMLDivElement | null>(null);
 
+  const playerIdForPresets = user?.id;
+
   useEffect(() => {
     const panel = presetsPanelRef.current;
     if (!panel) return;
@@ -490,9 +492,15 @@ export default function CostTestPage() {
     return allFilled && unique;
   }, [team]);
 
+  const MAX_PRESETS = 50; // keep in sync with backend
+
   const exportToTeamPresets = () => {
     if (!user?.id) {
       toast.error("Please sign in first.");
+      return;
+    }
+    if (presets.length >= MAX_PRESETS) {
+      toast.info(`You’ve reached the maximum of ${MAX_PRESETS} presets.`);
       return;
     }
     if (!canExport) {
@@ -507,49 +515,181 @@ export default function CostTestPage() {
     setShowExportModal(true);
   };
 
+
   const handleCreatePreset = async () => {
     if (!user?.id) return;
+
     const name = exportName.trim();
     const description = exportDesc.trim();
+
+    // Guards
     if (!name) {
       toast.info("Please enter a preset name.");
       return;
     }
 
-    const slots = team.map((m) => ({
-      characterId: m.characterId,
-      eidolon: m.eidolon,
-      lightConeId: m.lightConeId,
-      superimpose: m.superimpose,
-    }));
+    // Block duplicate names (case-insensitive) — common 500 cause server-side
+    const dup = presets.some(
+      (p) => p.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (dup) {
+      toast.info("A preset with that name already exists. Pick another name.");
+      return;
+    }
 
-    // ← derive expectedCycle from the modal input
+    // Must be 4 unique filled characters
+    const members = team.filter((m) => !!m.characterId);
+    const ids = members.map((m) => String(m.characterId));
+    const uniq = new Set(ids);
+    if (members.length !== 4 || uniq.size !== 4) {
+      toast.info("Fill 4 unique characters to export.");
+      return;
+    }
+
+    // Normalize & validate slot fields
+    const slots = team.slice(0, 4).map((m, i) => {
+      const eid = Number.isFinite(Number(m.eidolon))
+        ? Math.max(0, Math.min(6, Number(m.eidolon)))
+        : 0;
+      const sup = Number.isFinite(Number(m.superimpose))
+        ? Math.max(1, Math.min(5, Number(m.superimpose)))
+        : 1;
+      const charId = String(m.characterId || "");
+      const coneId = String(m.lightConeId || "");
+      if (!charId) throw new Error(`Slot ${i + 1} missing characterId`);
+      return {
+        characterId: charId,
+        eidolon: eid,
+        lightConeId: coneId,
+        superimpose: sup,
+      };
+    });
+
+    // expectedCycle as number or null
     const expectedCycle =
       exportCycleInput === ""
         ? null
         : Math.max(0, Math.floor(Number(exportCycleInput)));
 
-    try {
-      const r = await fetch(
-        `${import.meta.env.VITE_API_BASE}/api/player/${user.id}/presets`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, description, slots, expectedCycle }),
-        }
-      );
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Create failed");
+    const body = { name, description, slots, expectedCycle };
 
-      setPresets((prev) => [j.preset, ...prev]);
+    try {
+      const url = `${import.meta.env.VITE_API_BASE}/api/player/${
+        user.id
+      }/presets`;
+      console.log("Creating preset →", url, body); // DEBUG: see exactly what's being sent
+
+      const r = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const text = await r.text(); // may be empty on 500
+      if (!r.ok) {
+        let serverMsg = "";
+        try {
+          const parsed = text ? JSON.parse(text) : null;
+          serverMsg = parsed?.error || parsed?.message || "";
+        } catch {}
+        const msg =
+          serverMsg ||
+          (r.status === 500
+            ? "Server error (500). Check backend logs for the thrown error (often duplicate name or over limit)."
+            : `Create failed (HTTP ${r.status}).`);
+        throw new Error(msg);
+      }
+
+      const j = text ? JSON.parse(text) : {};
+      if (j?.preset) {
+        setPresets((prev) => [j.preset, ...prev]);
+      } else {
+        // If server didn't return the new preset, reconcile
+        const rr = await fetch(
+          `${import.meta.env.VITE_API_BASE}/api/player/${user.id}/presets`,
+          { credentials: "include" }
+        );
+        if (rr.ok) {
+          const jj = await rr.json();
+          setPresets(jj.presets || []);
+        }
+      }
+
       toast.success("Preset created");
       setShowExportModal(false);
     } catch (err: any) {
-      console.error(err);
+      console.error("Create preset failed:", err);
       toast.error(err.message || "Failed to create preset");
     }
   };
+
+
+
+  const handleDeletePreset = async (presetId: string) => {
+    if (!playerIdForPresets) return;
+
+    // quick local sanity check (prevents calling API with a bogus id)
+    const existsLocally = presets.some((p) => p.id === presetId);
+    if (!existsLocally) {
+      toast.info("Preset already gone locally. Refreshing…");
+      // re-fetch to reconcile
+      try {
+        const r = await fetch(
+          `${
+            import.meta.env.VITE_API_BASE
+          }/api/player/${playerIdForPresets}/presets`,
+          { credentials: "include" }
+        );
+        const j = await r.json();
+        if (r.ok) setPresets(j.presets || []);
+      } catch {}
+      return;
+    }
+
+    try {
+      // helpful debug log during dev; remove if you like
+      console.log(
+        "DELETE",
+        `${
+          import.meta.env.VITE_API_BASE
+        }/api/player/${playerIdForPresets}/presets/${presetId}`
+      );
+
+      const r = await fetch(
+        `${
+          import.meta.env.VITE_API_BASE
+        }/api/player/${playerIdForPresets}/presets/${presetId}`,
+        { method: "DELETE", credentials: "include" }
+      );
+
+      if (r.status === 404) {
+        // Server says it doesn't exist — reconcile the list.
+        toast.info("Preset not found on server. Refreshing list…");
+        const rr = await fetch(
+          `${
+            import.meta.env.VITE_API_BASE
+          }/api/player/${playerIdForPresets}/presets`,
+          { credentials: "include" }
+        );
+        if (rr.ok) {
+          const jj = await rr.json();
+          setPresets(jj.presets || []);
+        }
+        return;
+      }
+
+      if (!r.ok) throw new Error(`Delete failed (HTTP ${r.status})`);
+
+      // success (many APIs return 204 No Content)
+      setPresets((prev) => prev.filter((p) => p.id !== presetId));
+      toast.success("Preset deleted");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete preset");
+    }
+  };
+
 
   /* ───────────── Early error/loading return ───────────── */
   if (loading || error) {
@@ -1603,11 +1743,20 @@ export default function CostTestPage() {
                     >
                       {p.name}
                     </strong>
+
                     <button
-                      className="btn btn-sm btn-outline-light ms-auto"
+                      className="btn btn-sm btn-outline-light ms-auto me-2"
                       onClick={() => importPreset(p)}
                     >
                       Import
+                    </button>
+
+                    <button
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={() => handleDeletePreset(p.id)}
+                      title="Delete preset"
+                    >
+                      ✕
                     </button>
                   </div>
 

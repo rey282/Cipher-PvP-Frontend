@@ -900,98 +900,94 @@ export default function ZzzDraftPage() {
             className="mb-5 px-2"
             style={{ maxWidth: "1000px", margin: "0 auto" }}
           >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))",
-                gap: "12px",
-                justifyContent: "center",
-              }}
-            >
-              {characters
-                .filter((char) => {
-                  const lowerSearch = keyboardSearch.toLowerCase();
-                  const name = char.name.toLowerCase();
-                  const subname =
-                    char.subname && char.subname.toLowerCase() !== "null"
-                      ? char.subname.toLowerCase()
-                      : "";
-                  return (
-                    name.includes(lowerSearch) || subname.includes(lowerSearch)
-                  );
-                })
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((char) => {
-                  const currentStep = draftSequence[currentTurn];
-                  if (!currentStep) return null;
+            <div className="character-pool-scroll">
+              <div className="character-pool-grid">
+                {characters
+                  .filter((char) => {
+                    const lowerSearch = keyboardSearch.toLowerCase();
+                    const name = char.name.toLowerCase();
+                    const subname =
+                      char.subname && char.subname.toLowerCase() !== "null"
+                        ? char.subname.toLowerCase()
+                        : "";
+                    return (
+                      name.includes(lowerSearch) ||
+                      subname.includes(lowerSearch)
+                    );
+                  })
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((char) => {
+                    const currentStep = draftSequence[currentTurn];
+                    if (!currentStep) return null;
 
-                  const mySide = currentStep.startsWith("B") ? "B" : "R";
-                  const opponentSide = mySide === "B" ? "R" : "B";
+                    const mySide = currentStep.startsWith("B") ? "B" : "R";
+                    const opponentSide = mySide === "B" ? "R" : "B";
 
-                  const myPicks = draftPicks.filter((_, i) =>
-                    draftSequence[i]?.startsWith(mySide)
-                  );
-                  const opponentPicks = draftPicks.filter((_, i) =>
-                    draftSequence[i]?.startsWith(opponentSide)
-                  );
+                    const myPicks = draftPicks.filter((_, i) =>
+                      draftSequence[i]?.startsWith(mySide)
+                    );
+                    const opponentPicks = draftPicks.filter((_, i) =>
+                      draftSequence[i]?.startsWith(opponentSide)
+                    );
 
-                  const alreadyPickedByMe = myPicks.some(
-                    (p) => p?.character.code === char.code
-                  );
-                  const alreadyPickedByOpponent = opponentPicks.some(
-                    (p) => p?.character.code === char.code
-                  );
+                    const alreadyPickedByMe = myPicks.some(
+                      (p) => p?.character.code === char.code
+                    );
+                    const alreadyPickedByOpponent = opponentPicks.some(
+                      (p) => p?.character.code === char.code
+                    );
 
-                  const isBanned = bannedCodes.includes(char.code);
+                    const isBanned = bannedCodes.includes(char.code);
 
-                  const isAcePickStep = currentStep.includes("ACE");
-                  const isOpponentPicked = alreadyPickedByOpponent;
+                    const isAcePickStep = currentStep.includes("ACE");
+                    const isOpponentPicked = alreadyPickedByOpponent;
 
-                  const isDisabled =
-                    draftComplete ||
-                    isBanned ||
-                    (!isAcePickStep &&
-                      (alreadyPickedByMe || alreadyPickedByOpponent)) ||
-                    (isAcePickStep && alreadyPickedByMe);
+                    const isDisabled =
+                      draftComplete ||
+                      isBanned ||
+                      (!isAcePickStep &&
+                        (alreadyPickedByMe || alreadyPickedByOpponent)) ||
+                      (isAcePickStep && alreadyPickedByMe);
 
-                  return (
-                    <div
-                      key={char.code}
-                      title={char.name}
-                      onClick={() => !isDisabled && handleCharacterPick(char)}
-                      style={{
-                        width: "70px",
-                        height: "70px",
-                        borderRadius: "8px",
-                        border:
-                          isAcePickStep && isOpponentPicked
-                            ? "2px solid gold"
-                            : isBanned
-                            ? "2px dashed #888"
-                            : alreadyPickedByMe || alreadyPickedByOpponent
-                            ? "2px solid #aaa"
-                            : "2px solid #555",
-                        backgroundImage: `url(${char.image_url})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        cursor: isDisabled ? "not-allowed" : "pointer",
-                        opacity: isDisabled ? 0.4 : 1,
-                        filter: isDisabled
-                          ? "grayscale(100%) brightness(0.6)"
-                          : "none",
-                        transition:
-                          "transform 0.15s ease, box-shadow 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isDisabled)
-                          e.currentTarget.style.transform = "scale(1.1)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "scale(1)";
-                      }}
-                    />
-                  );
-                })}
+                    return (
+                      <div
+                        key={char.code}
+                        title={char.name}
+                        onClick={() => !isDisabled && handleCharacterPick(char)}
+                        style={{
+                          width: "70px",
+                          height: "70px",
+                          borderRadius: "8px",
+                          border:
+                            isAcePickStep && isOpponentPicked
+                              ? "2px solid gold"
+                              : isBanned
+                              ? "2px dashed #888"
+                              : alreadyPickedByMe || alreadyPickedByOpponent
+                              ? "2px solid #aaa"
+                              : "2px solid #555",
+                          backgroundImage: `url(${char.image_url})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                          cursor: isDisabled ? "not-allowed" : "pointer",
+                          opacity: isDisabled ? 0.4 : 1,
+                          filter: isDisabled
+                            ? "grayscale(100%) brightness(0.6)"
+                            : "none",
+                          transition:
+                            "transform 0.15s ease, box-shadow 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isDisabled)
+                            e.currentTarget.style.transform = "scale(1.1)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                        }}
+                      />
+                    );
+                  })}
+              </div>
             </div>
           </div>
         )}
