@@ -262,11 +262,12 @@ export default function CostTestPage() {
             cipConeRes.json(),
           ]);
 
-        setCharInfos(charData.data);
-        setCharCosts(cerCostData.characters);
-        setCones(cerConeData.cones);
+        setCharInfos(charData.data || charData || []);
+        setCharCosts(cerCostData.characters || cerCostData || []);
+        setCones(cerConeData.cones || cerConeData || []);
         setCipherChars(cipCharData.characters || cipCharData || []);
         setCipherCones(cipConeData.cones || cipConeData || []);
+
 
         setTeam(makeEmptyTeam());
         setLoad(false);
@@ -291,17 +292,36 @@ export default function CostTestPage() {
           `${import.meta.env.VITE_API_BASE}/api/player/${user.id}/presets`,
           { credentials: "include", signal: ac.signal }
         );
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Failed to load presets");
-        setPresets(j.presets || []);
+
+        let j: any = null;
+        try {
+          j = await r.json();
+        } catch {}
+
+        if (!r.ok) {
+          const msg =
+            j?.error ||
+            (r.status === 401
+              ? "Not logged in."
+              : r.status === 403
+              ? "Private: you can only view your own presets."
+              : `Failed to load presets (${r.status}).`);
+          throw new Error(msg);
+        }
+
+        setPresets((j?.presets ?? []) as TeamPreset[]);
         setPresetsError(null);
       } catch (e: any) {
-        if (e?.name !== "AbortError")
+        if (e?.name !== "AbortError") {
+          console.error(e);
           setPresetsError(e.message || "Failed to load presets");
+          setPresets([]);
+        }
       }
     })();
     return () => ac.abort();
   }, [user?.id]);
+
 
   /* ───────────── Maps for fast lookups ───────────── */
   // Cerydra
@@ -566,10 +586,15 @@ export default function CostTestPage() {
     });
 
     // expectedCycle as number or null
-    const expectedCycle =
-      exportCycleInput === ""
-        ? null
-        : Math.max(0, Math.floor(Number(exportCycleInput)));
+    let expectedCycle: number | null = null;
+    if (exportCycleInput.trim() !== "") {
+      const n = Number(exportCycleInput);
+      if (!Number.isInteger(n) || n < 0) {
+        toast.error("Expected Cycle must be a non-negative integer.");
+        return;
+      }
+      expectedCycle = n;
+    }
 
     const body = { name, description, slots, expectedCycle };
 
@@ -662,6 +687,24 @@ export default function CostTestPage() {
         }/api/player/${playerIdForPresets}/presets/${presetId}`,
         { method: "DELETE", credentials: "include" }
       );
+
+      if (r.status === 404) {
+        // ...
+      } else if (!r.ok) {
+        let j: any = null;
+        try {
+          j = await r.json();
+        } catch {}
+        const msg =
+          j?.error ||
+          (r.status === 401
+            ? "Not logged in."
+            : r.status === 403
+            ? "Private: you can only delete your own presets."
+            : `Delete failed (${r.status}).`);
+        throw new Error(msg);
+      }
+
 
       if (r.status === 404) {
         // Server says it doesn't exist — reconcile the list.

@@ -83,6 +83,10 @@ export default function TeamPresets() {
   const [cones, setCones] = useState<LightCone[]>([]); // Cerydra cone costs
   const [search, setSearch] = useState("");
 
+  const SUPERUSER_ID =
+    import.meta.env.VITE_SUPERUSER_ID ?? "371513247641370625";
+  const isSuperuser = user?.id === SUPERUSER_ID;
+
   // Cerydra character E-costs (via image id)
   const [cerCharCosts, setCerCharCosts] = useState<
     { id: string; costs: number[] }[]
@@ -136,7 +140,9 @@ export default function TeamPresets() {
   /* ───────────── Fetch presets ───────────── */
   useEffect(() => {
     if (!user || !targetId) return;
-    if (params.id && !isSelf && !user?.isAdmin) {
+
+    // Frontend guard: only self or superuser may view another user's presets
+    if (params.id && !isSelf && !isSuperuser) {
       setError("Access Denied");
       setLoading(false);
       return;
@@ -147,20 +153,36 @@ export default function TeamPresets() {
       credentials: "include",
     })
       .then(async (r) => {
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Failed to load presets");
-        return j as { presets: TeamPreset[] };
+        let j: any = null;
+        try {
+          j = await r.json();
+        } catch {
+          // ignore JSON parse errors for non-200s
+        }
+
+        if (!r.ok) {
+          const msg =
+            j?.error ||
+            (r.status === 401
+              ? "Not logged in."
+              : r.status === 403
+              ? "Private: you can only view your own presets."
+              : `Failed to load presets (${r.status}).`);
+          throw new Error(msg);
+        }
+        return (j ?? { presets: [] }) as { presets: TeamPreset[] };
       })
       .then((data) => {
         setPresets(data.presets || []);
         setError(null);
       })
-      .catch((err) => {
+      .catch((err: any) => {
         console.error(err);
+        setPresets([]);
         setError(err.message || "Failed to load presets");
       })
       .finally(() => setLoading(false));
-  }, [user, targetId, params.id, isSelf]);
+  }, [user, targetId, params.id, isSelf, isSuperuser]);
 
   /* ───────────── Fetch characters & cones & costs ───────────── */
   useEffect(() => {
@@ -413,9 +435,10 @@ export default function TeamPresets() {
   };
 
   const cipherCharCost = (slot: PresetSlot) => {
-    const arr = cipherCharCostMap.get(slot.characterId);
+    const arr = cipherCharCostMap.get(slot.characterId.toLowerCase());
     return arr?.[slot.eidolon] ?? 0;
   };
+
   const cipherConeCost = (slot: PresetSlot) => {
     if (!slot.lightConeId) return 0;
     const limited = cipherConeLimitedMap.get(slot.lightConeId);
@@ -453,10 +476,35 @@ export default function TeamPresets() {
 
   const handleSubmit = async () => {
     if (!targetId) return;
-    const expectedCycle =
-      expectedCycleInput.trim() === ""
-        ? null
-        : Math.max(0, Math.floor(Number(expectedCycleInput)));
+
+    // Validate expectedCycle
+    let expectedCycle: number | null = null;
+    if (expectedCycleInput.trim() !== "") {
+      const n = Number(expectedCycleInput);
+      if (!Number.isInteger(n) || n < 0) {
+        toast.error("Expected Cycle must be a non-negative integer.");
+        return;
+      }
+      expectedCycle = n;
+    }
+
+    // Optional: client-side slot validation for UX (server enforces as well)
+    for (const s of slotsState) {
+      if (
+        !s.characterId ||
+        !Number.isInteger(s.eidolon) ||
+        s.eidolon < 0 ||
+        s.eidolon > 6 ||
+        typeof s.lightConeId !== "string" ||
+        !Number.isInteger(s.superimpose) ||
+        s.superimpose < 1 ||
+        s.superimpose > 5
+      ) {
+        toast.error("Each slot must have a character, E0–E6, and S1–S5.");
+        return;
+      }
+    }
+
     const body = {
       name: nameInput.trim(),
       description: descriptionInput.trim(),
@@ -468,35 +516,42 @@ export default function TeamPresets() {
         superimpose: s.superimpose,
       })),
     };
+
     try {
+      const r = await fetch(
+        !editingId
+          ? `${import.meta.env.VITE_API_BASE}/api/player/${targetId}/presets`
+          : `${
+              import.meta.env.VITE_API_BASE
+            }/api/player/${targetId}/presets/${editingId}`,
+        {
+          method: editingId ? "PATCH" : "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
+
+      let j: any = null;
+      try {
+        j = await r.json();
+      } catch {}
+
+      if (!r.ok) {
+        const msg =
+          j?.error ||
+          (r.status === 401
+            ? "Not logged in."
+            : r.status === 403
+            ? "Private: you can only manage your own presets."
+            : `${editingId ? "Update" : "Create"} failed (${r.status}).`);
+        throw new Error(msg);
+      }
+
       if (!editingId) {
-        const r = await fetch(
-          `${import.meta.env.VITE_API_BASE}/api/player/${targetId}/presets`,
-          {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          }
-        );
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Create failed");
         setPresets((prev) => [j.preset, ...prev]);
         toast.success("Preset created");
       } else {
-        const r = await fetch(
-          `${
-            import.meta.env.VITE_API_BASE
-          }/api/player/${targetId}/presets/${editingId}`,
-          {
-            method: "PATCH",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          }
-        );
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Update failed");
         setPresets((prev) =>
           prev.map((p) => (p.id === editingId ? j.preset : p))
         );
@@ -509,6 +564,7 @@ export default function TeamPresets() {
     }
   };
 
+
   const handleDelete = async (presetId: string) => {
     if (!targetId) return;
     if (!confirm("Delete this preset?")) return;
@@ -519,7 +575,21 @@ export default function TeamPresets() {
         }/api/player/${targetId}/presets/${presetId}`,
         { method: "DELETE", credentials: "include" }
       );
-      if (!r.ok) throw new Error("Delete failed");
+      let j: any = null;
+      try {
+        j = await r.json();
+      } catch {}
+      if (!r.ok) {
+        const msg =
+          j?.error ||
+          (r.status === 401
+            ? "Not logged in."
+            : r.status === 403
+            ? "Private: you can only delete your own presets."
+            : `Delete failed (${r.status}).`);
+        throw new Error(msg);
+      }
+
       setPresets((prev) => prev.filter((p) => p.id !== presetId));
       toast.success("Preset deleted");
     } catch (err: any) {
@@ -562,7 +632,7 @@ export default function TeamPresets() {
       </div>
     );
   }
-  if (params.id && !isSelf && !user?.isAdmin) {
+  if (params.id && !isSelf && !isSuperuser) {
     return (
       <div
         className="d-flex justify-content-center align-items-center text-danger text-center"
@@ -607,7 +677,7 @@ export default function TeamPresets() {
 
   const savedCipherTotal = (slots: PresetSlot[]) =>
     slots.reduce((sum, s) => {
-      const eArr = cipherCharCostMap.get(s.characterId);
+      const eArr = cipherCharCostMap.get(s.characterId.toLowerCase());
       const e = eArr?.[s.eidolon] ?? 0;
       const limited = cipherConeLimitedMap.get(s.lightConeId);
       const steps = [0.25, 0.25, 0.5, 0.5, 0.75];
@@ -616,6 +686,7 @@ export default function TeamPresets() {
         : 0;
       return sum + e + sc;
     }, 0);
+
 
   return (
     <div
@@ -739,143 +810,168 @@ export default function TeamPresets() {
             </div>
           ) : (
             <div className="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-3">
-              {presets
-                .filter(
-                  (p) =>
-                    p.name.toLowerCase().includes(presetQuery.toLowerCase()) ||
-                    (p.description || "")
-                      .toLowerCase()
-                      .includes(presetQuery.toLowerCase())
-                )
-                .map((p) => (
-                  <div className="col" key={p.id}>
-                    <div
-                      className="card bg-dark bg-opacity-75 p-3 h-100 shadow-sm"
-                      style={{
-                        borderRadius: 12,
-                        border: "1px solid rgba(255,255,255,0.1)",
-                      }}
-                    >
-                      <div className="d-flex align-items-center">
-                        <strong
-                          className="fs-5"
-                          style={{
-                            color: "#0af",
-                            textShadow: "0 0 8px rgba(0,170,255,.35)",
-                          }}
-                        >
-                          {p.name}
-                        </strong>
-                        <span className="ms-auto text-white-50 small">
-                          {new Date(p.updated_at).toLocaleString()}
-                        </span>
-                      </div>
-
-                      {p.description && (
-                        <div className="mt-2 text-white-50 small">
-                          {p.description}
-                        </div>
-                      )}
-
-                      {/* Totals */}
-                      <div className="mt-2 d-flex gap-2 flex-wrap">
-                        <span
-                          className="badge"
-                          style={{
-                            background: "rgba(10, 170, 255, 0.2)",
-                            border: "1px solid rgba(10,170,255,0.35)",
-                          }}
-                        >
-                          Cerydra: {savedCerydraTotal(p.slots).toFixed(2)}
-                        </span>
-                        <span
-                          className="badge"
-                          style={{
-                            background: "rgba(255, 170, 20, 0.18)",
-                            border: "1px solid rgba(255,170,20,0.35)",
-                          }}
-                        >
-                          Cipher: {savedCipherTotal(p.slots).toFixed(2)}
-                        </span>
-
-                        {p.expectedCycle !== null &&
-                          p.expectedCycle !== undefined && (
-                            <span
-                              className="badge"
-                              style={{
-                                background: "rgba(255,255,255,0.08)",
-                                border: "1px solid rgba(255,255,255,0.15)",
-                              }}
-                            >
-                              Cycle: {p.expectedCycle}
-                            </span>
-                          )}
-                      </div>
-
-                      {/* Saved preset slots — force 4 in one row */}
-                      <div
-                        className="mt-3"
+              {filteredPresets.map((p) => (
+                <div className="col" key={p.id}>
+                  <div
+                    className="card bg-dark bg-opacity-75 p-3 h-100 shadow-sm"
+                    style={{
+                      borderRadius: 12,
+                      border: "1px solid rgba(255,255,255,0.1)",
+                    }}
+                  >
+                    <div className="d-flex align-items-center">
+                      <strong
+                        className="fs-5"
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                          gap: 8,
+                          color: "#0af",
+                          textShadow: "0 0 8px rgba(0,170,255,.35)",
                         }}
                       >
-                        {p.slots.map((s, i) => {
-                          const char = charByCode.get(s.characterId);
-                          const cone = s.lightConeId
-                            ? coneById.get(s.lightConeId)
-                            : undefined;
+                        {p.name}
+                      </strong>
+                      <span className="ms-auto text-white-50 small">
+                        {new Date(p.updated_at).toLocaleString()}
+                      </span>
+                    </div>
 
-                          return (
-                            <div
-                              key={i}
-                              title={
-                                char
-                                  ? `${char.name} • E${s.eidolon}` +
-                                    (cone
-                                      ? ` • ${cone.name} (S${s.superimpose})`
-                                      : " • No LC")
-                                  : s.characterId
-                              }
-                              style={{
-                                width: "100%",
-                                height: 190,
-                                borderRadius: 12,
-                                background: "rgba(0,0,0,0.65)",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                overflow: "hidden",
-                                position: "relative",
-                              }}
-                            >
-                              {/* Character area */}
-                              {char ? (
+                    {p.description && (
+                      <div className="mt-2 text-white-50 small">
+                        {p.description}
+                      </div>
+                    )}
+
+                    {/* Totals */}
+                    <div className="mt-2 d-flex gap-2 flex-wrap">
+                      <span
+                        className="badge"
+                        style={{
+                          background: "rgba(10, 170, 255, 0.2)",
+                          border: "1px solid rgba(10,170,255,0.35)",
+                        }}
+                      >
+                        Cerydra: {savedCerydraTotal(p.slots).toFixed(2)}
+                      </span>
+                      <span
+                        className="badge"
+                        style={{
+                          background: "rgba(255, 170, 20, 0.18)",
+                          border: "1px solid rgba(255,170,20,0.35)",
+                        }}
+                      >
+                        Cipher: {savedCipherTotal(p.slots).toFixed(2)}
+                      </span>
+
+                      {p.expectedCycle !== null &&
+                        p.expectedCycle !== undefined && (
+                          <span
+                            className="badge"
+                            style={{
+                              background: "rgba(255,255,255,0.08)",
+                              border: "1px solid rgba(255,255,255,0.15)",
+                            }}
+                          >
+                            Cycle: {p.expectedCycle}
+                          </span>
+                        )}
+                    </div>
+
+                    {/* Saved preset slots — force 4 in one row */}
+                    <div
+                      className="mt-3"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                        gap: 8,
+                      }}
+                    >
+                      {p.slots.map((s, i) => {
+                        const char = charByCode.get(s.characterId);
+                        const cone = s.lightConeId
+                          ? coneById.get(s.lightConeId)
+                          : undefined;
+
+                        return (
+                          <div
+                            key={i}
+                            title={
+                              char
+                                ? `${char.name} • E${s.eidolon}` +
+                                  (cone
+                                    ? ` • ${cone.name} (S${s.superimpose})`
+                                    : " • No LC")
+                                : s.characterId
+                            }
+                            style={{
+                              width: "100%",
+                              height: 190,
+                              borderRadius: 12,
+                              background: "rgba(0,0,0,0.65)",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              overflow: "hidden",
+                              position: "relative",
+                            }}
+                          >
+                            {/* Character area */}
+                            {char ? (
+                              <img
+                                src={char.image_url}
+                                alt={char.name}
+                                style={{
+                                  width: "100%",
+                                  height: cone ? 140 : 200,
+                                  objectFit: "cover",
+                                  transition: "height .2s ease",
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: "100%",
+                                  height: 200,
+                                  background: "rgba(255,255,255,0.05)",
+                                }}
+                              />
+                            )}
+
+                            {/* E badge */}
+                            {char && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: 6,
+                                  left: 6,
+                                  background: "#000",
+                                  color: "#fff",
+                                  fontSize: "0.75rem",
+                                  padding: "2px 6px",
+                                  borderRadius: 6,
+                                  border: "1px solid rgba(255,255,255,0.15)",
+                                }}
+                              >
+                                E{s.eidolon}
+                              </div>
+                            )}
+
+                            {/* Light cone area */}
+                            {cone ? (
+                              <div style={{ position: "relative" }}>
                                 <img
-                                  src={char.image_url}
-                                  alt={char.name}
+                                  src={cone.imageUrl}
+                                  alt={cone.name}
+                                  loading="lazy"
                                   style={{
                                     width: "100%",
-                                    height: cone ? 140 : 200,
+                                    height: 60,
                                     objectFit: "cover",
-                                    transition: "height .2s ease",
+                                    display: "block",
+                                    borderTop:
+                                      "1px solid rgba(255,255,255,0.08)",
                                   }}
                                 />
-                              ) : (
-                                <div
-                                  style={{
-                                    width: "100%",
-                                    height: 200,
-                                    background: "rgba(255,255,255,0.05)",
-                                  }}
-                                />
-                              )}
-
-                              {/* E badge */}
-                              {char && (
                                 <div
                                   style={{
                                     position: "absolute",
-                                    top: 6,
+                                    bottom: 6,
                                     left: 6,
                                     background: "#000",
                                     color: "#fff",
@@ -885,80 +981,43 @@ export default function TeamPresets() {
                                     border: "1px solid rgba(255,255,255,0.15)",
                                   }}
                                 >
-                                  E{s.eidolon}
+                                  S{s.superimpose}
                                 </div>
-                              )}
+                              </div>
+                            ) : (
+                              char && (
+                                <div
+                                  style={{
+                                    width: "100%",
+                                    height: 60,
+                                    background: "rgba(255,255,255,0.05)",
+                                    borderTop:
+                                      "1px solid rgba(255,255,255,0.08)",
+                                  }}
+                                />
+                              )
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                              {/* Light cone area */}
-                              {cone ? (
-                                <div style={{ position: "relative" }}>
-                                  <img
-                                    src={cone.imageUrl}
-                                    alt={cone.name}
-                                    loading="lazy"
-                                    style={{
-                                      width: "100%",
-                                      height: 60,
-                                      objectFit: "cover",
-                                      display: "block",
-                                      borderTop:
-                                        "1px solid rgba(255,255,255,0.08)",
-                                    }}
-                                  />
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      bottom: 6,
-                                      left: 6,
-                                      background: "#000",
-                                      color: "#fff",
-                                      fontSize: "0.75rem",
-                                      padding: "2px 6px",
-                                      borderRadius: 6,
-                                      border:
-                                        "1px solid rgba(255,255,255,0.15)",
-                                    }}
-                                  >
-                                    S{s.superimpose}
-                                  </div>
-                                </div>
-                              ) : (
-                                char && (
-                                  <div
-                                    style={{
-                                      width: "100%",
-                                      height: 60,
-                                      background: "rgba(255,255,255,0.05)",
-                                      borderTop:
-                                        "1px solid rgba(255,255,255,0.08)",
-                                    }}
-                                  />
-                                )
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <div className="mt-3 d-flex gap-2">
-                        <button
-                          className="btn-glass"
-                          onClick={() => openEdit(p)}
-                        >
-                          <span className="btn-ico">✏️</span>
-                          Edit
-                        </button>
-                        <button
-                          className="btn-glass-danger"
-                          onClick={() => handleDelete(p.id)}
-                        >
-                          <span className="btn-ico">🗑️</span>
-                          Delete
-                        </button>
-                      </div>
+                    <div className="mt-3 d-flex gap-2">
+                      <button className="btn-glass" onClick={() => openEdit(p)}>
+                        <span className="btn-ico">✏️</span>
+                        Edit
+                      </button>
+                      <button
+                        className="btn-glass-danger"
+                        onClick={() => handleDelete(p.id)}
+                      >
+                        <span className="btn-ico">🗑️</span>
+                        Delete
+                      </button>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           )}
 
