@@ -82,7 +82,7 @@ export default function ZzzDraftPage() {
   const query = new URLSearchParams(location.search);
   const mode = query.get("mode") || "2v2";
   const is3v3 = mode === "3v3";
-  const COST_LIMIT = is3v3 ? 12 : 8; // FIXED to match rules text
+  const COST_LIMIT = is3v3 ? 9 : 6; 
 
   const draftSequence: string[] = is3v3
     ? [
@@ -246,7 +246,7 @@ export default function ZzzDraftPage() {
         <strong>Penalty and Resets:</strong>
         <ul>
           <li>
-            Every 0.25 points above limit (8 for 2v2, 12 for 3v3) reduces team
+            Every 0.25 points above limit (6 for 2v2, 9 for 3v3) reduces team
             score by 2500.
           </li>
           <li>Each team has 2 resets per match.</li>
