@@ -106,6 +106,11 @@ export default function TeamPresets() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewPreset, setViewPreset] = useState<TeamPreset | null>(null);
 
+  // bulk delete modal state
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
+  const [bulkDeleteText, setBulkDeleteText] = useState("");
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   const openView = (p: TeamPreset) => {
     setViewPreset(p);
     setShowViewModal(true);
@@ -319,6 +324,63 @@ export default function TeamPresets() {
     setSlotsState(p.slots);
     setShowModal(true);
   };
+
+  const openBulkDelete = () => {
+    if (!presets.length) {
+      toast.info("No presets to delete.");
+      return;
+    }
+    setBulkDeleteText("");
+    setShowBulkDelete(true);
+  };
+
+  const handleDeleteAllPresets = async () => {
+    if (!targetId) return;
+    if (bulkDeleteText.trim().toLowerCase() !== "confirm") {
+      toast.error('Type "confirm" to enable Delete All.');
+      return;
+    }
+
+    try {
+      setBulkDeleting(true);
+
+      // Adjust this URL if you prefer a different route (see backend snippet below).
+      const r = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/player/${targetId}/presets`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      let j: any = null;
+      try {
+        j = await r.json();
+      } catch {}
+
+      if (!r.ok) {
+        const msg =
+          j?.error ||
+          (r.status === 401
+            ? "Not logged in."
+            : r.status === 403
+            ? "Private: you can only delete your own presets."
+            : `Bulk delete failed (${r.status}).`);
+        throw new Error(msg);
+      }
+
+      setPresets([]); // wipe from UI
+      toast.success("All presets deleted");
+      setShowBulkDelete(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Bulk delete failed");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
 
   /* ───────────── Assign character / cone ───────────── */
   const assignCharacterToSlot = (char: CharacterInfo) => {
@@ -730,7 +792,7 @@ export default function TeamPresets() {
           <div className="container mb-3">
             <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
               {/* Avatar + Title */}
-              <div className="d-flex align-items-center gap-2">
+              <div className="d-flex align-items-center gap-3 flex-wrap">
                 {user?.avatar && (
                   <img
                     src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
@@ -741,6 +803,21 @@ export default function TeamPresets() {
                   />
                 )}
                 <h2 className="m-0">Team Presets</h2>
+
+                {presets.length > 0 && (
+                  <button
+                    className="btn back-button-glass ms-2"
+                    style={{
+                      borderColor: "rgba(255,0,0,0.4)",
+                      color: "#ff6b6b",
+                    }}
+                    onClick={openBulkDelete}
+                    aria-label="Delete all presets"
+                    title="Delete all presets (requires typing confirm)"
+                  >
+                    🗑️ Delete All
+                  </button>
+                )}
               </div>
 
               {/* Search + Button unified pill */}
@@ -2065,6 +2142,61 @@ export default function TeamPresets() {
                 onClick={() => setShowViewModal(false)}
               >
                 Close
+              </button>
+            </Modal.Footer>
+          </Modal>
+
+          <Modal
+            show={showBulkDelete}
+            onHide={() => setShowBulkDelete(false)}
+            centered
+            contentClassName="bg-dark text-white"
+          >
+            <Modal.Header closeButton>
+              <Modal.Title>Delete All Presets</Modal.Title>
+            </Modal.Header>
+
+            <Modal.Body>
+              <p className="mb-2">
+                This will permanently delete <strong>all</strong> your team
+                presets
+                {isSuperuser && !isSelf ? " for this user" : ""}. This action
+                cannot be undone.
+              </p>
+              <p className="text-warning">
+                To proceed, type <code>confirm</code> below.
+              </p>
+
+              <input
+                type="text"
+                className="form-control bg-dark text-white"
+                placeholder='Type "confirm" to enable'
+                value={bulkDeleteText}
+                onChange={(e) => setBulkDeleteText(e.target.value)}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            </Modal.Body>
+
+            <Modal.Footer>
+              <button
+                className="btn-glass-muted"
+                onClick={() => setShowBulkDelete(false)}
+                disabled={bulkDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-glass-danger"
+                onClick={handleDeleteAllPresets}
+                disabled={
+                  bulkDeleting ||
+                  bulkDeleteText.trim().toLowerCase() !== "confirm"
+                }
+              >
+                {bulkDeleting ? "Deleting…" : "Delete All"}
               </button>
             </Modal.Footer>
           </Modal>
