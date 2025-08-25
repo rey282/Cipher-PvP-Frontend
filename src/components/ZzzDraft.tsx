@@ -207,7 +207,7 @@ export default function ZzzDraftPage() {
         <strong>Draft:</strong>
         <p>Three pick types: Bans, Ace(s), Normal Pick.</p>
         <p>
-          During draft, select agents and wengines up to 8/12 cost for 2v2/3v3
+          During draft, select agents and wengines up to 6/9 cost for 2v2/3v3
           respectively. Over cost limit results in score penalty.
         </p>
         <p>Drafting phase will proceed as the number shown in the box.</p>

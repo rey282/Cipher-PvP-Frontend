@@ -102,6 +102,15 @@ export default function TeamPresets() {
   const [selectedConeId, setSelectedConeId] = useState("");
   const [showConeModal, setShowConeModal] = useState(false);
 
+  // view modal state (read-only)
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewPreset, setViewPreset] = useState<TeamPreset | null>(null);
+
+  const openView = (p: TeamPreset) => {
+    setViewPreset(p);
+    setShowViewModal(true);
+  };
+
   /* helpers */
   const makeEmptySlot = (): PresetSlot => ({
     characterId: "",
@@ -564,7 +573,6 @@ export default function TeamPresets() {
     }
   };
 
-
   const handleDelete = async (presetId: string) => {
     if (!targetId) return;
     if (!confirm("Delete this preset?")) return;
@@ -686,7 +694,6 @@ export default function TeamPresets() {
         : 0;
       return sum + e + sc;
     }, 0);
-
 
   return (
     <div
@@ -813,11 +820,40 @@ export default function TeamPresets() {
               {filteredPresets.map((p) => (
                 <div className="col" key={p.id}>
                   <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openView(p)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openView(p);
+                      }
+                    }}
                     className="card bg-dark bg-opacity-75 p-3 h-100 shadow-sm"
                     style={{
                       borderRadius: 12,
                       border: "1px solid rgba(255,255,255,0.1)",
+                      cursor: "pointer",
+                      transition:
+                        "transform .12s ease, box-shadow .12s ease, border-color .12s ease",
                     }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.boxShadow =
+                        "0 0 0 1px rgba(10,170,255,.35), 0 6px 18px rgba(0,0,0,.35)";
+                      (e.currentTarget as HTMLDivElement).style.transform =
+                        "translateY(-1px)";
+                      (e.currentTarget as HTMLDivElement).style.borderColor =
+                        "rgba(10,170,255,.35)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.boxShadow =
+                        "none";
+                      (e.currentTarget as HTMLDivElement).style.transform =
+                        "none";
+                      (e.currentTarget as HTMLDivElement).style.borderColor =
+                        "rgba(255,255,255,0.1)";
+                    }}
+                    aria-label={`View preset: ${p.name}`}
                   >
                     <div className="d-flex align-items-center">
                       <strong
@@ -825,19 +861,36 @@ export default function TeamPresets() {
                         style={{
                           color: "#0af",
                           textShadow: "0 0 8px rgba(0,170,255,.35)",
+                          cursor: "pointer",
                         }}
+                        onClick={() => openView(p)}
+                        title="View preset"
                       >
                         {p.name}
                       </strong>
+
                       <span className="ms-auto text-white-50 small">
                         {new Date(p.updated_at).toLocaleString()}
                       </span>
                     </div>
 
                     {p.description && (
-                      <div className="mt-2 text-white-50 small">
+                      <button
+                        className="mt-2 text-white-50 small text-start p-0 border-0 bg-transparent"
+                        onClick={() => openView(p)}
+                        title="View full details"
+                        style={{
+                          cursor: "pointer",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2, // ← number of lines before truncation
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "normal",
+                        }}
+                      >
                         {p.description}
-                      </div>
+                      </button>
                     )}
 
                     {/* Totals */}
@@ -1003,13 +1056,23 @@ export default function TeamPresets() {
                     </div>
 
                     <div className="mt-3 d-flex gap-2">
-                      <button className="btn-glass" onClick={() => openEdit(p)}>
+                      <button
+                        className="btn-glass"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(p);
+                        }}
+                      >
                         <span className="btn-ico">✏️</span>
                         Edit
                       </button>
+
                       <button
                         className="btn-glass-danger"
-                        onClick={() => handleDelete(p.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(p.id);
+                        }}
                       >
                         <span className="btn-ico">🗑️</span>
                         Delete
@@ -1124,7 +1187,7 @@ export default function TeamPresets() {
                         rows={3}
                         onChange={(e) => {
                           const next = e.target.value;
-                          if (next.length <= 200) setDescriptionInput(next);
+                          if (next.length <= 300) setDescriptionInput(next);
                         }}
                         autoComplete="off"
                         autoCorrect="off"
@@ -1132,7 +1195,7 @@ export default function TeamPresets() {
                         spellCheck={false}
                       />
                       <small className="text-white-50">
-                        {descriptionInput.length}/200
+                        {descriptionInput.length}/300
                       </small>
                     </div>
 
@@ -1807,6 +1870,201 @@ export default function TeamPresets() {
                 }}
               >
                 Confirm
+              </button>
+            </Modal.Footer>
+          </Modal>
+          {/* View Preset Modal (read-only) */}
+          <Modal
+            show={showViewModal}
+            onHide={() => setShowViewModal(false)}
+            centered
+            contentClassName="bg-dark text-white"
+          >
+            <Modal.Header closeButton>
+              <Modal.Title>
+                {viewPreset?.name}
+                <span
+                  className="ms-2 text-white-50"
+                  style={{ fontSize: "0.9rem" }}
+                >
+                  {viewPreset &&
+                    new Date(viewPreset.updated_at).toLocaleString()}
+                </span>
+              </Modal.Title>
+            </Modal.Header>
+
+            <Modal.Body>
+              {viewPreset?.description ? (
+                <p className="text-white-75" style={{ whiteSpace: "pre-wrap" }}>
+                  {viewPreset.description}
+                </p>
+              ) : (
+                <p className="text-white-50 fst-italic m-0">No description.</p>
+              )}
+
+              {/* Totals */}
+              {viewPreset && (
+                <div className="mt-3 d-flex gap-2 flex-wrap">
+                  <span
+                    className="badge"
+                    style={{
+                      background: "rgba(10,170,255,0.2)",
+                      border: "1px solid rgba(10,170,255,0.35)",
+                    }}
+                  >
+                    Cerydra: {savedCerydraTotal(viewPreset.slots).toFixed(2)}
+                  </span>
+                  <span
+                    className="badge"
+                    style={{
+                      background: "rgba(255,170,20,0.18)",
+                      border: "1px solid rgba(255,170,20,0.35)",
+                    }}
+                  >
+                    Cipher: {savedCipherTotal(viewPreset.slots).toFixed(2)}
+                  </span>
+                  {viewPreset.expectedCycle !== null &&
+                    viewPreset.expectedCycle !== undefined && (
+                      <span
+                        className="badge"
+                        style={{
+                          background: "rgba(255,255,255,0.08)",
+                          border: "1px solid rgba(255,255,255,0.15)",
+                        }}
+                      >
+                        Cycle: {viewPreset.expectedCycle}
+                      </span>
+                    )}
+                </div>
+              )}
+
+              {/* Slots preview (same look as cards) */}
+              {viewPreset && (
+                <div
+                  className="mt-3"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(4, minmax(0,1fr))",
+                    gap: 8,
+                  }}
+                >
+                  {viewPreset.slots.map((s, i) => {
+                    const char = charByCode.get(s.characterId);
+                    const cone = s.lightConeId
+                      ? coneById.get(s.lightConeId)
+                      : undefined;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          width: "100%",
+                          height: 190,
+                          borderRadius: 12,
+                          background: "rgba(0,0,0,0.65)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          overflow: "hidden",
+                          position: "relative",
+                        }}
+                        title={
+                          char
+                            ? `${char.name} • E${s.eidolon}${
+                                cone
+                                  ? ` • ${cone.name} (S${s.superimpose})`
+                                  : " • No LC"
+                              }`
+                            : s.characterId
+                        }
+                      >
+                        {char ? (
+                          <img
+                            src={char.image_url}
+                            alt={char.name}
+                            style={{
+                              width: "100%",
+                              height: cone ? 140 : 200,
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: 200,
+                              background: "rgba(255,255,255,0.05)",
+                            }}
+                          />
+                        )}
+                        {char && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 6,
+                              left: 6,
+                              background: "#000",
+                              color: "#fff",
+                              fontSize: "0.75rem",
+                              padding: "2px 6px",
+                              borderRadius: 6,
+                              border: "1px solid rgba(255,255,255,0.15)",
+                            }}
+                          >
+                            E{s.eidolon}
+                          </div>
+                        )}
+                        {cone ? (
+                          <div style={{ position: "relative" }}>
+                            <img
+                              src={cone.imageUrl}
+                              alt={cone.name}
+                              loading="lazy"
+                              style={{
+                                width: "100%",
+                                height: 60,
+                                objectFit: "cover",
+                                borderTop: "1px solid rgba(255,255,255,0.08)",
+                              }}
+                            />
+                            <div
+                              style={{
+                                position: "absolute",
+                                bottom: 6,
+                                left: 6,
+                                background: "#000",
+                                color: "#fff",
+                                fontSize: "0.75rem",
+                                padding: "2px 6px",
+                                borderRadius: 6,
+                                border: "1px solid rgba(255,255,255,0.15)",
+                              }}
+                            >
+                              S{s.superimpose}
+                            </div>
+                          </div>
+                        ) : (
+                          char && (
+                            <div
+                              style={{
+                                width: "100%",
+                                height: 60,
+                                background: "rgba(255,255,255,0.05)",
+                                borderTop: "1px solid rgba(255,255,255,0.08)",
+                              }}
+                            />
+                          )
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Modal.Body>
+
+            <Modal.Footer>
+              <button
+                className="btn-glass-primary"
+                onClick={() => setShowViewModal(false)}
+              >
+                Close
               </button>
             </Modal.Footer>
           </Modal>
