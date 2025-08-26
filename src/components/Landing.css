@@ -907,3 +907,21 @@ span.beta-badge {
     padding: 10px;
   }
 }
+
+/* Ensure the app can always scroll unless a modal is truly open */
+html,
+body,
+#root {
+  height: auto;
+  overflow-y: auto !important;
+}
+
+/* If you use page fade wrappers elsewhere, prefer svh (mobile-safe) */
+.page-fade-in {
+  min-height: 100svh;
+}
+
+/* Just in case any global class disabled touch scrolling */
+* {
+  touch-action: auto;
+}

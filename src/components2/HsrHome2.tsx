@@ -5,11 +5,22 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 
 export default function HsrHome() {
-  /* ───────── page fade logic ───────── */
   const [leaving] = useState(false);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const { user } = useAuth();
 
+  // 🔧 Clear any leftover Bootstrap modal locks + ensure iOS-friendly scrolling
+  useEffect(() => {
+    const body = document.body;
+    body.classList.remove("modal-open");
+    body.style.overflow = "";
+    body.style.paddingRight = "";
+    document.querySelectorAll(".modal-backdrop").forEach((el) => el.remove());
+    (document.scrollingElement as HTMLElement | null)?.style.setProperty(
+      "-webkit-overflow-scrolling",
+      "touch"
+    );
+  }, []);
 
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_BASE}/api/announcement`)
@@ -18,7 +29,6 @@ export default function HsrHome() {
       .catch(() => setAnnouncement(null));
   }, []);
 
-  /* ───────── data for cards ───────── */
   const cards = [
     {
       title: "Play Now",
@@ -54,8 +64,7 @@ export default function HsrHome() {
       btnText: "View MOC Stats",
     },
   ];
-  
-  /* ───────── markup ───────── */
+
   return (
     <div
       className={`page-fade-in ${leaving ? "fade-out" : ""}`}
@@ -63,29 +72,32 @@ export default function HsrHome() {
         backgroundImage: "url('/background2.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
-        minHeight: "100vh",
+        // ✅ Make this the scroll container (mobile-safe)
+        minHeight: "100svh",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
         position: "relative",
       }}
     >
-      {/* overlay */}
+      {/* overlay (don’t block touches/scroll) */}
       <div
         style={{
           backgroundColor: "rgba(0,0,0,.6)",
           position: "absolute",
           inset: 0,
           zIndex: 1,
+          pointerEvents: "none",
         }}
       />
 
       {/* content */}
       <div
         className="position-relative z-2 text-white d-flex flex-column px-4"
-        style={{ minHeight: "100vh" }}
+        // avoid nested 100vh; let parent handle scrolling
+        style={{ minHeight: "auto" }}
       >
-        {/* navbar */}
         <Navbar />
 
-        {/* hero */}
         <div className="text-center py-5 animate__animated animate__fadeInDown">
           <h1 className="display-4 fw-bold mb-3">Cerydra PvP!</h1>
           {user && (
@@ -94,6 +106,7 @@ export default function HsrHome() {
             </p>
           )}
         </div>
+
         {announcement && (
           <div className="announcement-banner d-flex align-items-center justify-content-center gap-2">
             <span role="img" aria-label="alert" style={{ fontSize: "1.3rem" }}>
@@ -103,7 +116,6 @@ export default function HsrHome() {
           </div>
         )}
 
-        {/* grid */}
         <div className="container mb-5">
           <div className="row g-4 animate__animated animate__fadeInUp animate__delay-1s">
             {cards.map(({ title, desc, url }, i) => (
@@ -115,7 +127,6 @@ export default function HsrHome() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="feature-card text-decoration-none d-flex flex-column align-items-center justify-content-center text-white"
-                      onClick={() => window.scrollTo(0, 0)}
                     >
                       <div className="feature-title">{title}</div>
                       <div className="feature-desc text-center">{desc}</div>
@@ -124,7 +135,6 @@ export default function HsrHome() {
                     <Link
                       to={url}
                       className="feature-card text-decoration-none d-flex flex-column align-items-center justify-content-center text-white"
-                      onClick={() => window.scrollTo(0, 0)}
                     >
                       <div className="feature-title">{title}</div>
                       <div className="feature-desc text-center">{desc}</div>
@@ -142,7 +152,6 @@ export default function HsrHome() {
           </div>
         </div>
 
-        {/* footer with Discord button */}
         <div className="text-center mb-4 animate__animated animate__fadeInUp animate__delay-2s">
           <p className="mb-3">Join our Discord to play!</p>
           <a
@@ -151,18 +160,16 @@ export default function HsrHome() {
             rel="noopener noreferrer"
             className="btn discord-glass-button"
           >
-            {
-              <img
-                src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
-                alt="Discord"
-                width={20}
-                height={20}
-                style={{
-                  filter: "brightness(0) saturate(100%) invert(100%)",
-                  marginBottom: 4,
-                }}
-              />
-            }{" "}
+            <img
+              src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
+              alt="Discord"
+              width={20}
+              height={20}
+              style={{
+                filter: "brightness(0) saturate(100%) invert(100%)",
+                marginBottom: 4,
+              }}
+            />{" "}
             &nbsp; Join Discord
           </a>
         </div>
