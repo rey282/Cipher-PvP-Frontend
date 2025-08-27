@@ -831,7 +831,7 @@ export default function ZzzDraftPage() {
         {/* Post-draft scoring */}
         {draftComplete && (
           <div
-            className="d-flex flex-column flex-md-row gap-3 px-2 mt-4"
+            className="score-row d-flex flex-column flex-md-row gap-3 px-2 mt-4"
             style={{ maxWidth: 1000, margin: "0 auto" }}
           >
             {(["B", "R"] as const).map((side) => {
@@ -873,16 +873,16 @@ export default function ZzzDraftPage() {
                           max={SCORE_MAX}
                           value={scores[i] === 0 ? "" : String(scores[i])}
                           onChange={(e) => {
-                            const v = e.target.value; 
+                            const v = e.target.value;
                             const updated = [...scores];
                             if (v === "") {
-                              updated[i] = 0; 
+                              updated[i] = 0;
                             } else {
                               const n = parseInt(v, 10) || 0;
                               updated[i] = Math.max(
                                 SCORE_MIN,
                                 Math.min(SCORE_MAX, n)
-                              ); 
+                              );
                             }
                             setScores(updated);
                           }}

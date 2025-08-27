@@ -1366,6 +1366,10 @@ input[type="range"].big-slider {
   margin-top: 6px;
 }
 
+.score-row {
+  justify-content: center;
+}
+
 .score-input-group {
   background: rgba(255, 255, 255, .04);
   border: 1px solid rgba(255, 255, 255, .12);
@@ -1447,4 +1451,11 @@ input[type="range"].big-slider {
   margin-left: 6px;
   font-weight: 900;
   color: var(--accent);
+}
+
+@media (min-width: 768px) {
+  .score-card {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
