@@ -30,6 +30,9 @@ type DraftPick = {
   superimpose: number; // W1..W5 (1..5)
 };
 
+const SCORE_MIN = 0;
+const SCORE_MAX = 65000;
+
 /* ───────────── Responsive row sizing ───────────── */
 // Base card metrics (match your CSS defaults)
 const CARD_W = 170; // px
@@ -866,12 +869,29 @@ export default function ZzzDraftPage() {
                           className="form-control score-input"
                           placeholder="0"
                           inputMode="numeric"
-                          min={0}
+                          min={SCORE_MIN}
+                          max={SCORE_MAX}
                           value={scores[i] === 0 ? "" : String(scores[i])}
                           onChange={(e) => {
                             const v = e.target.value; 
                             const updated = [...scores];
-                            updated[i] = v === "" ? 0 : parseInt(v, 10) || 0;
+                            if (v === "") {
+                              updated[i] = 0; 
+                            } else {
+                              const n = parseInt(v, 10) || 0;
+                              updated[i] = Math.max(
+                                SCORE_MIN,
+                                Math.min(SCORE_MAX, n)
+                              ); 
+                            }
+                            setScores(updated);
+                          }}
+                          onBlur={() => {
+                            const updated = [...scores];
+                            updated[i] = Math.max(
+                              SCORE_MIN,
+                              Math.min(SCORE_MAX, updated[i] || 0)
+                            );
                             setScores(updated);
                           }}
                         />
