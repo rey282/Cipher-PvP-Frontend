@@ -1453,6 +1453,13 @@ input[type="range"].big-slider {
   color: var(--accent);
 }
 
+.team-cost.over,
+.score-draft.over {
+  background: rgba(220, 53, 69, 0.14);
+  border-color: rgba(220, 53, 69, 0.45);
+  color: #ff6b6b;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.12) inset;
+}
 @media (min-width: 768px) {
   .score-card {
     flex: 1 1 0;

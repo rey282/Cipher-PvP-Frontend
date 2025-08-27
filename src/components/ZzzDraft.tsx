@@ -444,11 +444,12 @@ export default function ZzzDraftPage() {
                     {name}
                   </div>
 
-                  <div className="team-cost">
+                  <div
+                    className={`team-cost ${
+                      cost.total > COST_LIMIT ? "over" : ""
+                    }`}
+                  >
                     Cost: {cost.total} / {COST_LIMIT}
-                    {cost.penaltyPoints > 0 && (
-                      <span className="penalty">–{cost.penaltyPoints} pts</span>
-                    )}
                   </div>
                 </div>
 
@@ -850,13 +851,12 @@ export default function ZzzDraftPage() {
                 >
                   <div className="score-header">
                     <div className="score-title">{label}</div>
-                    <div className="score-draft">
+                    <div
+                      className={`score-draft ${
+                        total > COST_LIMIT ? "over" : ""
+                      }`}
+                    >
                       Cost: {total} / {COST_LIMIT}
-                      {penaltyPoints > 0 && (
-                        <span className="penalty-pill">
-                          −{penaltyPoints} pts
-                        </span>
-                      )}
                     </div>
                   </div>
 
