@@ -1271,6 +1271,47 @@ input[type="range"].big-slider {
   font-weight: 800;
 }
 
+/* 3-zone chip row: [ M | COST | P ] */
+.draft-card .chip-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  /* left flex | center fixed | right flex */
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* reuse your .chip styles; just position them */
+.draft-card .chip-left {
+  justify-self: start;
+}
+
+.draft-card .chip-center {
+  justify-self: center;
+  font-weight: 700;
+  min-width: 44px;
+  /* keeps it from wobbling */
+  text-align: center;
+}
+
+.draft-card .chip-right {
+  justify-self: end;
+}
+
+/* when no W-Engine, we still keep the right column so center never moves */
+.draft-card .chip-spacer {
+  display: block;
+  height: 0;
+  /* occupies the grid cell without visual noise */
+}
+
+/* (optional) make cost pop a bit; keep your existing .chip.cost if you have it */
+.draft-card .chip.cost.chip-center {
+  /* example subtle highlight – tweak to match your theme */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
 /* Undo glass button */
 .back-button-glass {
   background: rgba(255, 255, 255, .08);

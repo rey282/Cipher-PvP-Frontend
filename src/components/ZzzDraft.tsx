@@ -171,8 +171,32 @@ export default function ZzzDraftPage() {
 
   const draftComplete = currentTurn >= draftSequence.length;
 
-  const team1Name = query.get("team1") || "Blue Team";
-  const team2Name = query.get("team2") || "Red Team";
+  // Raw team strings (can be "A|B" or "A|B|C")
+  const team1Raw = query.get("team1") || "Blue Team";
+  const team2Raw = query.get("team2") || "Red Team";
+
+  // Player labels extracted from pipes for scoreboard
+  const nPlayers = is3v3 ? 3 : 2;
+  const rawTeam1List = (query.get("team1") || "")
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const rawTeam2List = (query.get("team2") || "")
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const blueLabels = buildNameLabels(rawTeam1List, nPlayers);
+  const redLabels = buildNameLabels(rawTeam2List, nPlayers);
+
+  const team1Name = team1Raw; // show pipes in the big header as requested
+  const team2Name = team2Raw;
+
+  function buildNameLabels(rawList: string[], count: number): string[] {
+    const primary = rawList.find(Boolean) || ""; // first non-empty, or empty
+    return Array(count)
+      .fill("")
+      .map((_, i) => rawList[i] || primary);
+  }
 
   const [blueScores, setBlueScores] = useState<number[]>(
     is3v3 ? [0, 0, 0] : [0, 0]
@@ -180,6 +204,23 @@ export default function ZzzDraftPage() {
   const [redScores, setRedScores] = useState<number[]>(
     is3v3 ? [0, 0, 0] : [0, 0]
   );
+
+  // Keep score arrays in sync if mode toggles
+  useEffect(() => {
+    const len = is3v3 ? 3 : 2;
+    setBlueScores((prev) => {
+      const a = [...prev];
+      a.length = len;
+      for (let i = 0; i < len; i++) a[i] = a[i] || 0;
+      return a;
+    });
+    setRedScores((prev) => {
+      const a = [...prev];
+      a.length = len;
+      for (let i = 0; i < len; i++) a[i] = a[i] || 0;
+      return a;
+    });
+  }, [is3v3]);
 
   const bannedCodes = draftPicks
     .map((pick, i) =>
@@ -593,9 +634,7 @@ export default function ZzzDraftPage() {
                                   onClick={(e) => e.stopPropagation()}
                                   onMouseDown={(e) => e.stopPropagation()}
                                 >
-                                  <div className="slider-label">
-                                    Superimpose
-                                  </div>
+                                  <div className="slider-label">Phase</div>
                                   <input
                                     type="range"
                                     min={1}
@@ -634,6 +673,8 @@ export default function ZzzDraftPage() {
                                 const name = draftPicks[i]!.character.name;
                                 const bannedSlot =
                                   side === "BB" || side === "RR";
+                                const hasWengine = !!draftPicks[i]?.wengine;
+
                                 return (
                                   <div
                                     className="info-bar"
@@ -642,52 +683,57 @@ export default function ZzzDraftPage() {
                                     <div className="char-name" title={name}>
                                       {name}
                                     </div>
-                                    <div className="chips">
-                                      {!bannedSlot && (
-                                        <>
-                                          <span
-                                            className="chip clickable"
-                                            title="Set Mindscape"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setSuperOpenIndex(null);
-                                              setEidolonOpenIndex(
-                                                eidolonOpenIndex === i
-                                                  ? null
-                                                  : i
-                                              );
-                                            }}
-                                          >
-                                            M{draftPicks[i]!.eidolon}
-                                          </span>
-                                          {draftPicks[i]?.wengine && (
-                                            <span
-                                              className="chip clickable"
-                                              title="Set Superimpose"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEidolonOpenIndex(null);
-                                                setSuperOpenIndex(
-                                                  superOpenIndex === i
-                                                    ? null
-                                                    : i
-                                                );
-                                              }}
-                                            >
-                                              S{draftPicks[i]!.superimpose}
-                                            </span>
-                                          )}
-                                        </>
-                                      )}
-                                      {!bannedSlot && (
+
+                                    {/* NEW: fixed 3-zone row (left: M, center: COST, right: P) */}
+                                    {!bannedSlot && (
+                                      <div className="chip-row">
+                                        {/* Left: Mindscape */}
                                         <span
-                                          className="chip cost"
+                                          className="chip clickable chip-left"
+                                          title="Set Mindscape"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSuperOpenIndex(null);
+                                            setEidolonOpenIndex(
+                                              eidolonOpenIndex === i ? null : i
+                                            );
+                                          }}
+                                        >
+                                          M{draftPicks[i]!.eidolon}
+                                        </span>
+
+                                        {/* Center: Cost (always centered) */}
+                                        <span
+                                          className="chip cost chip-center"
                                           title={`Agent ${c.agentCost} + W-Eng ${c.weCost}`}
                                         >
                                           {c.total}
                                         </span>
-                                      )}
-                                    </div>
+
+                                        {/* Right: Phase (only if there is a W-Engine) */}
+                                        {hasWengine ? (
+                                          <span
+                                            className="chip clickable chip-right"
+                                            title="Set Phase"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setEidolonOpenIndex(null);
+                                              setSuperOpenIndex(
+                                                superOpenIndex === i ? null : i
+                                              );
+                                            }}
+                                          >
+                                            P{draftPicks[i]!.superimpose}
+                                          </span>
+                                        ) : (
+                                          // empty cell preserves center alignment and spacing
+                                          <span
+                                            className="chip-spacer"
+                                            aria-hidden="true"
+                                          />
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })()}
@@ -839,7 +885,17 @@ export default function ZzzDraftPage() {
               const isBlue = side === "B";
               const scores = isBlue ? blueScores : redScores;
               const setScores = isBlue ? setBlueScores : setRedScores;
-              const label = isBlue ? team1Name : team2Name;
+              const label = isBlue ? (
+                <span style={{ color: "#3388ff", fontWeight: 700 }}>
+                  Blue Team
+                </span>
+              ) : (
+                <span style={{ color: "#cc3333", fontWeight: 700 }}>
+                  Red Team
+                </span>
+              );
+              const nameLabels = isBlue ? blueLabels : redLabels;
+
               const { total, penaltyPoints } = getTeamCost(side);
               const adjustedTotal =
                 scores.reduce((a, b) => a + b, 0) - penaltyPoints;
@@ -863,7 +919,7 @@ export default function ZzzDraftPage() {
                   <div className="score-inputs">
                     {(is3v3 ? [0, 1, 2] : [0, 1]).map((i) => (
                       <div className="score-input-group" key={i}>
-                        <label>Player {i + 1}</label>
+                        <label>{nameLabels[i] || `Player ${i + 1}`}</label>
                         <input
                           type="number"
                           className="form-control score-input"
