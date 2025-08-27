@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import "../components/Landing.css";
 import { useLocation } from "react-router-dom";
-import { Modal, Button, Popover, OverlayTrigger } from "react-bootstrap";
+import { Modal, Button } from "react-bootstrap";
 
 /* ───────────── Types ───────────── */
 type Character = {
@@ -11,7 +11,7 @@ type Character = {
   subname?: string;
   rarity: number; // 5 = S, 4 = A
   image_url: string;
-  limited: boolean; // NEW
+  limited: boolean;
 };
 
 type WEngine = {
@@ -20,58 +20,80 @@ type WEngine = {
   subname?: string;
   rarity: number; // 5 = S, 4/A/B below
   image_url: string;
-  limited: boolean; // NEW
+  limited: boolean;
 };
 
 type DraftPick = {
   character: Character;
   eidolon: number; // Mindscape M0..M6
   wengine?: WEngine;
-  superimpose: number; // Refinement W1..W5 (0 if none)
+  superimpose: number; // W1..W5 (1..5)
 };
 
+/* ───────────── Responsive row sizing ───────────── */
+// Base card metrics (match your CSS defaults)
+const CARD_W = 170; // px
+const CARD_H = 240; // px
+const CARD_GAP = 12; // px
+const CARD_MIN_SCALE = 0.68; // smallest we allow cards to get
+
+function useRowScale<T extends HTMLElement>(
+  ref: React.MutableRefObject<T | null>,
+  cardCount: number
+) {
+  const [scale, setScale] = useState<number>(1);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const el = ref.current;
+
+    const compute = () => {
+      const available = el.clientWidth;
+      const needed = cardCount * CARD_W + (cardCount - 1) * CARD_GAP;
+      const s = Math.min(1, Math.max(CARD_MIN_SCALE, available / needed));
+      setScale(s);
+    };
+
+    compute();
+
+    const ro = new ResizeObserver(() => compute());
+    ro.observe(el);
+    window.addEventListener("resize", compute);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", compute);
+    };
+  }, [ref, cardCount]);
+
+  return scale;
+}
+
 /* ───────────── Cost Rules Helpers ───────────── */
-/** Mindscape levels are integers 0..6 (M0..M6) */
 function calcAgentCost(agent: Character, mindscape: number): number {
   const ms = Math.max(0, Math.min(6, mindscape));
+  if (agent.rarity === 4) return 0.5; // All A Rank agents: 0.5 flat
 
-  // All A Rank agents: 0.5 at all mindscapes.
-  if (agent.rarity === 4) return 0.5;
-
-  // S Rank
   if (agent.rarity === 5) {
     if (agent.limited) {
-      // Limited S Rank agent: starts at 1, +0.5 per unique mindscape (except M3 & M5).
-      // i.e., bumps at M1, M2, M4, M6
+      // Limited S Rank agent: +0.5 at M1, M2, M4, M6 (M3 & M5 skipped)
       const bumpMilestones = [1, 2, 4, 6];
       const bumps = bumpMilestones.filter((m) => ms >= m).length;
       return 1 + 0.5 * bumps;
     } else {
-      // Standard S Rank agent: starts at 1, 1.5 cost at M6.
+      // Standard S Rank agent: 1.0 base, 1.5 at M6
       return ms >= 6 ? 1.5 : 1;
     }
   }
-
-  // Anything else (just in case): free
   return 0;
 }
 
-/** Refinement levels are integers 0..5 (0 if none, W1..W5 => 1..5). */
 function calcWEngineCost(we: WEngine | undefined, refine: number): number {
   if (!we) return 0;
   const r = Math.max(0, Math.min(5, refine));
-
-  // A & B Rank wengines: 0 cost at all refinements.
-  if (we.rarity <= 4) return 0;
-
-  // S Rank wengines
-  if (we.limited) {
-    // Limited S Rank wengines: 0.25 starting cost, 0.5 at W3+ refinements.
-    return r >= 3 ? 0.5 : 0.25;
-  } else {
-    // Standard S Rank wengines: 0 starting cost, 0.25 at W3+ refinements.
-    return r >= 3 ? 0.25 : 0;
-  }
+  if (we.rarity <= 4) return 0; // A & B Rank: 0 cost
+  if (we.limited) return r >= 3 ? 0.5 : 0.25; // Limited S
+  return r >= 3 ? 0.25 : 0; // Standard S
 }
 
 /* ───────────── Penalty ───────────── */
@@ -82,7 +104,7 @@ export default function ZzzDraftPage() {
   const query = new URLSearchParams(location.search);
   const mode = query.get("mode") || "2v2";
   const is3v3 = mode === "3v3";
-  const COST_LIMIT = is3v3 ? 9 : 6; 
+  const COST_LIMIT = is3v3 ? 9 : 6;
 
   const draftSequence: string[] = is3v3
     ? [
@@ -156,125 +178,6 @@ export default function ZzzDraftPage() {
     is3v3 ? [0, 0, 0] : [0, 0]
   );
 
-  const pvpRulesPopover = (
-    <Popover
-      id="pvp-rules-popover"
-      style={{
-        maxWidth: 350,
-        backgroundColor: "#1e1e2f",
-        color: "#ddd",
-        border: "1px solid #444",
-      }}
-    >
-      <Popover.Header
-        as="h3"
-        style={{
-          fontSize: "1.1rem",
-          fontWeight: "bold",
-          backgroundColor: "#2c2c44",
-          color: "#eee",
-          borderBottom: "1px solid #444",
-        }}
-      >
-        PvP Rules
-      </Popover.Header>
-      <Popover.Body
-        style={{
-          maxHeight: 300,
-          overflowY: "auto",
-          fontSize: 12,
-          textAlign: "left",
-          whiteSpace: "normal",
-          paddingRight: 10,
-          backgroundColor: "#1e1e2f",
-          color: "#ddd",
-        }}
-      >
-        <strong>Rules:</strong>
-        <p>
-          For ZZZ PvP you can fight in either of 2 modes, 2v2 or 3v3 in Deadly
-          Assault boss stages where you compete for the highest total score.
-        </p>
-        <strong>Match Procedure:</strong>
-        <ul>
-          <li>
-            2v2: Make teams, draft, then select 2 out of the 3 bosses your team
-            will fight.
-          </li>
-          <li>3v3: Draft, then fight all 3 bosses.</li>
-          <li>The bosses picked in 2v2 must be unique for a team.</li>
-        </ul>
-        <strong>Draft:</strong>
-        <p>Three pick types: Bans, Ace(s), Normal Pick.</p>
-        <p>
-          During draft, select agents and wengines up to 6/9 cost for 2v2/3v3
-          respectively. Over cost limit results in score penalty.
-        </p>
-        <p>Drafting phase will proceed as the number shown in the box.</p>
-        <strong>Picks:</strong>
-        <ul>
-          <li>
-            <strong>Normal pick (blank boxes):</strong> pick unpicked/unbanned
-            agents.
-          </li>
-          <li>
-            <strong>Ban (red boxes):</strong> elect an agent to ban (cannot ban
-            first 4 picks).
-          </li>
-          <li>
-            <strong>Ace pick (orange/yellow boxes):</strong> select any unbanned
-            agent, including opponent's picks; only one copy per team allowed.
-          </li>
-        </ul>
-        <strong>Cost:</strong>
-        <ul>
-          <li>
-            Limited S Rank agent: starts at 1 cost, increases by 0.5 per unique
-            mindscape (except M3 & M5).
-          </li>
-          <li>Standard S Rank agent: starts at 1, 1.5 cost at M6.</li>
-          <li>All A Rank agents: 0.5 cost all mindscapes.</li>
-          <li>
-            Limited S Rank wengines: 0.25 starting cost, 0.5 at W3+ refinements.
-          </li>
-          <li>
-            Standard S Rank wengines: 0 starting cost, 0.25 at W3+ refinements.
-          </li>
-          <li>A & B Rank wengines: 0 cost at all refinements.</li>
-          <li>Bangboos do not cost points.</li>
-        </ul>
-        <strong>Penalty and Resets:</strong>
-        <ul>
-          <li>
-            Every 0.25 points above limit (6 for 2v2, 9 for 3v3) reduces team
-            score by 2500.
-          </li>
-          <li>Each team has 2 resets per match.</li>
-          <li>Resets must be used before battle end screen.</li>
-          <li>
-            Battle starts when boss appears; resets after consume one reset.
-          </li>
-          <li>Previous runs voided; only latest run counts.</li>
-        </ul>
-        <strong>Play:</strong>
-        <p>
-          After draft, players select bosses and test teams. Runs must be live
-          streamed for fairness. If you are unable to stream the run, ask your
-          opponents' consent for screenshot submission.
-        </p>
-        <strong>Discord Server:</strong>{" "}
-        <a
-          href="https://discord.gg/MHzc5GRDQW"
-          target="_blank"
-          rel="noreferrer"
-          style={{ color: "#57a6ff", textDecoration: "underline" }}
-        >
-          Join Discord Server
-        </a>
-      </Popover.Body>
-    </Popover>
-  );
-
   const bannedCodes = draftPicks
     .map((pick, i) =>
       draftSequence[i] === "BB" || draftSequence[i] === "RR"
@@ -282,6 +185,14 @@ export default function ZzzDraftPage() {
         : null
     )
     .filter(Boolean) as string[];
+
+  /* Row refs + scales (hooks must be outside maps) */
+  const blueRowRef = useRef<HTMLDivElement>(null);
+  const redRowRef = useRef<HTMLDivElement>(null);
+  const blueCount = draftSequence.filter((s) => s.startsWith("B")).length;
+  const redCount = draftSequence.filter((s) => s.startsWith("R")).length;
+  const blueScale = useRowScale(blueRowRef, blueCount);
+  const redScale = useRowScale(redRowRef, redCount);
 
   function getSlotCost(pick: DraftPick | null | undefined) {
     if (!pick) return { agentCost: 0, weCost: 0, total: 0 };
@@ -293,7 +204,6 @@ export default function ZzzDraftPage() {
       total: Number((agentCost + weCost).toFixed(2)),
     };
   }
-
 
   /* ───────────── Data Fetch ───────────── */
   useEffect(() => {
@@ -309,9 +219,6 @@ export default function ZzzDraftPage() {
         const charData = await charRes.json();
         const wengData = await wengRes.json();
         if (!charRes.ok || !wengRes.ok) throw new Error("Failed to fetch data");
-
-        // Expecting `limited` to be returned from API; if not, safely default to true for characters, false for engines?
-        // Based on your DB defaults, characters/wengines default to TRUE unless you updated them; keep as-is from API.
         setCharacters((charData.data || []) as Character[]);
         setWengines((wengData.data || []) as WEngine[]);
       })
@@ -326,8 +233,8 @@ export default function ZzzDraftPage() {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
 
-      const modal = document.querySelector(".modal-content");
-      if (modal && modal.contains(target)) return;
+      const bootstrapModal = document.querySelector(".modal-content");
+      if (bootstrapModal && bootstrapModal.contains(target)) return;
 
       if (
         superOpenIndex !== null &&
@@ -336,7 +243,6 @@ export default function ZzzDraftPage() {
       ) {
         setSuperOpenIndex(null);
       }
-
       if (
         eidolonOpenIndex !== null &&
         eidolonRefs.current[eidolonOpenIndex] &&
@@ -347,20 +253,16 @@ export default function ZzzDraftPage() {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [superOpenIndex, eidolonOpenIndex]);
 
   /* ───────────── Draft actions ───────────── */
   const handleCharacterPick = (char: Character) => {
     if (draftComplete) return;
-
     const currentStep = draftSequence[currentTurn];
     if (!currentStep) return;
 
     const mySide = currentStep.startsWith("B") ? "B" : "R";
-
     if (bannedCodes.includes(char.code)) return;
 
     const myTeamPicks = draftPicks.filter((_, i) =>
@@ -372,11 +274,7 @@ export default function ZzzDraftPage() {
     if (alreadyPickedByMyTeam) return;
 
     const updated = [...draftPicks];
-    updated[currentTurn] = {
-      character: char,
-      eidolon: 0, // M0
-      superimpose: 1, // W1 by default (changeable via slider)
-    };
+    updated[currentTurn] = { character: char, eidolon: 0, superimpose: 1 };
     setDraftPicks(updated);
     setCurrentTurn((prev) => prev + 1);
     setKeyboardSearch("");
@@ -406,6 +304,9 @@ export default function ZzzDraftPage() {
   };
 
   const openWengineModal = (index: number) => {
+    // guard: don't allow engines on BAN slots
+    if (draftSequence[index] === "BB" || draftSequence[index] === "RR") return;
+
     const currentConeId = draftPicks[index]?.wengine?.id || "";
     setSelectedWengineId(currentConeId);
     setActiveSlotIndex(index);
@@ -413,6 +314,12 @@ export default function ZzzDraftPage() {
   };
 
   const confirmWengine = (index: number) => {
+    // guard: ignore on BAN slots
+    if (draftSequence[index] === "BB" || draftSequence[index] === "RR") {
+      setShowWengineModal(false);
+      return;
+    }
+
     const selected =
       selectedWengineId === ""
         ? undefined
@@ -421,19 +328,13 @@ export default function ZzzDraftPage() {
     setDraftPicks((prev) => {
       const updated = [...prev];
       if (updated[index]) {
-        updated[index] = {
-          ...updated[index]!,
-          wengine: selected ? { ...selected } : undefined,
-        };
+        updated[index] = { ...updated[index]!, wengine: selected ?? undefined };
       }
       return updated;
     });
 
     setShowWengineModal(false);
-    setTimeout(() => {
-      setActiveSlotIndex(null);
-    }, 100);
-
+    setTimeout(() => setActiveSlotIndex(null), 100);
     setSelectedWengineId("");
     setWengineSearch("");
   };
@@ -465,46 +366,12 @@ export default function ZzzDraftPage() {
 
       const charCost = calcAgentCost(pick.character, pick.eidolon);
       const weCost = calcWEngineCost(pick.wengine, pick.superimpose);
-      // const bbCost = calcBangbooCost(); // no bangboo in UI currently
-
-      total += charCost + weCost; // + bbCost
+      total += charCost + weCost;
     }
 
     const penalty = Math.max(0, total - COST_LIMIT);
     const penaltyPoints = Math.floor(penalty / 0.25) * PENALTY_PER_POINT;
-
     return { total: Number(total.toFixed(2)), penaltyPoints };
-  };
-
-  const slotStyle = (index: number, side: string) => {
-    const isActive = index === currentTurn;
-    const isBlue = side.startsWith("B");
-    const isRed = side.startsWith("R");
-    const isBan = side === "BB" || side === "RR";
-    const isAce = side.includes("ACE");
-    const borderColor = isBlue ? "#3388ff" : isRed ? "#cc3333" : "#888";
-
-    let backgroundColor = "#111";
-    if (isBan) backgroundColor = "#330000";
-    if (isAce) backgroundColor = "#332100"; // gold-ish
-
-    return {
-      width: "130px",
-      height: "190px",
-      borderRadius: "10px",
-      backgroundColor,
-      border: `2px solid ${borderColor}`,
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      fontSize: "0.9rem",
-      color: "#ccc",
-      boxShadow:
-        isActive && !draftComplete ? `0 0 10px 4px ${borderColor}` : "none",
-      overflow: "hidden",
-      position: "relative" as const,
-      flexDirection: "column" as const,
-    };
   };
 
   /* ───────────── Render ───────────── */
@@ -546,313 +413,297 @@ export default function ZzzDraftPage() {
             const team1Cost = getTeamCost("B");
             const team2Cost = getTeamCost("R");
 
-            const teams: {
-              prefix: string;
-              name: string;
-              color: string;
-              cost: { total: number; penaltyPoints: number };
-            }[] = [
+            return [
               {
-                prefix: "B",
+                prefix: "B" as const,
                 name: team1Name,
                 color: "#3388ff",
                 cost: team1Cost,
+                ref: blueRowRef,
+                scale: blueScale,
               },
               {
-                prefix: "R",
+                prefix: "R" as const,
                 name: team2Name,
                 color: "#cc3333",
                 cost: team2Cost,
+                ref: redRowRef,
+                scale: redScale,
               },
-            ];
-
-            return teams.map(({ prefix, name, color, cost }) => (
+            ].map(({ prefix, name, color, cost, ref, scale }) => (
               <div className="w-100 text-center" key={prefix}>
-                <h5
-                  className="mb-1 d-flex justify-content-center align-items-center gap-3"
-                  style={{ color }}
-                >
-                  {name}
-                  <span
-                    className="badge"
-                    style={{
-                      backgroundColor: "#000",
-                      border: "1px solid #888",
-                      color: "#fff",
-                      fontSize: "0.75rem",
-                      padding: "4px 8px",
-                      borderRadius: "6px",
-                    }}
-                  >
+                <div className="team-header">
+                  <div className="team-title" style={{ color }}>
+                    <span
+                      className="team-dot"
+                      style={{ backgroundColor: color }}
+                    />
+                    {name}
+                  </div>
+
+                  <div className="team-cost">
                     Cost: {cost.total} / {COST_LIMIT}
                     {cost.penaltyPoints > 0 && (
-                      <> (–{cost.penaltyPoints} pts)</>
+                      <span className="penalty">–{cost.penaltyPoints} pts</span>
                     )}
-                  </span>
-                </h5>
-                <div className="d-flex justify-content-center gap-2 flex-wrap">
-                  {draftSequence.map((side, i) =>
-                    side.startsWith(prefix as string) ? (
-                      <div
-                        key={i}
-                        style={{
-                          ...slotStyle(i, side),
-                          position: "relative",
-                          zIndex: 10,
-                          boxShadow:
-                            side.includes("ACE") && draftPicks[i]
-                              ? "0 0 8px 4px rgba(255, 215, 0, 0.6)" // gold glow
-                              : slotStyle(i, side).boxShadow,
-                        }}
-                      >
-                        {draftPicks[i] ? (
-                          <>
-                            {(() => {
-                              const cost = getSlotCost(draftPicks[i]);
+                  </div>
+                </div>
 
-                              return (
-                                <>
-                                  {/* Character Image */}
-                                  <img
-                                    src={draftPicks[i]!.character.image_url}
-                                    alt={draftPicks[i]!.character.name}
-                                    style={{
-                                      width: "100%",
-                                      height: draftPicks[i]?.wengine
-                                        ? "70%"
-                                        : "100%",
-                                      objectFit: "cover",
-                                      cursor: "pointer",
-                                      filter:
-                                        side === "BB" || side === "RR"
-                                          ? "grayscale(100%) brightness(0.4)"
-                                          : "none",
-                                    }}
-                                    onClick={() => openWengineModal(i)}
+                {/* measured wrapper */}
+                <div ref={ref} className="draft-row-wrap">
+                  {/* scaled row */}
+                  <div
+                    className="draft-row"
+                    style={
+                      {
+                        "--card-scale": scale,
+                        "--card-w": `${CARD_W}px`,
+                        "--card-h": `${CARD_H}px`,
+                        "--card-gap": `${CARD_GAP}px`,
+                      } as React.CSSProperties
+                    }
+                  >
+                    {draftSequence.map((side, i) =>
+                      side.startsWith(prefix) ? (
+                        <div
+                          key={i}
+                          className={[
+                            "draft-card",
+                            side.includes("ACE") ? "ace" : "",
+                            side === "BB" || side === "RR" ? "ban" : "",
+                            prefix === "B" ? "blue" : "red",
+                            i === currentTurn && !draftComplete ? "active" : "",
+                          ].join(" ")}
+                          style={{ zIndex: 10 }}
+                          onClick={(e) => {
+                            const isBanSlot = side === "BB" || side === "RR";
+                            if (isBanSlot) return;
+                            if (
+                              eidolonOpenIndex === i ||
+                              superOpenIndex === i
+                            ) {
+                              e.stopPropagation();
+                              return;
+                            }
+                            if (draftPicks[i]?.character) openWengineModal(i);
+                          }}
+                        >
+                          {/* Ribbon (only when empty) */}
+                          {(() => {
+                            const isBanSlot = side === "BB" || side === "RR";
+                            const isAceSlot = side.includes("ACE");
+                            const showRibbon =
+                              !draftPicks[i] && (isBanSlot || isAceSlot);
+                            if (!showRibbon) return null;
+                            return (
+                              <div
+                                className={`ribbon ${
+                                  isAceSlot ? "ace" : "ban"
+                                }`}
+                              >
+                                {isAceSlot ? "ACE" : "BAN"}
+                              </div>
+                            );
+                          })()}
+
+                          {draftPicks[i] ? (
+                            <>
+                              {/* Character image */}
+                              <img
+                                src={draftPicks[i]!.character.image_url}
+                                alt={draftPicks[i]!.character.name}
+                                className="draft-img"
+                                style={{
+                                  filter:
+                                    side === "BB" || side === "RR"
+                                      ? "grayscale(100%) brightness(0.5)"
+                                      : "none",
+                                }}
+                              />
+
+                              {/* Engine badge */}
+                              {draftPicks[i]?.wengine && (
+                                <img
+                                  src={draftPicks[i]!.wengine!.image_url}
+                                  alt={draftPicks[i]!.wengine!.name}
+                                  title={draftPicks[i]!.wengine!.name}
+                                  className="engine-badge"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openWengineModal(i);
+                                  }}
+                                />
+                              )}
+
+                              {/* Mindscape slider */}
+                              {eidolonOpenIndex === i && (
+                                <div
+                                  className="slider-panel"
+                                  ref={(el) => {
+                                    eidolonRefs.current[i] = el;
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                >
+                                  <div className="slider-label">Mindscape</div>
+                                  <input
+                                    type="range"
+                                    min={0}
+                                    max={6}
+                                    className="big-slider"
+                                    value={draftPicks[i]!.eidolon}
+                                    onChange={(e) =>
+                                      updateEidolon(
+                                        i,
+                                        parseInt(
+                                          (e.target as HTMLInputElement).value
+                                        )
+                                      )
+                                    }
                                   />
-
-                                  {/* Mindscape pill with cost */}
-                                  {!(
-                                    side === "BB" ||
-                                    side === "RR" ||
-                                    bannedCodes.includes(
-                                      draftPicks[i]?.character.code || ""
-                                    )
-                                  ) && (
-                                    <div
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEidolonOpenIndex(
-                                          eidolonOpenIndex === i ? null : i
-                                        );
-                                      }}
-                                      style={{
-                                        position: "absolute",
-                                        top: 4,
-                                        left: 4,
-                                        background: "#000",
-                                        padding: "2px 6px",
-                                        fontSize: "0.72rem",
-                                        borderRadius: "6px",
-                                        cursor: "pointer",
-                                        lineHeight: 1.15,
-                                        border:
-                                          "1px solid rgba(255,255,255,0.15)",
-                                      }}
-                                      title={`Agent ${cost.agentCost} + W-Eng ${cost.weCost} = ${cost.total}`}
-                                    >
-                                      M{draftPicks[i]!.eidolon} | {cost.total}
-                                    </div>
-                                  )}
-
-                                  {/* Mindscape slider panel */}
-                                  {eidolonOpenIndex === i && (
-                                    <div
-                                      ref={(el) => {
-                                        eidolonRefs.current[i] = el;
-                                      }}
-                                      style={{
-                                        position: "absolute",
-                                        top: "60%",
-                                        left: 0,
-                                        width: "100%",
-                                        background: "rgba(0,0,0,0.85)",
-                                        padding: "6px",
-                                        borderRadius: "6px",
-                                        zIndex: 20,
-                                      }}
-                                    >
-                                      <input
-                                        type="range"
-                                        min={0}
-                                        max={6}
-                                        value={draftPicks[i]!.eidolon}
-                                        onChange={(e) =>
-                                          updateEidolon(
-                                            i,
-                                            parseInt(e.target.value)
-                                          )
+                                  <div className="slider-ticks mt-1">
+                                    {[0, 1, 2, 3, 4, 5, 6].map((v) => (
+                                      <span
+                                        key={v}
+                                        className={
+                                          draftPicks[i]!.eidolon === v
+                                            ? "active"
+                                            : ""
                                         }
-                                        style={{
-                                          width: "100%",
-                                          accentColor: "#0af",
-                                        }}
-                                      />
-                                      <div className="d-flex justify-content-between text-white small mt-1">
-                                        {[
-                                          "0",
-                                          "1",
-                                          "2",
-                                          "3",
-                                          "4",
-                                          "5",
-                                          "6",
-                                        ].map((label, j) => (
+                                      >
+                                        {v}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Superimpose slider */}
+                              {superOpenIndex === i && (
+                                <div
+                                  className="slider-panel"
+                                  ref={(el) => {
+                                    superimposeRefs.current[i] = el;
+                                  }}
+                                  style={{ bottom: 70 }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                >
+                                  <div className="slider-label">
+                                    Superimpose
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min={1}
+                                    max={5}
+                                    className="big-slider"
+                                    value={draftPicks[i]!.superimpose}
+                                    onChange={(e) =>
+                                      updateSuperimpose(
+                                        i,
+                                        parseInt(
+                                          (e.target as HTMLInputElement).value
+                                        )
+                                      )
+                                    }
+                                  />
+                                  <div className="slider-ticks mt-1">
+                                    {[1, 2, 3, 4, 5].map((v) => (
+                                      <span
+                                        key={v}
+                                        className={
+                                          draftPicks[i]!.superimpose === v
+                                            ? "active"
+                                            : ""
+                                        }
+                                      >
+                                        {v}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Bottom info */}
+                              {(() => {
+                                const c = getSlotCost(draftPicks[i]);
+                                const name = draftPicks[i]!.character.name;
+                                const bannedSlot =
+                                  side === "BB" || side === "RR";
+                                return (
+                                  <div
+                                    className="info-bar"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="char-name" title={name}>
+                                      {name}
+                                    </div>
+                                    <div className="chips">
+                                      {!bannedSlot && (
+                                        <>
                                           <span
-                                            key={j}
-                                            style={{
-                                              color:
-                                                draftPicks[i]!.eidolon === j
-                                                  ? "#0af"
-                                                  : "#ccc",
-                                              fontWeight:
-                                                draftPicks[i]!.eidolon === j
-                                                  ? "bold"
-                                                  : "normal",
+                                            className="chip clickable"
+                                            title="Set Mindscape"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSuperOpenIndex(null);
+                                              setEidolonOpenIndex(
+                                                eidolonOpenIndex === i
+                                                  ? null
+                                                  : i
+                                              );
                                             }}
                                           >
-                                            {label}
+                                            M{draftPicks[i]!.eidolon}
                                           </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* W-Engine section */}
-                                  {draftPicks[i]?.wengine && (
-                                    <div
-                                      style={{
-                                        position: "relative",
-                                        width: "100%",
-                                      }}
-                                    >
-                                      <img
-                                        key={draftPicks[i]!.wengine!.id}
-                                        src={draftPicks[i]!.wengine!.image_url}
-                                        alt={draftPicks[i]!.wengine!.name}
-                                        style={{
-                                          width: "100%",
-                                          height: "50px",
-                                          objectFit: "cover",
-                                          borderTop:
-                                            "1px solid rgba(255,255,255,0.2)",
-                                          cursor: "pointer",
-                                        }}
-                                        onClick={() => openWengineModal(i)}
-                                      />
-
-                                      {/* Superimpose pill */}
-                                      <div
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEidolonOpenIndex(null);
-                                          setSuperOpenIndex(
-                                            superOpenIndex === i ? null : i
-                                          );
-                                        }}
-                                        style={{
-                                          position: "absolute",
-                                          bottom: 4,
-                                          left: 4,
-                                          background: "#000",
-                                          padding: "2px 6px",
-                                          fontSize: "0.75rem",
-                                          borderRadius: "6px",
-                                          cursor: "pointer",
-                                        }}
-                                      >
-                                        S{draftPicks[i]!.superimpose}
-                                      </div>
-
-                                      {/* Superimpose slider */}
-                                      {superOpenIndex === i && (
-                                        <div
-                                          ref={(el) => {
-                                            superimposeRefs.current[i] = el;
-                                          }}
-                                          style={{
-                                            position: "absolute",
-                                            bottom: "100%",
-                                            left: 0,
-                                            width: "100%",
-                                            background: "rgba(0,0,0,0.85)",
-                                            padding: "6px",
-                                            borderRadius: "6px",
-                                            zIndex: 20,
-                                          }}
+                                          {draftPicks[i]?.wengine && (
+                                            <span
+                                              className="chip clickable"
+                                              title="Set Superimpose"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEidolonOpenIndex(null);
+                                                setSuperOpenIndex(
+                                                  superOpenIndex === i
+                                                    ? null
+                                                    : i
+                                                );
+                                              }}
+                                            >
+                                              S{draftPicks[i]!.superimpose}
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                      {!bannedSlot && (
+                                        <span
+                                          className="chip cost"
+                                          title={`Agent ${c.agentCost} + W-Eng ${c.weCost}`}
                                         >
-                                          <input
-                                            type="range"
-                                            min={1}
-                                            max={5}
-                                            value={draftPicks[i]!.superimpose}
-                                            onChange={(e) =>
-                                              updateSuperimpose(
-                                                i,
-                                                parseInt(e.target.value)
-                                              )
-                                            }
-                                            style={{
-                                              width: "100%",
-                                              accentColor: "#0af",
-                                            }}
-                                          />
-                                          <div className="d-flex justify-content-between text-white small mt-1">
-                                            {["1", "2", "3", "4", "5"].map(
-                                              (label, j) => (
-                                                <span
-                                                  key={j}
-                                                  style={{
-                                                    color:
-                                                      draftPicks[i]!
-                                                        .superimpose ===
-                                                      j + 1
-                                                        ? "#0af"
-                                                        : "#ccc",
-                                                    fontWeight:
-                                                      draftPicks[i]!
-                                                        .superimpose ===
-                                                      j + 1
-                                                        ? "bold"
-                                                        : "normal",
-                                                  }}
-                                                >
-                                                  {label}
-                                                </span>
-                                              )
-                                            )}
-                                          </div>
-                                        </div>
+                                          {c.total}
+                                        </span>
                                       )}
                                     </div>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </>
-                        ) : (
-                          `#${i + 1}`
-                        )}
-                      </div>
-                    ) : null
-                  )}
+                                  </div>
+                                );
+                              })()}
+                            </>
+                          ) : (
+                            <div className="d-flex w-100 h-100 align-items-center justify-content-center text-white-50">
+                              #{i + 1}
+                            </div>
+                          )}
+                        </div>
+                      ) : null
+                    )}
+                  </div>
                 </div>
               </div>
             ));
           })()}
         </div>
 
-        {/* Search Bar + Undo + PvP Rules */}
+        {/* Search Bar + Undo */}
         <div className="mb-3 w-100 d-flex justify-content-center align-items-center gap-2 flex-wrap">
           <input
             type="text"
@@ -867,7 +718,6 @@ export default function ZzzDraftPage() {
               border: "1px solid rgba(255,255,255,0.25)",
             }}
           />
-
           <button
             className="btn back-button-glass"
             onClick={handleUndo}
@@ -876,22 +726,6 @@ export default function ZzzDraftPage() {
           >
             ⟲ Undo
           </button>
-
-          <OverlayTrigger
-            trigger="click"
-            placement="right"
-            overlay={pvpRulesPopover}
-            rootClose
-          >
-            <button
-              type="button"
-              className="btn back-button-glass"
-              style={{ whiteSpace: "nowrap" }}
-              aria-label="PvP Rules"
-            >
-              ℹ️ PvP Rules
-            </button>
-          </OverlayTrigger>
         </div>
 
         {/* Character Grid */}
@@ -901,19 +735,16 @@ export default function ZzzDraftPage() {
             style={{ maxWidth: "1000px", margin: "0 auto" }}
           >
             <div className="character-pool-scroll">
-              <div className="character-pool-grid">
+              <div className="character-pool-grid upscaled">
                 {characters
                   .filter((char) => {
-                    const lowerSearch = keyboardSearch.toLowerCase();
+                    const q = keyboardSearch.toLowerCase();
                     const name = char.name.toLowerCase();
-                    const subname =
+                    const sub =
                       char.subname && char.subname.toLowerCase() !== "null"
                         ? char.subname.toLowerCase()
                         : "";
-                    return (
-                      name.includes(lowerSearch) ||
-                      subname.includes(lowerSearch)
-                    );
+                    return name.includes(q) || sub.includes(q);
                   })
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((char) => {
@@ -938,7 +769,6 @@ export default function ZzzDraftPage() {
                     );
 
                     const isBanned = bannedCodes.includes(char.code);
-
                     const isAcePickStep = currentStep.includes("ACE");
                     const isOpponentPicked = alreadyPickedByOpponent;
 
@@ -979,10 +809,13 @@ export default function ZzzDraftPage() {
                         }}
                         onMouseEnter={(e) => {
                           if (!isDisabled)
-                            e.currentTarget.style.transform = "scale(1.1)";
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.transform = "scale(1.1)";
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
+                          (e.currentTarget as HTMLDivElement).style.transform =
+                            "scale(1)";
                         }}
                       />
                     );
@@ -992,17 +825,16 @@ export default function ZzzDraftPage() {
           </div>
         )}
 
-        {/* Post-draft scoring panels */}
+        {/* Post-draft scoring */}
         {draftComplete && (
           <div
-            className="d-flex justify-content-between gap-3 px-2 mt-4"
+            className="d-flex flex-column flex-md-row gap-3 px-2 mt-4"
             style={{ maxWidth: 1000, margin: "0 auto" }}
           >
-            {["B", "R"].map((side) => {
+            {(["B", "R"] as const).map((side) => {
               const isBlue = side === "B";
               const scores = isBlue ? blueScores : redScores;
               const setScores = isBlue ? setBlueScores : setRedScores;
-              const color = isBlue ? "#3388ff" : "#cc3333";
               const label = isBlue ? team1Name : team2Name;
               const { total, penaltyPoints } = getTeamCost(side);
               const adjustedTotal =
@@ -1011,45 +843,55 @@ export default function ZzzDraftPage() {
               return (
                 <div
                   key={side}
-                  className="p-3 rounded w-100"
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.6)",
-                    border: `2px solid ${color}`,
-                    boxShadow: `0 0 10px ${color}`,
-                    color: "white",
-                  }}
+                  className={`score-card ${isBlue ? "blue" : "red"} w-100`}
                 >
-                  <h5 style={{ color }}>{label}</h5>
-                  <div className="mb-2 small">
-                    Draft Cost: {total} / {COST_LIMIT}{" "}
-                    {penaltyPoints > 0 && (
-                      <span className="text-warning">
-                        (-{penaltyPoints} pts)
-                      </span>
-                    )}
+                  <div className="score-header">
+                    <div className="score-title">{label}</div>
+                    <div className="score-draft">
+                      Cost: {total} / {COST_LIMIT}
+                      {penaltyPoints > 0 && (
+                        <span className="penalty-pill">
+                          −{penaltyPoints} pts
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {(is3v3 ? [0, 1, 2] : [0, 1]).map((i) => (
-                    <input
-                      key={i}
-                      type="number"
-                      className="form-control form-control-sm mb-2 bg-dark text-white"
-                      placeholder={`Player ${i + 1} score`}
-                      value={scores[i]}
-                      onChange={(e) => {
-                        const updated = [...scores];
-                        updated[i] = parseInt(e.target.value) || 0;
-                        setScores(updated);
-                      }}
-                    />
-                  ))}
-                  <div className="mt-2 fw-bold">
-                    Total: {scores.reduce((a, b) => a + b, 0)}{" "}
-                    {penaltyPoints > 0 && (
-                      <>
-                        – {penaltyPoints} ={" "}
-                        <span style={{ color: "#0af" }}>{adjustedTotal}</span>
-                      </>
-                    )}
+
+                  <div className="score-inputs">
+                    {(is3v3 ? [0, 1, 2] : [0, 1]).map((i) => (
+                      <div className="score-input-group" key={i}>
+                        <label>Player {i + 1}</label>
+                        <input
+                          type="number"
+                          className="form-control score-input"
+                          placeholder="0"
+                          inputMode="numeric"
+                          min={0}
+                          value={scores[i] === 0 ? "" : String(scores[i])}
+                          onChange={(e) => {
+                            const v = e.target.value; 
+                            const updated = [...scores];
+                            updated[i] = v === "" ? 0 : parseInt(v, 10) || 0;
+                            setScores(updated);
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="score-total">
+                    <div className="score-total-label">Team Total</div>
+                    <div className="score-total-value">
+                      {scores.reduce((a, b) => a + b, 0)}
+                      {penaltyPoints > 0 && (
+                        <span className="score-penalty">
+                          −{penaltyPoints} ={" "}
+                          <span className="score-adjusted">
+                            {adjustedTotal}
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1066,7 +908,6 @@ export default function ZzzDraftPage() {
               const redTotal =
                 redScores.reduce((a, b) => a + b, 0) -
                 getTeamCost("R").penaltyPoints;
-
               if (blueTotal > redTotal)
                 return (
                   <h4 style={{ color: "#3388ff" }}>🏆 {team1Name} Wins!</h4>
@@ -1111,7 +952,6 @@ export default function ZzzDraftPage() {
                 </li>
                 {(() => {
                   const searchLower = wengineSearch.toLowerCase();
-
                   const activeChar =
                     activeSlotIndex !== null
                       ? draftPicks[activeSlotIndex]?.character
@@ -1122,7 +962,6 @@ export default function ZzzDraftPage() {
                   const filteredWengines = wengines.filter((w: WEngine) => {
                     const name = w.name?.toLowerCase() || "";
                     const sub = w.subname?.toLowerCase() || "";
-
                     if (name.includes(searchLower) || sub.includes(searchLower))
                       return true;
 
@@ -1138,24 +977,20 @@ export default function ZzzDraftPage() {
                         return true;
                       }
                     }
-
                     return false;
                   });
 
-                  // Sort to show signature first
+                  // signature first
                   filteredWengines.sort((a: WEngine, b: WEngine) => {
                     if (!activeCharName && !activeCharSubname) return 0;
-
                     const aSub = a.subname?.toLowerCase() || "";
                     const bSub = b.subname?.toLowerCase() || "";
-
                     const aMatches =
                       (activeCharName && aSub === activeCharName) ||
                       (activeCharSubname && aSub === activeCharSubname);
                     const bMatches =
                       (activeCharName && bSub === activeCharName) ||
                       (activeCharSubname && bSub === activeCharSubname);
-
                     if (aMatches && !bMatches) return -1;
                     if (!aMatches && bMatches) return 1;
                     return 0;
@@ -1164,7 +999,6 @@ export default function ZzzDraftPage() {
                   return filteredWengines.map((w: WEngine) => {
                     const isSig =
                       !!activeChar && isSignatureWengine(w, activeChar);
-
                     return (
                       <li
                         key={w.id}
@@ -1229,9 +1063,7 @@ export default function ZzzDraftPage() {
             <Button
               variant="primary"
               onClick={() => {
-                if (activeSlotIndex !== null) {
-                  confirmWengine(activeSlotIndex);
-                }
+                if (activeSlotIndex !== null) confirmWengine(activeSlotIndex);
               }}
             >
               Confirm

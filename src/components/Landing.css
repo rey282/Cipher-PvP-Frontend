@@ -925,3 +925,523 @@ body,
 * {
   touch-action: auto;
 }
+
+/* Make the dialog wider on desktop */
+@media (min-width: 1200px) {
+
+  /* Bootstrap 5 xl breakpoint */
+  .modal-xl {
+    --bs-modal-width: 980px;
+    /* wider rules modal */
+  }
+}
+
+/* Modal body layout */
+.rules-modal-body {
+  padding: 0.75rem 1rem 1rem;
+}
+
+/* Rules card now fills available width and centers */
+.rules-card {
+  width: 100%;
+  max-width: 920px;
+  /* wider but still readable */
+  margin: 0 auto;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 18px 22px;
+  color: #fff;
+  text-align: left;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* Typographic polish */
+.rules-card strong {
+  display: block;
+  margin: 12px 0 8px;
+  color: #ffc107;
+}
+
+.rules-card p {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.rules-card ul {
+  margin: 0 0 10px 1.2rem;
+  padding: 0;
+}
+
+.rules-card ul li {
+  margin-bottom: 6px;
+}
+
+/* Long content: prevent the modal from growing off-screen */
+.custom-dark-modal .rules-modal-body {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+/* Link color */
+.rules-link {
+  color: #57a6ff;
+  text-decoration: underline;
+}
+
+/* Mobile: full width, tighter padding */
+@media (max-width: 768px) {
+  .rules-card {
+    max-width: 100%;
+    padding: 14px 16px;
+  }
+}
+
+/* Info circle button next to Start Now */
+.btn-info-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s ease, transform .2s ease;
+}
+
+.btn-info-circle:hover {
+  background: rgba(255, 255, 255, .3);
+  transform: scale(1.05);
+}
+
+/* ───────────────────────────────────────────────────────────
+   Draft rows: viewport (scroll on small screens) + row
+─────────────────────────────────────────────────────────── */
+.draft-row-viewport {
+  position: relative;
+  width: 100%;
+  overflow: hidden;                 /* desktop: hidden (no bar) */
+}
+
+@media (max-width: 992px) {
+  .draft-row-viewport {
+    overflow-x: auto;               /* mobile: horizontal scroll */
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+}
+
+/* Arrows (only shown when row is scrollable; toggled in JS) */
+.row-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  user-select: none;
+  backdrop-filter: blur(4px);
+}
+.row-nav.left  { left: 6px; }
+.row-nav.right { right: 6px; }
+
+@media (min-width: 993px) {
+  .row-nav { display: none; }
+}
+
+/* Row that scales with CSS vars; width expands so it can scroll */
+.draft-row-wrap {
+  width: 100%;
+}
+
+.draft-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  /* or wrap, if you prefer */
+  gap: calc(var(--card-gap, 12px) * var(--card-scale, 1));
+}
+
+/* ───────────────────────────────────────────────────────────
+   Draft cards
+─────────────────────────────────────────────────────────── */
+.draft-card {
+  width: calc(var(--card-w, 170px) * var(--card-scale, 1));
+  height: calc(var(--card-h, 240px) * var(--card-scale, 1));
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #0b0b0b;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.draft-card.active { transform: translateY(-2px); }
+.draft-card.blue   { border-color: #3388ff; }
+.draft-card.red    { border-color: #cc3333; }
+.draft-card.ace    { box-shadow: 0 0 12px 3px rgba(255, 215, 0, 0.45); }
+.draft-card.ban    { filter: grayscale(100%) brightness(.6); }
+
+.draft-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Engine badge (larger & distinct from the card) */
+.engine-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: rgba(0, 0, 0, .65);
+  border: 2px solid #fff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, .6), 0 0 8px rgba(255, 255, 255, .25);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.engine-badge:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 12px rgba(255, 215, 0, .6);
+}
+
+/* Ribbon chips (shown only while an empty ACE/BAN slot) */
+.ribbon {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  font-size: .8rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .6);
+  border: 1px solid rgba(255, 255, 255, .15);
+  line-height: 1;
+}
+.ribbon.ban { color: #ff8080; }
+.ribbon.ace { color: #ffd54d; }
+
+/* Bottom info bar */
+.info-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 8px 8px 10px;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.85) 40%, rgba(0,0,0,.95) 100%);
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 6px;
+}
+.char-name {
+  font-weight: 700;
+  font-size: .95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip {
+  border: 1px solid rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .08);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: .85rem;
+  line-height: 1;
+  user-select: none;
+}
+.chip.clickable { cursor: pointer; }
+.chip.cost {
+  font-weight: 800;
+  letter-spacing: .2px;
+  background: linear-gradient(90deg, rgba(87,166,255,.25), rgba(255,215,64,.25));
+  border-color: rgba(255, 255, 255, .25);
+}
+
+/* Slider panels (Mindscape / Superimpose) */
+.slider-panel {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 70px;                     /* overridden for super panel in inline style */
+  background: rgba(12, 12, 12, .95);
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 10px;
+  padding: 10px 10px 6px;
+  z-index: 20;
+  backdrop-filter: blur(4px);
+  pointer-events: auto;             /* consume clicks so card onClick doesn't fire */
+}
+.slider-label {
+  font-size: .8rem;
+  opacity: .8;
+  margin-bottom: 4px;
+}
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: .8rem;
+}
+.slider-ticks span.active {
+  color: #57a6ff;
+  font-weight: 700;
+}
+input[type="range"].big-slider {
+  width: 100%;
+  height: 6px;
+  accent-color: #57a6ff;
+}
+
+/* Character pool bigger tiles */
+.character-pool-grid.upscaled > div {
+  width: 84px !important;
+  height: 84px !important;
+  border-radius: 10px !important;
+}
+
+/* Team header cost badge */
+.team-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 6px 0 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.team-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 900;
+  font-size: clamp(22px, 3.2vw, 30px);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .5);
+  margin-left: clamp(8px, 1vw, 16px);
+}
+
+.team-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.team-cost {
+  font-weight: 800;
+  font-size: clamp(16px, 2.2vw, 22px);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .14));
+  border: 1px solid rgba(255, 255, 255, .18);
+  color: #fff;
+  line-height: 1;
+}
+
+.team-cost .penalty {
+  color: #ffd54d;
+  margin-left: 8px;
+  font-weight: 800;
+}
+
+/* Undo glass button */
+.back-button-glass {
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .18);
+  color: #fff;
+}
+.back-button-glass:hover {
+  background: rgba(255, 255, 255, .16);
+}
+
+/* ── Score cards ─────────────────────────────────────────── */
+.score-card {
+  --accent: #57a6ff;
+  --glow: rgba(87, 166, 255, .28);
+  background: rgba(10, 12, 16, .55);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 16px;
+  padding: 14px 16px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35), 0 0 0 2px transparent;
+}
+
+.score-card.blue {
+  --accent: #3388ff;
+  --glow: rgba(51, 136, 255, .32);
+}
+
+.score-card.red {
+  --accent: #cc3333;
+  --glow: rgba(204, 51, 51, .28);
+}
+
+.score-card:hover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .42), 0 0 0 2px var(--glow);
+}
+
+/* Header (team name left, cost right) */
+.score-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.score-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 900;
+  letter-spacing: .3px;
+  color: #fff;
+  font-size: clamp(1.1rem, 1.2vw + .6rem, 1.6rem);
+}
+
+.score-title::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--glow);
+}
+
+.score-draft {
+  color: #dbe4ff;
+  font-weight: 600;
+  font-size: .95rem;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .10);
+}
+
+.penalty-pill {
+  margin-left: 8px;
+  background: rgba(255, 184, 0, .12);
+  color: #ffd35c;
+  border: 1px solid rgba(255, 184, 0, .35);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 800;
+  font-size: .85rem;
+}
+
+/* Inputs grid */
+.score-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.score-input-group {
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.score-input-group label {
+  display: block;
+  font-size: .8rem;
+  color: #b7c2d0;
+  margin-bottom: 4px;
+}
+
+.score-input {
+  background: #0d0f14 !important;
+  border: 1px solid rgba(255, 255, 255, .14) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  padding: 10px 12px !important;
+  font-weight: 800 !important;
+  font-size: 1rem !important;
+}
+
+.score-card.blue .score-input:focus {
+  border-color: #3388ff !important;
+  box-shadow: 0 0 0 2px rgba(51, 136, 255, .25) !important;
+  outline: none !important;
+}
+
+.score-card.red .score-input:focus {
+  border-color: #cc3333 !important;
+  box-shadow: 0 0 0 2px rgba(204, 51, 51, .25) !important;
+  outline: none !important;
+}
+
+/* Hide number spinners */
+.score-input[type="number"]::-webkit-outer-spin-button,
+.score-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.score-input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+/* Totals */
+.score-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, .14);
+}
+
+.score-total-label {
+  font-size: .9rem;
+  color: #cfd7e6;
+}
+
+.score-total-value {
+  font-size: clamp(1rem, 1.2vw + .7rem, 1.6rem);
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 14px var(--glow);
+}
+
+.score-penalty {
+  margin-left: 8px;
+  font-size: .95rem;
+  color: #ffc86b;
+}
+
+.score-adjusted {
+  margin-left: 6px;
+  font-weight: 900;
+  color: var(--accent);
+}
