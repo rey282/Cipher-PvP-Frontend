@@ -1312,17 +1312,18 @@ input[type="range"].big-slider {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  gap: 12px;
 }
 
 .score-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 900;
-  letter-spacing: .3px;
-  color: #fff;
-  font-size: clamp(1.1rem, 1.2vw + .6rem, 1.6rem);
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 800;
+  font-size: clamp(16px, 2.2vw, 28px);
+  letter-spacing: .2px;
 }
 
 .score-title::before {
@@ -1335,22 +1336,24 @@ input[type="range"].big-slider {
 }
 
 .score-draft {
-  color: #dbe4ff;
-  font-weight: 600;
-  font-size: .95rem;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 6px 10px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, .06);
-  border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(0, 0, 0, .35);
+  border: 1px solid rgba(255, 255, 255, .18);
+  font-weight: 700;
+  font-size: .95rem;
 }
 
 .penalty-pill {
-  margin-left: 8px;
-  background: rgba(255, 184, 0, .12);
-  color: #ffd35c;
-  border: 1px solid rgba(255, 184, 0, .35);
-  border-radius: 999px;
   padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(255, 153, 0, .16);
+  border: 1px solid rgba(255, 153, 0, .35);
+  color: #ffc866;
   font-weight: 800;
   font-size: .85rem;
 }
