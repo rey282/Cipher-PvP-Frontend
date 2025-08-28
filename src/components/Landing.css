@@ -2129,3 +2129,32 @@ input[type="range"].big-slider {
     bottom: 0;
   }
 }
+
+/* Floating SSE reconnect badge (doesn't affect layout) */
+.sse-indicator {
+  position: fixed;
+  top: 72px;
+  /* adjust if your Navbar is taller/shorter */
+  right: 12px;
+  z-index: 1055;
+  background: rgba(255, 193, 7, 0.16);
+  /* amber-ish glass */
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  pointer-events: none;
+  /* purely informational */
+  backdrop-filter: blur(4px);
+}
+
+@media (max-width: 520px) {
+  .sse-indicator {
+    top: 64px;
+    right: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}

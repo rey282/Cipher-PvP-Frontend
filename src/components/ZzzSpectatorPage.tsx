@@ -1,4 +1,3 @@
-// components/ZzzSpectatorPage.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -65,29 +64,23 @@ function useRowScale<T extends HTMLElement>(
 
     const compute = () => {
       const available = el.clientWidth || 0;
-
-      // ✅ Until we know how many cards we need, render at base size.
       if (!Number.isFinite(cardCount) || cardCount <= 0) {
         setScale(1);
         return;
       }
-
-      // For 1 card there is no inter-card gap.
       const gaps = Math.max(0, cardCount - 1);
-      const needed =
-        cardCount * CARD_W + gaps * CARD_GAP; // always ≥ CARD_W for cardCount ≥ 1
-
-      // Clamp between [CARD_MIN_SCALE, 1]
-      const s = Math.min(1, Math.max(CARD_MIN_SCALE, needed ? available / needed : 1));
+      const needed = cardCount * CARD_W + gaps * CARD_GAP;
+      const s = Math.min(
+        1,
+        Math.max(CARD_MIN_SCALE, needed ? available / needed : 1)
+      );
       setScale(s);
     };
 
-    // run now + on resize
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     window.addEventListener("resize", compute);
-
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", compute);
@@ -97,12 +90,10 @@ function useRowScale<T extends HTMLElement>(
   return scale;
 }
 
-
 /* ───────────── Cost rules (match ZzzDraft) ───────────── */
 function calcAgentCost(agent: Character, mindscape: number): number {
   const ms = Math.max(0, Math.min(6, mindscape));
   if (agent.rarity === 4) return 0.5;
-
   if (agent.rarity === 5) {
     if (agent.limited) {
       const bumps = [1, 2, 4, 6].filter((m) => ms >= m).length;
@@ -122,6 +113,12 @@ function calcWEngineCost(we: WEngine | undefined, refine: number): number {
 }
 const PENALTY_PER_POINT = 2500;
 
+/* ───────────── Floating reconnect badge ───────────── */
+function ReconnectingBadge({ show }: { show: boolean }) {
+  if (!show) return null;
+  return <div className="sse-indicator">Reconnecting… trying again</div>;
+}
+
 /* ───────────── Component ───────────── */
 export default function ZzzSpectatorPage() {
   const { key } = useParams<{ key: string }>();
@@ -131,6 +128,7 @@ export default function ZzzSpectatorPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [wengines, setWengines] = useState<WEngine[]>([]);
@@ -219,46 +217,55 @@ export default function ZzzSpectatorPage() {
     };
   }, []);
 
-  /* Load + poll the live spectator session */
+  /* Subscribe to live spectator session via SSE (with reconnect flag) */
   useEffect(() => {
     if (!key) return;
-    let cancelled = false;
-    let inFlight = false;
 
-    const fetchSession = async () => {
-      if (inFlight || cancelled) return;
-      inFlight = true;
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${key}`
-        );
-        if (res.status === 404) {
-          if (!cancelled) {
-            setNotFound(true);
-            setLoading(false);
-          }
-          return;
-        }
-        if (!res.ok) throw new Error("Failed to fetch session");
-        const data = (await res.json()) as SessionRow;
-        if (!cancelled) {
-          setSession(data);
-          setNotFound(false);
-          setError(null);
-        }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Failed to fetch session");
-      } finally {
-        if (!cancelled) setLoading(false);
-        inFlight = false;
-      }
+    setLoading(true);
+    setNotFound(false);
+    setError(null);
+    setReconnecting(false);
+
+    const url = `${
+      import.meta.env.VITE_API_BASE
+    }/api/zzz/sessions/${key}/stream`;
+    const es = new EventSource(url);
+
+    es.onopen = () => {
+      setReconnecting(false);
+      setLoading(false);
     };
 
-    fetchSession();
-    const id = setInterval(fetchSession, 1500);
+    const onSnapshot = (e: MessageEvent) => {
+      setSession(JSON.parse(e.data));
+      setLoading(false);
+      setReconnecting(false);
+    };
+    const onUpdate = (e: MessageEvent) => {
+      setSession(JSON.parse(e.data));
+      setReconnecting(false);
+    };
+    const onNotFound = () => {
+      setNotFound(true);
+      setLoading(false);
+      setReconnecting(false);
+      es.close();
+    };
+
+    es.onerror = () => {
+      if (!notFound) setReconnecting(true);
+    };
+
+    es.addEventListener("snapshot", onSnapshot);
+    es.addEventListener("update", onUpdate);
+    es.addEventListener("not_found", onNotFound);
+
     return () => {
-      cancelled = true;
-      clearInterval(id);
+      es.removeEventListener("snapshot", onSnapshot);
+      es.removeEventListener("update", onUpdate);
+      es.removeEventListener("not_found", onNotFound);
+      es.close();
+      setReconnecting(false);
     };
   }, [key]);
 
@@ -342,7 +349,7 @@ export default function ZzzSpectatorPage() {
           <div className="text-center my-4 text-danger">{error}</div>
         )}
 
-        {/* Draft rows (read-only, same sizing as draft) */}
+        {/* Draft rows (read-only) */}
         <div className="d-flex flex-column align-items-center gap-3 mb-4">
           {(["B", "R"] as const).map((prefix) => {
             const name = prefix === "B" ? team1Name : team2Name;
@@ -375,6 +382,7 @@ export default function ZzzSpectatorPage() {
                     className="draft-row"
                     style={
                       {
+                        // CSS variables used by the stylesheet:
                         "--card-scale": scale,
                         "--card-w": `${CARD_W}px`,
                         "--card-h": `${CARD_H}px`,
@@ -520,7 +528,7 @@ export default function ZzzSpectatorPage() {
           })}
         </div>
 
-        {/* Read-only scoring (same layout/sizing as draft) */}
+        {/* Read-only scoring */}
         {state && (
           <div
             className="score-row d-flex flex-column flex-md-row gap-3 px-2 mt-4"
@@ -561,7 +569,6 @@ export default function ZzzSpectatorPage() {
                     </div>
                   </div>
 
-                  {/* read-only values, styled to match inputs */}
                   <div className="score-inputs">
                     {(is3v3 ? [0, 1, 2] : [0, 1]).map((i) => (
                       <div className="score-input-group" key={i}>
@@ -609,6 +616,9 @@ export default function ZzzSpectatorPage() {
           </div>
         )}
       </div>
+
+      {/* floating, layout-safe reconnect badge */}
+      <ReconnectingBadge show={reconnecting && !loading && !notFound} />
     </div>
   );
 }
