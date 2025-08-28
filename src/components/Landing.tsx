@@ -361,14 +361,12 @@ export default function Landing() {
 
 
   const handleStart = () => {
-    // allow 1v1 inside 2v2/3v3 → at least one non-empty across both teams
     const anyName = [...team1Names, ...team2Names].some((n) => n.trim() !== "");
     if (!anyName) {
       toast.warn("Please enter at least one player name.");
       return;
     }
 
-    // Clean and pipe-join names
     const t1 = team1Names
       .map((s) => s.trim())
       .filter(Boolean)
@@ -378,10 +376,24 @@ export default function Landing() {
       .filter(Boolean)
       .join("|");
 
+    // randomize sides
     const [team1, team2] = Math.random() < 0.5 ? [t1, t2] : [t2, t1];
+    const payload = { team1, team2, mode };
 
-    const query = new URLSearchParams({ team1, team2, mode });
-    navigate(`/zzz/draft?${query.toString()}`);
+    // 🔑 forget any old spectator session when starting a new draft
+    sessionStorage.removeItem("zzzSpectatorKey");
+
+    // (optional but nice) give this draft a unique id to detect true “newness”
+    const draftId =
+      (crypto as any).randomUUID?.() ??
+      `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem("zzzDraftId", draftId);
+
+    // keep a refresh-safe copy without exposing URL params
+    sessionStorage.setItem("zzzDraftInit", JSON.stringify(payload));
+
+    // navigate with state so the URL stays /zzz/draft
+    navigate("/zzz/draft", { state: { ...payload, draftId } });
   };
 
 

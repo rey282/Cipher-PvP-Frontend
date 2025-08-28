@@ -58,8 +58,9 @@ export default function TermsOfService() {
             <p>
               Cipher is a community driven fan project and is&nbsp;
               <strong>not</strong>&nbsp;affiliated with, sponsored by, or
-              endorsed by HoYoverse. All Honkai: Star&nbsp;Rail names, images,
-              and other assets remain the property of HoYoverse.
+              endorsed by HoYoverse. All Honkai: Star&nbsp;Rail and
+              Zenless&nbsp;Zone&nbsp;Zero names, images, and other assets remain
+              the property of HoYoverse.
             </p>
           </section>
 

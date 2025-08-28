@@ -25,6 +25,7 @@ const CostTest = lazy(() => import("./components2/CostTest"));
 const RosterLog = lazy(() => import("./components/RosterLog"));
 const ZzzDraftPage = lazy(() => import("./components/ZzzDraft"));
 const TeamPresets = lazy(() => import("./components/TeamPresets"));
+const ZzzSpectatorPage = lazy(() => import("./components/ZzzSpectatorPage"));
 
 /* ─────────── Layout wrapper ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
@@ -226,16 +227,29 @@ export default function App() {
         />
       </Route>
 
-      <Route
-        path="/zzz/draft"
-        element={
-          <Suspense fallback={<LoadingSplash />}>
-            <PageWithFooter>
-              <ZzzDraftPage />
-            </PageWithFooter>
-          </Suspense>
-        }
-      />
+      {/* ZZZ Format */}
+      <Route path="/zzz">
+        <Route
+          path="draft"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <ZzzDraftPage />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="s/:key"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <ZzzSpectatorPage />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+      </Route>
 
       {/* Admin Pages */}
       <Route path="/admin">

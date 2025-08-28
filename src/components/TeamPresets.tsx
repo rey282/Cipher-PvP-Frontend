@@ -124,7 +124,6 @@ export default function TeamPresets() {
     superimpose: 1,
   });
 
-  // mobile + body-unlock helpers
   const isTouchDevice =
     typeof window !== "undefined" &&
     window.matchMedia("(hover: none) and (pointer: coarse)").matches;
@@ -133,15 +132,12 @@ export default function TeamPresets() {
     !!document.querySelector(".modal.show, .modal.d-block");
 
   const unlockBody = () => {
-    // Only clean up body styles when no modal of any kind is open.
     if (!anyModalOpen()) {
       document.body.classList.remove("modal-open");
       document.body.style.removeProperty("overflow");
     }
-    // Do NOT remove .modal-backdrop — React-Bootstrap owns those.
   };
 
-  // ensure body unlocked whenever no modal is open, and on unmount
   useEffect(() => {
     if (!showModal && !showConeModal) {
       const t = setTimeout(unlockBody, 0);
@@ -155,7 +151,6 @@ export default function TeamPresets() {
   useEffect(() => {
     if (!user || !targetId) return;
 
-    // Frontend guard: only self or superuser may view another user's presets
     if (params.id && !isSelf && !isSuperuser) {
       setError("Access Denied");
       setLoading(false);
@@ -171,7 +166,6 @@ export default function TeamPresets() {
         try {
           j = await r.json();
         } catch {
-          // ignore JSON parse errors for non-200s
         }
 
         if (!r.ok) {
@@ -1016,117 +1010,44 @@ export default function TeamPresets() {
                     >
                       {p.slots.map((s, i) => {
                         const char = charByCode.get(s.characterId);
-                        const cone = s.lightConeId
-                          ? coneById.get(s.lightConeId)
-                          : undefined;
 
                         return (
-                          <div
-                            key={i}
-                            title={
-                              char
-                                ? `${char.name} • E${s.eidolon}` +
-                                  (cone
-                                    ? ` • ${cone.name} (S${s.superimpose})`
-                                    : " • No LC")
-                                : s.characterId
-                            }
-                            style={{
-                              width: "100%",
-                              height: 190,
-                              borderRadius: 12,
-                              background: "rgba(0,0,0,0.65)",
-                              border: "1px solid rgba(255,255,255,0.1)",
-                              overflow: "hidden",
-                              position: "relative",
-                            }}
-                          >
-                            {/* Character area */}
-                            {char ? (
-                              <img
-                                src={char.image_url}
-                                alt={char.name}
-                                style={{
-                                  width: "100%",
-                                  height: cone ? 140 : 200,
-                                  objectFit: "cover",
-                                  transition: "height .2s ease",
-                                }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: "100%",
-                                  height: 200,
-                                  background: "rgba(255,255,255,0.05)",
-                                }}
-                              />
-                            )}
-
-                            {/* E badge */}
-                            {char && (
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  top: 6,
-                                  left: 6,
-                                  background: "#000",
-                                  color: "#fff",
-                                  fontSize: "0.75rem",
-                                  padding: "2px 6px",
-                                  borderRadius: 6,
-                                  border: "1px solid rgba(255,255,255,0.15)",
-                                }}
-                              >
-                                E{s.eidolon}
-                              </div>
-                            )}
-
-                            {/* Light cone area */}
-                            {cone ? (
-                              <div style={{ position: "relative" }}>
-                                <img
-                                  src={cone.imageUrl}
-                                  alt={cone.name}
-                                  loading="lazy"
-                                  style={{
-                                    width: "100%",
-                                    height: 60,
-                                    objectFit: "cover",
-                                    display: "block",
-                                    borderTop:
-                                      "1px solid rgba(255,255,255,0.08)",
-                                  }}
-                                />
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    bottom: 6,
-                                    left: 6,
-                                    background: "#000",
-                                    color: "#fff",
-                                    fontSize: "0.75rem",
-                                    padding: "2px 6px",
-                                    borderRadius: 6,
-                                    border: "1px solid rgba(255,255,255,0.15)",
-                                  }}
-                                >
-                                  S{s.superimpose}
-                                </div>
-                              </div>
-                            ) : (
-                              char && (
-                                <div
-                                  style={{
-                                    width: "100%",
-                                    height: 60,
-                                    background: "rgba(255,255,255,0.05)",
-                                    borderTop:
-                                      "1px solid rgba(255,255,255,0.08)",
-                                  }}
-                                />
-                              )
-                            )}
+                          <div key={i} style={{ width: "100%" }}>
+                            <div
+                              className="draft-card ct preset-mini"
+                              style={{
+                                width: "100%",
+                                height: 170,
+                                position: "relative",
+                              }}
+                              title={char ? char.name : s.characterId}
+                            >
+                              {char ? (
+                                <>
+                                  <img
+                                    src={char.image_url}
+                                    alt={char.name}
+                                    className="draft-img"
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "cover",
+                                    }}
+                                  />
+                                  {/* name only, centered */}
+                                  <div className="info-bar">
+                                    <div
+                                      className="char-name center-only"
+                                      title={char.name}
+                                    >
+                                      {char.name}
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="d-flex w-100 h-100 align-items-center justify-content-center" />
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1287,6 +1208,7 @@ export default function TeamPresets() {
                         overflowX: "auto",
                         overflowY: "hidden",
                         paddingBottom: 4,
+                        WebkitOverflowScrolling: "touch",
                       }}
                     >
                       {slotsState.map((slot, idx) => {
@@ -1297,325 +1219,289 @@ export default function TeamPresets() {
                           slot.lightConeData ||
                           cones.find((c) => c.id === slot.lightConeId);
 
+                        // costs (Cerydra)
+                        const eCery = (() => {
+                          if (!char) return 0;
+                          const imageId = extractImageId(char.image_url);
+                          const arr = cerCharCostMap.get(imageId);
+                          return arr?.[slot.eidolon] ?? 0;
+                        })();
+                        const sCery = cone
+                          ? cone.costs?.[slot.superimpose - 1] ?? 0
+                          : 0;
+                        const fmt = (v: number) =>
+                          v % 1 === 0 ? String(v) : v.toFixed(1);
+
                         return (
-                          <div
-                            key={idx}
-                            onClick={() => char && openConeModal(idx)}
-                            style={{
-                              flex: "0 0 auto",
-                              width: 120,
-                              height: 220,
-                              borderRadius: 12,
-                              background: "rgba(0,0,0,0.7)",
-                              border: "1px solid rgba(255,255,255,0.1)",
-                              cursor: char ? "pointer" : "default",
-                              overflow: "visible",
-                              position: "relative",
-                            }}
-                          >
-                            {char ? (
-                              <>
-                                {/* character area */}
-                                <div style={{ position: "relative" }}>
+                          <div key={idx} style={{ flex: "0 0 auto" }}>
+                            {/* ===== CostTest-sized card (170x270) ===== */}
+                            <div
+                              className="draft-card ct preset-edit-card"
+                              title={
+                                char
+                                  ? `${char.name} • E${slot.eidolon}${
+                                      cone
+                                        ? ` • ${cone.name} (S${slot.superimpose})`
+                                        : ""
+                                    }`
+                                  : ""
+                              }
+                              onClick={() => char && openConeModal(idx)}
+                            >
+                              {char ? (
+                                <>
+                                  {/* Fixed full-image so it never jumps when LC is equipped */}
                                   <img
                                     src={char.image_url}
                                     alt={char.name}
-                                    loading="lazy"
+                                    className="draft-img"
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "cover",
+                                    }}
                                     onError={(e) => {
                                       (
                                         e.currentTarget as HTMLImageElement
                                       ).style.visibility = "hidden";
                                     }}
-                                    style={{
-                                      width: "100%",
-                                      height: cone ? 140 : 220,
-                                      objectFit: "cover",
-                                      transition: "height 0.3s ease",
-                                      borderTopLeftRadius: 12,
-                                      borderTopRightRadius: 12,
-                                    }}
                                   />
 
-                                  {/* EIDOLON badge + popup */}
+                                  {/* Light cone badge (overlay icon) */}
+                                  {cone && (
+                                    <img
+                                      src={cone.imageUrl}
+                                      alt={cone.name}
+                                      title={cone.name}
+                                      className="engine-badge"
+                                    />
+                                  )}
+
+                                  {/* Bottom info: centered name + 4 pills */}
                                   <div
-                                    style={{
-                                      position: "absolute",
-                                      top: 4,
-                                      left: 4,
-                                      zIndex: 10,
-                                    }}
+                                    className="info-bar"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     <div
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSuperOpenIndex(null);
-                                        setEidolonOpenIndex(
-                                          eidolonOpenIndex === idx ? null : idx
-                                        );
-                                      }}
+                                      className="char-name"
                                       style={{
-                                        position: "relative",
-                                        display: "inline-block",
-                                        cursor: "pointer",
+                                        textAlign: "center",
+                                        fontWeight: 700,
                                       }}
                                     >
-                                      <div
-                                        style={{
-                                          background: "#000",
-                                          color: "#fff",
-                                          fontSize: "0.75rem",
-                                          padding: "2px 6px",
-                                          borderRadius: 6,
+                                      {char.name}
+                                    </div>
+
+                                    <div className="chip-row four">
+                                      {/* E (opens Eidolon slider) */}
+                                      <span
+                                        className="chip clickable chip-left"
+                                        title="Set Eidolon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSuperOpenIndex(null);
+                                          setEidolonOpenIndex(
+                                            eidolonOpenIndex === idx
+                                              ? null
+                                              : idx
+                                          );
                                         }}
                                       >
                                         E{slot.eidolon}
-                                      </div>
+                                      </span>
 
-                                      {eidolonOpenIndex === idx && (
-                                        <div
-                                          ref={(el) => {
-                                            eidolonRefs.current[idx] = el;
-                                          }}
-                                          onClick={(e) => e.stopPropagation()}
-                                          style={{
-                                            position: "absolute",
-                                            top: "calc(100% - 1px)",
-                                            left: 0,
-                                            width: 180,
-                                            background: "rgba(0,0,0,0.85)",
-                                            padding: 8,
-                                            borderRadius: 10,
-                                            boxShadow:
-                                              "0 0 6px rgba(0,0,0,0.6)",
-                                            backdropFilter: "blur(4px)",
-                                            zIndex: 999,
+                                      {/* E COST */}
+                                      <span
+                                        className="chip cost chip-center"
+                                        title="Character Cost"
+                                      >
+                                        {fmt(eCery)}
+                                      </span>
+
+                                      {/* LC COST (spacer if none) */}
+                                      {cone ? (
+                                        <span
+                                          className="chip cost chip-center"
+                                          title="Light Cone Cost"
+                                        >
+                                          {fmt(sCery)}
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className="chip-spacer"
+                                          aria-hidden="true"
+                                        />
+                                      )}
+
+                                      {/* S (opens Superimposition slider) or spacer if no LC */}
+                                      {cone ? (
+                                        <span
+                                          className="chip clickable chip-right"
+                                          title="Set Superimposition"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEidolonOpenIndex(null);
+                                            setSuperOpenIndex(
+                                              superOpenIndex === idx
+                                                ? null
+                                                : idx
+                                            );
                                           }}
                                         >
-                                          <input
-                                            type="range"
-                                            min={0}
-                                            max={6}
-                                            step={1}
-                                            value={slot.eidolon}
-                                            onChange={(e) => {
-                                              e.stopPropagation();
-                                              const updated = [...slotsState];
-                                              updated[idx].eidolon = Number(
-                                                e.target.value
-                                              );
-                                              setSlotsState(updated);
-                                            }}
-                                            style={{
-                                              width: "100%",
-                                              accentColor: "#0af",
-                                              cursor: "pointer",
-                                            }}
-                                          />
-                                          <div
-                                            className="d-flex justify-content-between text-white mt-1"
-                                            style={{
-                                              fontSize: "0.75rem",
-                                              fontWeight: 500,
-                                              color: "#ccc",
-                                            }}
-                                          >
-                                            {[
-                                              "E0",
-                                              "E1",
-                                              "E2",
-                                              "E3",
-                                              "E4",
-                                              "E5",
-                                              "E6",
-                                            ].map((label, i) => (
-                                              <span
-                                                key={i}
-                                                style={{
-                                                  color:
-                                                    slot.eidolon === i
-                                                      ? "#0af"
-                                                      : "#ccc",
-                                                  fontWeight:
-                                                    slot.eidolon === i
-                                                      ? "bold"
-                                                      : "normal",
-                                                }}
-                                              >
-                                                {label}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        </div>
+                                          S{slot.superimpose}
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className="chip-spacer"
+                                          aria-hidden="true"
+                                        />
                                       )}
                                     </div>
                                   </div>
 
-                                  {/* remove char */}
+                                  {/* Eidolon slider (centered labels, ZZZ style) */}
+                                  {eidolonOpenIndex === idx && (
+                                    <div
+                                      className="slider-panel"
+                                      ref={(el) => {
+                                        eidolonRefs.current[idx] = el;
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="slider-label">
+                                        Eidolon
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={6}
+                                        className="big-slider"
+                                        value={slot.eidolon}
+                                        onChange={(e) => {
+                                          const updated = [...slotsState];
+                                          updated[idx].eidolon = Number(
+                                            (e.target as HTMLInputElement).value
+                                          );
+                                          setSlotsState(updated);
+                                        }}
+                                      />
+                                      <div
+                                        className="slider-ticks"
+                                        style={{ textAlign: "center" }}
+                                      >
+                                        {[
+                                          "E0",
+                                          "E1",
+                                          "E2",
+                                          "E3",
+                                          "E4",
+                                          "E5",
+                                          "E6",
+                                        ].map((label, i) => (
+                                          <span
+                                            key={label}
+                                            className={
+                                              slot.eidolon === i ? "active" : ""
+                                            }
+                                            style={{ flex: 1 }}
+                                          >
+                                            {label}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Super slider (centered labels, ZZZ style) */}
+                                  {superOpenIndex === idx && (
+                                    <div
+                                      className="slider-panel"
+                                      ref={(el) => {
+                                        superimposeRefs.current[idx] = el;
+                                      }}
+                                      style={{ bottom: 70 }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="slider-label">
+                                        Superimposition
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min={1}
+                                        max={5}
+                                        className="big-slider"
+                                        value={slot.superimpose}
+                                        onChange={(e) => {
+                                          const updated = [...slotsState];
+                                          updated[idx].superimpose = Number(
+                                            (e.target as HTMLInputElement).value
+                                          );
+                                          setSlotsState(updated);
+                                        }}
+                                      />
+                                      <div
+                                        className="slider-ticks"
+                                        style={{ textAlign: "center" }}
+                                      >
+                                        {["S1", "S2", "S3", "S4", "S5"].map(
+                                          (label, i) => (
+                                            <span
+                                              key={label}
+                                              className={
+                                                slot.superimpose === i + 1
+                                                  ? "active"
+                                                  : ""
+                                              }
+                                              style={{ flex: 1 }}
+                                            >
+                                              {label}
+                                            </span>
+                                          )
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="d-flex w-100 h-100 align-items-center justify-content-center" />
+                              )}
+                            </div>
+
+                            {char && (
+                              <div className="slot-action-bar">
+                                <div
+                                  style={{
+                                    marginTop: 6,
+                                    background: "rgba(0,0,0,0.55)",
+                                    border: "1px solid rgba(255,255,255,0.1)",
+                                    borderRadius: 10,
+                                    padding: 6,
+                                  }}
+                                >
                                   <button
+                                    className="btn btn-outline-danger btn-sm w-100"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       removeSlot(idx);
                                     }}
-                                    className="btn btn-sm btn-danger position-absolute"
-                                    style={{
-                                      top: 4,
-                                      right: 4,
-                                      padding: "2px 6px",
-                                      fontSize: "0.75rem",
-                                    }}
+                                    disabled={!slot.characterId}
+                                    title={
+                                      slot.characterId
+                                        ? "Remove this member"
+                                        : "Empty slot"
+                                    }
                                   >
-                                    ✕
+                                    Remove
                                   </button>
                                 </div>
-
-                                {/* cone area — only render if we actually have a cone */}
-                                {cone && (
-                                  <div style={{ position: "relative" }}>
-                                    <img
-                                      src={cone.imageUrl}
-                                      alt={cone.name}
-                                      loading="lazy"
-                                      onError={(e) => {
-                                        (
-                                          e.currentTarget as HTMLImageElement
-                                        ).style.visibility = "hidden";
-                                      }}
-                                      style={{
-                                        width: "100%",
-                                        height: 80,
-                                        objectFit: "cover",
-                                        borderBottomLeftRadius: 12,
-                                        borderBottomRightRadius: 12,
-                                      }}
-                                    />
-
-                                    {/* SUPER badge + popup */}
-                                    <div
-                                      style={{
-                                        position: "absolute",
-                                        bottom: 4,
-                                        left: 4,
-                                        zIndex: 10,
-                                      }}
-                                    >
-                                      <div
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEidolonOpenIndex(null);
-                                          setSuperOpenIndex(
-                                            superOpenIndex === idx ? null : idx
-                                          );
-                                        }}
-                                        style={{
-                                          position: "relative",
-                                          display: "inline-block",
-                                          cursor: "pointer",
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            background: "#000",
-                                            color: "#fff",
-                                            fontSize: "0.75rem",
-                                            padding: "2px 6px",
-                                            borderRadius: 6,
-                                          }}
-                                        >
-                                          S{slot.superimpose}
-                                        </div>
-
-                                        {superOpenIndex === idx && (
-                                          <div
-                                            ref={(el) => {
-                                              superimposeRefs.current[idx] = el;
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                            style={{
-                                              position: "absolute",
-                                              bottom: "calc(100% - 1px)",
-                                              left: 0,
-                                              width: 180,
-                                              background: "rgba(0,0,0,0.85)",
-                                              padding: 8,
-                                              borderRadius: 10,
-                                              boxShadow:
-                                                "0 0 6px rgba(0,0,0,0.6)",
-                                              backdropFilter: "blur(4px)",
-                                              zIndex: 999,
-                                            }}
-                                          >
-                                            <input
-                                              type="range"
-                                              min={1}
-                                              max={5}
-                                              step={1}
-                                              value={slot.superimpose}
-                                              onChange={(e) => {
-                                                e.stopPropagation();
-                                                const updated = [...slotsState];
-                                                updated[idx].superimpose =
-                                                  Number(e.target.value);
-                                                setSlotsState(updated);
-                                              }}
-                                              style={{
-                                                width: "100%",
-                                                accentColor: "#0af",
-                                                cursor: "pointer",
-                                              }}
-                                            />
-                                            <div
-                                              className="d-flex justify-content-between text-white mt-1"
-                                              style={{
-                                                fontSize: "0.75rem",
-                                                fontWeight: 500,
-                                                color: "#ccc",
-                                              }}
-                                            >
-                                              {[
-                                                "S1",
-                                                "S2",
-                                                "S3",
-                                                "S4",
-                                                "S5",
-                                              ].map((label, i) => (
-                                                <span
-                                                  key={i}
-                                                  style={{
-                                                    color:
-                                                      slot.superimpose === i + 1
-                                                        ? "#0af"
-                                                        : "#ccc",
-                                                    fontWeight:
-                                                      slot.superimpose === i + 1
-                                                        ? "bold"
-                                                        : "normal",
-                                                  }}
-                                                >
-                                                  {label}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            ) : (
-                              // EMPTY: one solid block, no cone strip
-                              <div
-                                style={{
-                                  width: "100%",
-                                  height: 220,
-                                  background: "rgba(255,255,255,0.05)",
-                                  borderRadius: 12,
-                                }}
-                              />
+                              </div>
                             )}
                           </div>
                         );
                       })}
+
                       {/* Expected Cycle */}
                       <div className="mb-3">
                         <label
@@ -1950,11 +1836,12 @@ export default function TeamPresets() {
               </button>
             </Modal.Footer>
           </Modal>
-          {/* View Preset Modal (read-only) */}
+          {/* View Preset Modal*/}
           <Modal
             show={showViewModal}
             onHide={() => setShowViewModal(false)}
             centered
+            dialogClassName="preset-view-dialog-4"
             contentClassName="bg-dark text-white"
           >
             <Modal.Header closeButton>
@@ -1981,154 +1868,97 @@ export default function TeamPresets() {
 
               {/* Totals */}
               {viewPreset && (
-                <div className="mt-3 d-flex gap-2 flex-wrap">
-                  <span
-                    className="badge"
-                    style={{
-                      background: "rgba(10,170,255,0.2)",
-                      border: "1px solid rgba(10,170,255,0.35)",
-                    }}
-                  >
-                    Cerydra: {savedCerydraTotal(viewPreset.slots).toFixed(2)}
-                  </span>
-                  <span
-                    className="badge"
-                    style={{
-                      background: "rgba(255,170,20,0.18)",
-                      border: "1px solid rgba(255,170,20,0.35)",
-                    }}
-                  >
-                    Cipher: {savedCipherTotal(viewPreset.slots).toFixed(2)}
-                  </span>
-                  {viewPreset.expectedCycle !== null &&
-                    viewPreset.expectedCycle !== undefined && (
-                      <span
-                        className="badge"
-                        style={{
-                          background: "rgba(255,255,255,0.08)",
-                          border: "1px solid rgba(255,255,255,0.15)",
-                        }}
-                      >
-                        Cycle: {viewPreset.expectedCycle}
-                      </span>
-                    )}
-                </div>
-              )}
-
-              {/* Slots preview (same look as cards) */}
-              {viewPreset && (
-                <div
-                  className="mt-3"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, minmax(0,1fr))",
-                    gap: 8,
-                  }}
-                >
+                <div className="mt-3 preset-view-grid">
                   {viewPreset.slots.map((s, i) => {
                     const char = charByCode.get(s.characterId);
                     const cone = s.lightConeId
                       ? coneById.get(s.lightConeId)
                       : undefined;
+
+                    const imageId = char ? extractImageId(char.image_url) : "";
+                    const eCery = imageId
+                      ? cerCharCostMap.get(imageId)?.[s.eidolon] ?? 0
+                      : 0;
+                    const sCery = cone
+                      ? cone.costs?.[s.superimpose - 1] ?? 0
+                      : 0;
+                    const fmt = (v: number) =>
+                      v % 1 === 0 ? String(v) : v.toFixed(1);
+
                     return (
-                      <div
-                        key={i}
-                        style={{
-                          width: "100%",
-                          height: 190,
-                          borderRadius: 12,
-                          background: "rgba(0,0,0,0.65)",
-                          border: "1px solid rgba(255,255,255,0.1)",
-                          overflow: "hidden",
-                          position: "relative",
-                        }}
-                        title={
-                          char
-                            ? `${char.name} • E${s.eidolon}${
-                                cone
-                                  ? ` • ${cone.name} (S${s.superimpose})`
-                                  : " • No LC"
-                              }`
-                            : s.characterId
-                        }
-                      >
-                        {char ? (
-                          <img
-                            src={char.image_url}
-                            alt={char.name}
-                            style={{
-                              width: "100%",
-                              height: cone ? 140 : 200,
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: "100%",
-                              height: 200,
-                              background: "rgba(255,255,255,0.05)",
-                            }}
-                          />
-                        )}
-                        {char && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: 6,
-                              left: 6,
-                              background: "#000",
-                              color: "#fff",
-                              fontSize: "0.75rem",
-                              padding: "2px 6px",
-                              borderRadius: 6,
-                              border: "1px solid rgba(255,255,255,0.15)",
-                            }}
-                          >
-                            E{s.eidolon}
-                          </div>
-                        )}
-                        {cone ? (
-                          <div style={{ position: "relative" }}>
-                            <img
-                              src={cone.imageUrl}
-                              alt={cone.name}
-                              loading="lazy"
-                              style={{
-                                width: "100%",
-                                height: 60,
-                                objectFit: "cover",
-                                borderTop: "1px solid rgba(255,255,255,0.08)",
-                              }}
-                            />
-                            <div
-                              style={{
-                                position: "absolute",
-                                bottom: 6,
-                                left: 6,
-                                background: "#000",
-                                color: "#fff",
-                                fontSize: "0.75rem",
-                                padding: "2px 6px",
-                                borderRadius: 6,
-                                border: "1px solid rgba(255,255,255,0.15)",
-                              }}
-                            >
-                              S{s.superimpose}
-                            </div>
-                          </div>
-                        ) : (
-                          char && (
-                            <div
-                              style={{
-                                width: "100%",
-                                height: 60,
-                                background: "rgba(255,255,255,0.05)",
-                                borderTop: "1px solid rgba(255,255,255,0.08)",
-                              }}
-                            />
-                          )
-                        )}
+                      <div key={i} className="preset-view-cell">
+                        <div
+                          className="draft-card ct preset-card"
+                          title={
+                            char
+                              ? `${char.name} • E${s.eidolon}${
+                                  cone
+                                    ? ` • ${cone.name} (S${s.superimpose})`
+                                    : ""
+                                }`
+                              : s.characterId
+                          }
+                        >
+                          {char && (
+                            <>
+                              <img
+                                src={char.image_url}
+                                alt={char.name}
+                                className="draft-img"
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                              {cone && (
+                                <img
+                                  src={cone.imageUrl}
+                                  alt={cone.name}
+                                  title={cone.name}
+                                  className="engine-badge"
+                                />
+                              )}
+                              <div className="info-bar">
+                                <div
+                                  className="char-name"
+                                  style={{
+                                    textAlign: "center",
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  {char.name}
+                                </div>
+                                <div className="chip-row four">
+                                  <span className="chip">E{s.eidolon}</span>
+                                  <span className="chip cost chip-center">
+                                    {fmt(eCery)}
+                                  </span>
+                                  {cone ? (
+                                    <span className="chip cost chip-center">
+                                      {fmt(sCery)}
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className="chip-spacer"
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                  {cone ? (
+                                    <span className="chip">
+                                      S{s.superimpose}
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className="chip-spacer"
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

@@ -1,8 +1,10 @@
+// components/ZzzDraft.tsx
 import { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import "../components/Landing.css";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Modal, Button } from "react-bootstrap";
+import { useAuth } from "../context/AuthContext";
 
 /* ───────────── Types ───────────── */
 type Character = {
@@ -104,9 +106,47 @@ const PENALTY_PER_POINT = 2500; // per 0.25 above cap
 
 export default function ZzzDraftPage() {
   const location = useLocation();
+  type DraftInit = { team1?: string; team2?: string; mode?: "2v2" | "3v3" };
+
+  const navigate = useNavigate();
   const query = new URLSearchParams(location.search);
-  const mode = query.get("mode") || "2v2";
+  const navState = (location.state as DraftInit) || null;
+
+  const stored: DraftInit | null = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("zzzDraftInit") || "null");
+    } catch {
+      return null;
+    }
+  })();
+
+  const seed = navState ?? stored ?? {};
+
+  const mode = seed.mode || (query.get("mode") as "2v2" | "3v3") || "2v2";
   const is3v3 = mode === "3v3";
+
+  // Raw team strings (can be "A|B" or "A|B|C")
+  const team1Raw = seed.team1 || query.get("team1") || "Blue Team";
+  const team2Raw = seed.team2 || query.get("team2") || "Red Team";
+
+  useEffect(() => {
+    if (location.search) {
+      // Replace the URL with a clean path and keep data in state
+      navigate(location.pathname, {
+        replace: true,
+        state: { team1: team1Raw, team2: team2Raw, mode },
+      });
+    }
+  }, [location.pathname, location.search, team1Raw, team2Raw, mode, navigate]);
+
+  const { user } = useAuth(); // truthy if logged in
+  const [spectatorKey, setSpectatorKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const k = sessionStorage.getItem("zzzSpectatorKey");
+    if (k) setSpectatorKey(k);
+  }, []);
+
   const COST_LIMIT = is3v3 ? 9 : 6;
 
   const draftSequence: string[] = is3v3
@@ -149,6 +189,63 @@ export default function ZzzDraftPage() {
         "R",
       ];
 
+  const collectSpectatorState = () => ({
+    draftSequence,
+    currentTurn,
+    picks: draftPicks.map((p) =>
+      p
+        ? {
+            characterCode: p.character.code,
+            eidolon: p.eidolon,
+            wengineId: p.wengine?.id ?? null,
+            superimpose: p.superimpose,
+          }
+        : null
+    ),
+    blueScores,
+    redScores,
+  });
+
+  const [creating, setCreating] = useState(false);
+
+  const generateSpectatorSession = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const payload = {
+        team1: team1Raw,
+        team2: team2Raw,
+        mode,
+        state: collectSpectatorState(),
+      };
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/zzz/sessions`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to create session");
+      const data = await res.json(); // { key, url }
+      setSpectatorKey(data.key);
+      sessionStorage.setItem("zzzSpectatorKey", data.key);
+      await navigator.clipboard.writeText(data.url);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user && spectatorKey) {
+      sessionStorage.removeItem("zzzSpectatorKey");
+      setSpectatorKey(null);
+    }
+  }, [user]);
+
   const [characters, setCharacters] = useState<Character[]>([]);
   const [wengines, setWengines] = useState<WEngine[]>([]);
   const [draftPicks, setDraftPicks] = useState<(DraftPick | null)[]>(
@@ -166,25 +263,25 @@ export default function ZzzDraftPage() {
   const [wengineSearch, setWengineSearch] = useState("");
   const [keyboardSearch, setKeyboardSearch] = useState("");
 
+  const [scoresFinalized, setScoresFinalized] = useState(false);
+
   const eidolonRefs = useRef<(HTMLDivElement | null)[]>([]);
   const superimposeRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const draftComplete = currentTurn >= draftSequence.length;
-
-  // Raw team strings (can be "A|B" or "A|B|C")
-  const team1Raw = query.get("team1") || "Blue Team";
-  const team2Raw = query.get("team2") || "Red Team";
+  const isComplete = draftComplete && scoresFinalized;
 
   // Player labels extracted from pipes for scoreboard
   const nPlayers = is3v3 ? 3 : 2;
-  const rawTeam1List = (query.get("team1") || "")
+  const rawTeam1List = (team1Raw || "")
     .split("|")
     .map((s) => s.trim())
     .filter(Boolean);
-  const rawTeam2List = (query.get("team2") || "")
+  const rawTeam2List = (team2Raw || "")
     .split("|")
     .map((s) => s.trim())
     .filter(Boolean);
+
   const blueLabels = buildNameLabels(rawTeam1List, nPlayers);
   const redLabels = buildNameLabels(rawTeam2List, nPlayers);
 
@@ -204,6 +301,12 @@ export default function ZzzDraftPage() {
   const [redScores, setRedScores] = useState<number[]>(
     is3v3 ? [0, 0, 0] : [0, 0]
   );
+
+  // If scores change after being finalized, un-finalize to prevent accidental stale finalization
+  useEffect(() => {
+    setScoresFinalized(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(blueScores), JSON.stringify(redScores)]);
 
   // Keep score arrays in sync if mode toggles
   useEffect(() => {
@@ -229,6 +332,72 @@ export default function ZzzDraftPage() {
         : null
     )
     .filter(Boolean) as string[];
+
+  const lastPayloadRef = useRef<string>("");
+
+  useEffect(() => {
+    if (!user || !spectatorKey) return;
+
+    const payload = JSON.stringify({
+      state: collectSpectatorState(),
+      isComplete: isComplete || undefined,
+    });
+
+    if (payload === lastPayloadRef.current) return; // nothing changed
+    lastPayloadRef.current = payload;
+
+    const ctrl = new AbortController();
+
+    (async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`,
+          {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+            signal: ctrl.signal,
+          }
+        );
+        if (res.status === 401 || res.status === 404) {
+          sessionStorage.removeItem("zzzSpectatorKey");
+          setSpectatorKey(null);
+        }
+      } catch (e) {
+        // swallow; we’ll try again on next real change
+        console.warn("spectator PUT failed", e);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [
+    user,
+    spectatorKey,
+    isComplete,
+    draftComplete,
+    draftPicks,
+    blueScores,
+    redScores,
+    currentTurn,
+  ]);
+
+  // --- add a light keepalive so last_activity_at updates even if idle ---
+  useEffect(() => {
+    if (!user || !spectatorKey) return;
+    const id = setInterval(() => {
+      fetch(
+        `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ state: collectSpectatorState() }),
+        }
+      ).catch(() => {});
+    }, 25_000);
+    return () => clearInterval(id);
+  }, [user, spectatorKey]);
 
   /* Row refs + scales (hooks must be outside maps) */
   const blueRowRef = useRef<HTMLDivElement>(null);
@@ -684,7 +853,6 @@ export default function ZzzDraftPage() {
                                       {name}
                                     </div>
 
-                                    {/* NEW: fixed 3-zone row (left: M, center: COST, right: P) */}
                                     {!bannedSlot && (
                                       <div className="chip-row">
                                         {/* Left: Mindscape */}
@@ -702,7 +870,6 @@ export default function ZzzDraftPage() {
                                           M{draftPicks[i]!.eidolon}
                                         </span>
 
-                                        {/* Center: Cost (always centered) */}
                                         <span
                                           className="chip cost chip-center"
                                           title={`Agent ${c.agentCost} + W-Eng ${c.weCost}`}
@@ -710,7 +877,6 @@ export default function ZzzDraftPage() {
                                           {c.total}
                                         </span>
 
-                                        {/* Right: Phase (only if there is a W-Engine) */}
                                         {hasWengine ? (
                                           <span
                                             className="chip clickable chip-right"
@@ -726,7 +892,6 @@ export default function ZzzDraftPage() {
                                             P{draftPicks[i]!.superimpose}
                                           </span>
                                         ) : (
-                                          // empty cell preserves center alignment and spacing
                                           <span
                                             className="chip-spacer"
                                             aria-hidden="true"
@@ -776,6 +941,27 @@ export default function ZzzDraftPage() {
           >
             ⟲ Undo
           </button>
+          {user &&
+            (spectatorKey ? (
+              <button
+                className="btn back-button-glass"
+                onClick={() => {
+                  const url = `${window.location.origin}/zzz/s/${spectatorKey}`;
+                  navigator.clipboard.writeText(url);
+                }}
+              >
+                Copy Spectator Link
+              </button>
+            ) : (
+              <button
+                className="btn back-button-glass"
+                onClick={generateSpectatorSession}
+                disabled={creating}
+                title="Create a read-only link for spectators"
+              >
+                {creating ? "Generating..." : "Generate Spectator Link"}
+              </button>
+            ))}
         </div>
 
         {/* Character Grid */}
@@ -877,124 +1063,142 @@ export default function ZzzDraftPage() {
 
         {/* Post-draft scoring */}
         {draftComplete && (
-          <div
-            className="score-row d-flex flex-column flex-md-row gap-3 px-2 mt-4"
-            style={{ maxWidth: 1000, margin: "0 auto" }}
-          >
-            {(["B", "R"] as const).map((side) => {
-              const isBlue = side === "B";
-              const scores = isBlue ? blueScores : redScores;
-              const setScores = isBlue ? setBlueScores : setRedScores;
-              const label = isBlue ? (
-                <span style={{ color: "#3388ff", fontWeight: 700 }}>
-                  Blue Team
-                </span>
-              ) : (
-                <span style={{ color: "#cc3333", fontWeight: 700 }}>
-                  Red Team
-                </span>
-              );
-              const nameLabels = isBlue ? blueLabels : redLabels;
+          <>
+            <div
+              className="score-row d-flex flex-column flex-md-row gap-3 px-2 mt-4"
+              style={{ maxWidth: 1000, margin: "0 auto" }}
+            >
+              {(["B", "R"] as const).map((side) => {
+                const isBlue = side === "B";
+                const scores = isBlue ? blueScores : redScores;
+                const setScores = isBlue ? setBlueScores : setRedScores;
+                const label = isBlue ? (
+                  <span style={{ color: "#3388ff", fontWeight: 700 }}>
+                    Blue Team
+                  </span>
+                ) : (
+                  <span style={{ color: "#cc3333", fontWeight: 700 }}>
+                    Red Team
+                  </span>
+                );
+                const nameLabels = isBlue ? blueLabels : redLabels;
 
-              const { total, penaltyPoints } = getTeamCost(side);
-              const adjustedTotal =
-                scores.reduce((a, b) => a + b, 0) - penaltyPoints;
+                const { total, penaltyPoints } = getTeamCost(side);
+                const adjustedTotal =
+                  scores.reduce((a, b) => a + b, 0) - penaltyPoints;
 
-              return (
-                <div
-                  key={side}
-                  className={`score-card ${isBlue ? "blue" : "red"} w-100`}
-                >
-                  <div className="score-header">
-                    <div className="score-title">{label}</div>
-                    <div
-                      className={`score-draft ${
-                        total > COST_LIMIT ? "over" : ""
-                      }`}
-                    >
-                      Cost: {total} / {COST_LIMIT}
+                return (
+                  <div
+                    key={side}
+                    className={`score-card ${isBlue ? "blue" : "red"} w-100`}
+                  >
+                    <div className="score-header">
+                      <div className="score-title">{label}</div>
+                      <div
+                        className={`score-draft ${
+                          total > COST_LIMIT ? "over" : ""
+                        }`}
+                      >
+                        Cost: {total} / {COST_LIMIT}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="score-inputs">
-                    {(is3v3 ? [0, 1, 2] : [0, 1]).map((i) => (
-                      <div className="score-input-group" key={i}>
-                        <label>{nameLabels[i] || `Player ${i + 1}`}</label>
-                        <input
-                          type="number"
-                          className="form-control score-input"
-                          placeholder="0"
-                          inputMode="numeric"
-                          min={SCORE_MIN}
-                          max={SCORE_MAX}
-                          value={scores[i] === 0 ? "" : String(scores[i])}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            const updated = [...scores];
-                            if (v === "") {
-                              updated[i] = 0;
-                            } else {
-                              const n = parseInt(v, 10) || 0;
+                    <div className="score-inputs">
+                      {(is3v3 ? [0, 1, 2] : [0, 1]).map((i) => (
+                        <div className="score-input-group" key={i}>
+                          <label>{nameLabels[i] || `Player ${i + 1}`}</label>
+                          <input
+                            type="number"
+                            className="form-control score-input"
+                            placeholder="0"
+                            inputMode="numeric"
+                            min={SCORE_MIN}
+                            max={SCORE_MAX}
+                            value={scores[i] === 0 ? "" : String(scores[i])}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const updated = [...scores];
+                              if (v === "") {
+                                updated[i] = 0;
+                              } else {
+                                const n = parseInt(v, 10) || 0;
+                                updated[i] = Math.max(
+                                  SCORE_MIN,
+                                  Math.min(SCORE_MAX, n)
+                                );
+                              }
+                              setScores(updated);
+                            }}
+                            onBlur={() => {
+                              const updated = [...scores];
                               updated[i] = Math.max(
                                 SCORE_MIN,
-                                Math.min(SCORE_MAX, n)
+                                Math.min(SCORE_MAX, updated[i] || 0)
                               );
-                            }
-                            setScores(updated);
-                          }}
-                          onBlur={() => {
-                            const updated = [...scores];
-                            updated[i] = Math.max(
-                              SCORE_MIN,
-                              Math.min(SCORE_MAX, updated[i] || 0)
-                            );
-                            setScores(updated);
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                              setScores(updated);
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
 
-                  <div className="score-total">
-                    <div className="score-total-label">Team Total</div>
-                    <div className="score-total-value">
-                      {scores.reduce((a, b) => a + b, 0)}
-                      {penaltyPoints > 0 && (
-                        <span className="score-penalty">
-                          −{penaltyPoints} ={" "}
-                          <span className="score-adjusted">
-                            {adjustedTotal}
+                    <div className="score-total">
+                      <div className="score-total-label">Team Total</div>
+                      <div className="score-total-value">
+                        {scores.reduce((a, b) => a + b, 0)}
+                        {penaltyPoints > 0 && (
+                          <span className="score-penalty">
+                            −{penaltyPoints} ={" "}
+                            <span className="score-adjusted">
+                              {adjustedTotal}
+                            </span>
                           </span>
-                        </span>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
 
-        {draftComplete && (
-          <div className="text-center mt-4 text-white">
-            {(() => {
-              const blueTotal =
-                blueScores.reduce((a, b) => a + b, 0) -
-                getTeamCost("B").penaltyPoints;
-              const redTotal =
-                redScores.reduce((a, b) => a + b, 0) -
-                getTeamCost("R").penaltyPoints;
-              if (blueTotal > redTotal)
-                return (
-                  <h4 style={{ color: "#3388ff" }}>🏆 {team1Name} Wins!</h4>
-                );
-              if (redTotal > blueTotal)
-                return (
-                  <h4 style={{ color: "#cc3333" }}>🏆 {team2Name} Wins!</h4>
-                );
-              return <h4 className="text-warning">Draw!</h4>;
-            })()}
-          </div>
+            {/* Finalize / Complete control */}
+            <div className="text-center mt-3">
+              <button
+                className="btn back-button-glass"
+                onClick={() => setScoresFinalized((v) => !v)}
+                title={
+                  scoresFinalized
+                    ? "Unmark to continue editing scores"
+                    : "Marks this match as complete"
+                }
+              >
+                {scoresFinalized
+                  ? "✓ Match Marked Complete"
+                  : "Mark Match Complete"}
+              </button>
+            </div>
+
+            {/* Winner banner */}
+            <div className="text-center mt-4 text-white">
+              {(() => {
+                const blueTotal =
+                  blueScores.reduce((a, b) => a + b, 0) -
+                  getTeamCost("B").penaltyPoints;
+                const redTotal =
+                  redScores.reduce((a, b) => a + b, 0) -
+                  getTeamCost("R").penaltyPoints;
+                if (blueTotal > redTotal)
+                  return (
+                    <h4 style={{ color: "#3388ff" }}>🏆 {team1Name} Wins!</h4>
+                  );
+                if (redTotal > blueTotal)
+                  return (
+                    <h4 style={{ color: "#cc3333" }}>🏆 {team2Name} Wins!</h4>
+                  );
+                return <h4 className="text-warning">Draw!</h4>;
+              })()}
+            </div>
+          </>
         )}
 
         {/* W-Engine Modal */}
