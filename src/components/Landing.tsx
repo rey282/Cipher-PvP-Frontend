@@ -249,7 +249,6 @@ export default function Landing() {
     }
   }, [showDraftModal]);
 
-
   // Background crossfade
   useEffect(() => {
     if (!bgFading) return;
@@ -271,6 +270,66 @@ export default function Landing() {
     setLeaving(true);
     setTimeout(() => navigate(url), 500);
   };
+
+  // Match History modal state
+  const [showMatchesModal, setShowMatchesModal] = useState(false);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [liveDrafts, setLiveDrafts] = useState<any[]>([]);
+  const [recentMatches, setRecentMatches] = useState<any[]>([]);
+
+  const fetchMatches = async () => {
+    setLoadingMatches(true);
+    try {
+      const [liveRes, recentRes] = await Promise.all([
+        fetch(
+          `${
+            import.meta.env.VITE_API_BASE
+          }/api/zzz/matches/live?limit=8&minutes=2`,
+          { credentials: "include" }
+        ),
+        fetch(
+          `${import.meta.env.VITE_API_BASE}/api/zzz/matches/recent?limit=20`,
+          { credentials: "include" }
+        ),
+      ]);
+      const liveJson = liveRes.ok ? await liveRes.json() : { data: [] };
+      const recentJson = recentRes.ok ? await recentRes.json() : { data: [] };
+      setLiveDrafts(Array.isArray(liveJson.data) ? liveJson.data : []);
+      setRecentMatches(Array.isArray(recentJson.data) ? recentJson.data : []);
+    } catch {
+      setLiveDrafts([]);
+      setRecentMatches([]);
+    } finally {
+      setLoadingMatches(false);
+    }
+  };
+
+  const openMatches = () => {
+    setShowMatchesModal(true);
+    fetchMatches();
+  };
+
+  // optional: quick helper
+  const goSpectator = (key: string) => {
+    setLeaving(true);
+    setTimeout(() => navigate(`/zzz/s/${key}`), 250);
+  };
+
+  const fmtWhen = (ts?: string) => {
+    if (!ts) return "";
+    try {
+      return new Date(ts).toLocaleString();
+    } catch {
+      return "";
+    }
+  };
+
+  useEffect(() => {
+    if (!showMatchesModal) return;
+    const id = setInterval(fetchMatches, 25000);
+    return () => clearInterval(id);
+  }, [showMatchesModal]);
+
 
   // Cached fetch of team avatars
   const fetchProfiles = async (
@@ -359,7 +418,6 @@ export default function Landing() {
     setRandomizeLocked(true);
   };
 
-
   const handleStart = () => {
     const anyName = [...team1Names, ...team2Names].some((n) => n.trim() !== "");
     if (!anyName) {
@@ -395,7 +453,6 @@ export default function Landing() {
     // navigate with state so the URL stays /zzz/draft
     navigate("/zzz/draft", { state: { ...payload, draftId } });
   };
-
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -604,6 +661,100 @@ export default function Landing() {
           </Modal.Footer>
         </Modal>
 
+        {/* ───────────────── Match History Modal ───────────────── */}
+        <Modal
+          show={showMatchesModal}
+          onHide={() => setShowMatchesModal(false)}
+          centered
+          contentClassName="custom-dark-modal"
+          size="lg"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Match History</Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body>
+            {loadingMatches ? (
+              <div className="text-center py-4 text-white-50">Loading…</div>
+            ) : (
+              <>
+                {/* Live section */}
+                {liveDrafts.length > 0 && (
+                  <>
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <div className="fw-semibold">Live Now</div>
+                      <span className="badge bg-danger">LIVE</span>
+                    </div>
+                    <div className="list-group mb-3">
+                      {liveDrafts.map((m) => (
+                        <button
+                          key={`live-${m.key}`}
+                          className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                          onClick={() => goSpectator(m.key)}
+                          style={{ cursor: "pointer" }}
+                        >
+                          <div>
+                            <div className="fw-semibold">
+                              {m.team1}{" "}
+                              <span className="text-white-50">vs</span>{" "}
+                              {m.team2}
+                            </div>
+                            <div className="small text-white-50">
+                              Mode: {m.mode?.toUpperCase?.() || m.mode} • Last
+                              activity: {fmtWhen(m.lastActivityAt)}
+                            </div>
+                          </div>
+                          <span className="badge bg-danger">LIVE</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Completed section */}
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                  <div className="fw-semibold">Completed</div>
+                </div>
+                {recentMatches.length === 0 ? (
+                  <div className="text-white-50">No completed matches yet.</div>
+                ) : (
+                  <div className="list-group">
+                    {recentMatches.map((m) => (
+                      <button
+                        key={`done-${m.key}`}
+                        className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        onClick={() => goSpectator(m.key)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <div>
+                          <div className="fw-semibold">
+                            {m.team1} <span className="text-white-50">vs</span>{" "}
+                            {m.team2}
+                          </div>
+                          <div className="small text-white-50">
+                            Mode: {m.mode?.toUpperCase?.() || m.mode} •
+                            Completed: {fmtWhen(m.completedAt)}
+                          </div>
+                        </div>
+                        <span className="badge bg-success">Done</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </Modal.Body>
+
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowMatchesModal(false)}
+            >
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
         {/* ───── Hero Section ───── */}
         <div className="flex-grow-1 d-flex flex-column justify-content-center align-items-center text-center">
           <div className="hero animate__animated animate__fadeInDown text-white">
@@ -673,6 +824,17 @@ export default function Landing() {
                     onClick={() => setShowDraftModal(true)}
                   >
                     Start Now
+                  </button>
+                  <button
+                    className="btn btn-info-circle"
+                    title="Match History"
+                    onClick={openMatches}
+                    style={{
+                      fontSize: "1.2rem",
+                      zIndex: 5,
+                    }}
+                  >
+                    📖
                   </button>
                   <button
                     className="btn btn-info-circle"

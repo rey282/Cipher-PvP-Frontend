@@ -984,6 +984,51 @@ body,
   overflow: auto;
 }
 
+/* FORCE dark list items inside Match History modal */
+.custom-dark-modal .list-group {
+  background: transparent !important;
+}
+
+.custom-dark-modal .list-group-item {
+  background-color: #0f0f12 !important;
+  /* hard dark */
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.custom-dark-modal .list-group-item.list-group-item-action:hover,
+.custom-dark-modal .list-group-item.list-group-item-action:focus {
+  background-color: #17171c !important;
+  /* hover */
+  color: #ffffff !important;
+}
+
+.custom-dark-modal .list-group-item.list-group-item-action:active {
+  background-color: #1f1f26 !important;
+  /* active/pressed */
+  color: #ffffff !important;
+}
+
+/* If your items are <button> tags, make sure they don't pull default btn styles */
+.custom-dark-modal button.list-group-item {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Optional: round it a bit so it matches your other modals */
+.custom-dark-modal .list-group-item {
+  border-radius: 12px !important;
+}
+
+/* Keep badges readable on dark */
+.custom-dark-modal .badge.bg-danger {
+  background-color: #dc3545 !important;
+}
+
+.custom-dark-modal .badge.bg-success {
+  background-color: #198754 !important;
+}
+
 /* Link color */
 .rules-link {
   color: #57a6ff;
@@ -1873,4 +1918,214 @@ input[type="range"].big-slider {
 
 .draft-card.ct .chip-row.four .chip {
   justify-self: center;
+}
+
+/* === CostTestPage: responsive 4-in-1-row on phones === */
+:root {
+  --ct-gap: 10px;
+}
+
+/* Desktop/default: horizontal row that can scroll */
+.ct-team-slots {
+  display: flex;
+  gap: var(--ct-gap);
+  overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.ct-slot {
+  flex: 0 0 auto;
+  width: 170px;
+}
+
+.ct-card {
+  position: relative;
+  width: 100%;
+  height: 270px;
+  border-radius: 12px;
+  overflow: hidden;
+  /* clean edges for overlays */
+}
+
+/* LC badge overlay (shows over the image, above info-bar) */
+.ct-engine {
+  position: absolute;
+  right: 8px;
+  bottom: 76px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  z-index: 3;
+}
+
+/* Bottom info bar tweaks */
+.ct-info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px 8px 10px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ct-card .char-name {
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Center the E | E COST | LC COST | S pills in a tight grid */
+.ct-card .chip-row.four {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  align-items: center;
+  justify-items: center;
+}
+
+.ct-card .chip,
+.ct-card .chip.cost {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+}
+
+.ct-card .chip-spacer {
+  height: 22px;
+  display: block;
+}
+
+/* Sliders: fill the card width and sit above the info bar */
+.ct-slider-panel {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 68px;
+  z-index: 4;
+  background: rgba(0, 0, 0, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.ct-slider-panel .slider-label {
+  font-size: 0.78rem;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+.big-slider {
+  width: 100%;
+}
+
+/* ====== Phone (≤576px): 4 cards in ONE row ====== */
+@media (max-width: 576px) {
+  :root {
+    --ct-gap: 6px;
+  }
+
+  /* Switch to a 4-column grid, remove horizontal scroll */
+  .ct-team-slots {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--ct-gap);
+    overflow: visible;
+  }
+
+  .ct-slot {
+    width: auto;
+  }
+
+  /* Slightly smaller cards */
+  .ct-card {
+    height: 208px;
+  }
+
+  /* Smaller LC badge, keep clear of the info bar */
+  .ct-engine,
+  .engine-badge {
+    /* keep compatibility if old class remains */
+    width: 28px;
+    height: 28px;
+    bottom: 56px;
+    right: 6px;
+  }
+
+  .ct-info {
+    padding: 6px 6px 8px;
+  }
+
+  .ct-card .char-name {
+    font-size: 12px;
+  }
+
+  .ct-card .chip,
+  .ct-card .chip.cost {
+    font-size: 11px;
+    padding: 1px 4px;
+    min-height: 20px;
+  }
+
+  /* Sliders fit within the smaller card */
+  .ct-slider-panel {
+    left: 6px;
+    right: 6px;
+    bottom: 58px;
+  }
+}
+/* --- CostTestPage: FORCE Light Cone badge to show on phones (top-right) --- */
+@media (max-width: 576px) {
+
+  /* Make sure the card is a positioning context */
+  .draft-card.ct {
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Some older rules hide or resize this on mobile — override them hard */
+  .draft-card.ct .engine-badge,
+  .draft-card.ct .ct-engine {
+    position: absolute !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    /* Top-right placement for phones */
+    top: 6px !important;
+    right: 6px !important;
+    bottom: auto !important;
+
+    width: 26px !important;
+    height: 26px !important;
+    z-index: 6 !important;
+
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    pointer-events: auto;
+  }
+
+  /* Ensure the image/info bar don't cover it */
+  .draft-card.ct .draft-img {
+    position: relative;
+    z-index: 1;
+  }
+
+  .draft-card.ct .info-bar {
+    position: absolute;
+    z-index: 2;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
 }

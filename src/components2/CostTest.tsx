@@ -882,18 +882,7 @@ export default function CostTestPage() {
             </div>
 
             {/* Team slots */}
-            <div
-              ref={slotsRef}
-              style={{
-                display: "flex",
-                gap: "10px",
-                overflowX: "auto",
-                overflowY: "hidden",
-                width: "100%",
-                WebkitOverflowScrolling: "touch",
-                paddingBottom: 4,
-              }}
-            >
+            <div ref={slotsRef} className="ct-team-slots">
               {team.map((member, index) => {
                 const char = member.characterInfo;
                 const cone = member.lightConeData;
@@ -902,21 +891,16 @@ export default function CostTestPage() {
                 const sCery = cone ? cerydraConeCost(member) : 0; // LC COST
 
                 return (
-                  <div key={index} style={{ flex: "0 0 auto", width: 170 }}>
+                  <div key={index} className="ct-slot">
                     {/* Card */}
                     <div
-                      className="draft-card ct"
+                      className="draft-card ct ct-card"
                       onClick={() => char && openConeModal(index)}
-                      style={{
-                        width: "100%",
-                        height: 270,
-                        position: "relative",
-                        cursor: char ? "pointer" : "default",
-                      }}
+                      style={{ cursor: char ? "pointer" : "default" }}
                     >
                       {char ? (
                         <>
-                          {/* Fixed image height so it never moves when LC is equipped */}
+                          {/* Full image area */}
                           <img
                             src={char.image_url}
                             alt={char.name}
@@ -940,7 +924,7 @@ export default function CostTestPage() {
                               src={cone.imageUrl}
                               alt={cone.name}
                               title={cone.name}
-                              className="engine-badge"
+                              className="engine-badge ct-engine"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openConeModal(index);
@@ -952,7 +936,7 @@ export default function CostTestPage() {
                           {eidolonOpenIndex === index && (
                             <div
                               ref={eidolonRef}
-                              className="slider-panel"
+                              className="slider-panel ct-slider-panel"
                               onClick={(e) => e.stopPropagation()}
                               onMouseDown={(e) => e.stopPropagation()}
                             >
@@ -990,12 +974,13 @@ export default function CostTestPage() {
                           {superOpenIndex === index && (
                             <div
                               ref={superRef}
-                              className="slider-panel"
-                              style={{ bottom: 70 }} 
+                              className="slider-panel ct-slider-panel"
                               onClick={(e) => e.stopPropagation()}
                               onMouseDown={(e) => e.stopPropagation()}
                             >
-                              <div className="slider-label">Superimposition</div>
+                              <div className="slider-label">
+                                Superimposition
+                              </div>
                               <input
                                 type="range"
                                 min={1}
@@ -1030,10 +1015,9 @@ export default function CostTestPage() {
 
                           {/* Bottom info bar */}
                           <div
-                            className="info-bar"
+                            className="info-bar ct-info"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {/* centered name */}
                             <div
                               className="char-name"
                               title={char.name}
@@ -1042,9 +1026,9 @@ export default function CostTestPage() {
                               {char.name}
                             </div>
 
-                            {/* 4 pills: E | E COST | LC COST | S */}
+                            {/* Centered 4 pills: E | E COST | LC COST | S */}
                             <div className="chip-row four">
-                              {/* E (opens Eidolon slider) */}
+                              {/* E (open Eidolon) */}
                               <span
                                 className="chip clickable"
                                 title="Set Eidolon"
@@ -1059,18 +1043,18 @@ export default function CostTestPage() {
                                 E{member.eidolon}
                               </span>
 
-                              {/* E COST (character cost only) */}
+                              {/* E COST */}
                               <span
-                                className="chip cost chip-center"
+                                className="chip cost"
                                 title="Character cost"
                               >
                                 {formatCost(eCery)}
                               </span>
 
-                              {/* LC COST (number only; blank spacer if no cone) */}
+                              {/* LC COST (spacer if no cone) */}
                               {cone ? (
                                 <span
-                                  className="chip cost chip-center"
+                                  className="chip cost"
                                   title="Light Cone cost"
                                 >
                                   {formatCost(sCery)}
@@ -1082,7 +1066,7 @@ export default function CostTestPage() {
                                 />
                               )}
 
-                              {/* S (opens Superimpose slider; spacer if no cone) */}
+                              {/* S (open Superimpose; spacer if no cone) */}
                               {cone ? (
                                 <span
                                   className="chip clickable"
@@ -1107,7 +1091,6 @@ export default function CostTestPage() {
                           </div>
                         </>
                       ) : (
-                        // Empty slot, no '#'
                         <div className="d-flex w-100 h-100 align-items-center justify-content-center" />
                       )}
                     </div>

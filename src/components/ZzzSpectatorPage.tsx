@@ -52,6 +52,7 @@ const CARD_H = 240; // px
 const CARD_GAP = 12; // px
 const CARD_MIN_SCALE = 0.68; // same minimum scale
 
+/* ───────────── Responsive row sizing (robust) ───────────── */
 function useRowScale<T extends HTMLElement>(
   ref: React.MutableRefObject<T | null>,
   cardCount: number
@@ -63,19 +64,30 @@ function useRowScale<T extends HTMLElement>(
     if (!el) return;
 
     const compute = () => {
-      const available = el.clientWidth;
-      const needed = cardCount * CARD_W + (cardCount - 1) * CARD_GAP;
-      const s = Math.min(
-        1,
-        Math.max(CARD_MIN_SCALE, needed ? available / needed : 1)
-      );
+      const available = el.clientWidth || 0;
+
+      // ✅ Until we know how many cards we need, render at base size.
+      if (!Number.isFinite(cardCount) || cardCount <= 0) {
+        setScale(1);
+        return;
+      }
+
+      // For 1 card there is no inter-card gap.
+      const gaps = Math.max(0, cardCount - 1);
+      const needed =
+        cardCount * CARD_W + gaps * CARD_GAP; // always ≥ CARD_W for cardCount ≥ 1
+
+      // Clamp between [CARD_MIN_SCALE, 1]
+      const s = Math.min(1, Math.max(CARD_MIN_SCALE, needed ? available / needed : 1));
       setScale(s);
     };
 
+    // run now + on resize
     compute();
-    const ro = new ResizeObserver(() => compute());
+    const ro = new ResizeObserver(compute);
     ro.observe(el);
     window.addEventListener("resize", compute);
+
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", compute);
@@ -84,6 +96,7 @@ function useRowScale<T extends HTMLElement>(
 
   return scale;
 }
+
 
 /* ───────────── Cost rules (match ZzzDraft) ───────────── */
 function calcAgentCost(agent: Character, mindscape: number): number {

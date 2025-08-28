@@ -36,57 +36,49 @@ const SCORE_MIN = 0;
 const SCORE_MAX = 65000;
 
 /* ───────────── Responsive row sizing ───────────── */
-// Base card metrics (match your CSS defaults)
-const CARD_W = 170; // px
-const CARD_H = 240; // px
-const CARD_GAP = 12; // px
-const CARD_MIN_SCALE = 0.68; // smallest we allow cards to get
+const CARD_W = 170;
+const CARD_H = 240;
+const CARD_GAP = 12;
+const CARD_MIN_SCALE = 0.68;
+
+const CREATE_LOCK_KEY = "zzzSpectatorCreateLock";
 
 function useRowScale<T extends HTMLElement>(
   ref: React.MutableRefObject<T | null>,
   cardCount: number
 ) {
   const [scale, setScale] = useState<number>(1);
-
   useEffect(() => {
     if (!ref.current) return;
     const el = ref.current;
-
     const compute = () => {
       const available = el.clientWidth;
       const needed = cardCount * CARD_W + (cardCount - 1) * CARD_GAP;
       const s = Math.min(1, Math.max(CARD_MIN_SCALE, available / needed));
       setScale(s);
     };
-
     compute();
-
     const ro = new ResizeObserver(() => compute());
     ro.observe(el);
     window.addEventListener("resize", compute);
-
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", compute);
     };
   }, [ref, cardCount]);
-
   return scale;
 }
 
 /* ───────────── Cost Rules Helpers ───────────── */
 function calcAgentCost(agent: Character, mindscape: number): number {
   const ms = Math.max(0, Math.min(6, mindscape));
-  if (agent.rarity === 4) return 0.5; // All A Rank agents: 0.5 flat
-
+  if (agent.rarity === 4) return 0.5;
   if (agent.rarity === 5) {
     if (agent.limited) {
-      // Limited S Rank agent: +0.5 at M1, M2, M4, M6 (M3 & M5 skipped)
       const bumpMilestones = [1, 2, 4, 6];
       const bumps = bumpMilestones.filter((m) => ms >= m).length;
       return 1 + 0.5 * bumps;
     } else {
-      // Standard S Rank agent: 1.0 base, 1.5 at M6
       return ms >= 6 ? 1.5 : 1;
     }
   }
@@ -96,13 +88,13 @@ function calcAgentCost(agent: Character, mindscape: number): number {
 function calcWEngineCost(we: WEngine | undefined, refine: number): number {
   if (!we) return 0;
   const r = Math.max(0, Math.min(5, refine));
-  if (we.rarity <= 4) return 0; // A & B Rank: 0 cost
-  if (we.limited) return r >= 3 ? 0.5 : 0.25; // Limited S
-  return r >= 3 ? 0.25 : 0; // Standard S
+  if (we.rarity <= 4) return 0;
+  if (we.limited) return r >= 3 ? 0.5 : 0.25;
+  return r >= 3 ? 0.25 : 0;
 }
 
 /* ───────────── Penalty ───────────── */
-const PENALTY_PER_POINT = 2500; // per 0.25 above cap
+const PENALTY_PER_POINT = 2500;
 
 export default function ZzzDraftPage() {
   const location = useLocation();
@@ -131,7 +123,6 @@ export default function ZzzDraftPage() {
 
   useEffect(() => {
     if (location.search) {
-      // Replace the URL with a clean path and keep data in state
       navigate(location.pathname, {
         replace: true,
         state: { team1: team1Raw, team2: team2Raw, mode },
@@ -189,63 +180,6 @@ export default function ZzzDraftPage() {
         "R",
       ];
 
-  const collectSpectatorState = () => ({
-    draftSequence,
-    currentTurn,
-    picks: draftPicks.map((p) =>
-      p
-        ? {
-            characterCode: p.character.code,
-            eidolon: p.eidolon,
-            wengineId: p.wengine?.id ?? null,
-            superimpose: p.superimpose,
-          }
-        : null
-    ),
-    blueScores,
-    redScores,
-  });
-
-  const [creating, setCreating] = useState(false);
-
-  const generateSpectatorSession = async () => {
-    if (creating) return;
-    setCreating(true);
-    try {
-      const payload = {
-        team1: team1Raw,
-        team2: team2Raw,
-        mode,
-        state: collectSpectatorState(),
-      };
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE}/api/zzz/sessions`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
-      if (!res.ok) throw new Error("Failed to create session");
-      const data = await res.json(); // { key, url }
-      setSpectatorKey(data.key);
-      sessionStorage.setItem("zzzSpectatorKey", data.key);
-      await navigator.clipboard.writeText(data.url);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!user && spectatorKey) {
-      sessionStorage.removeItem("zzzSpectatorKey");
-      setSpectatorKey(null);
-    }
-  }, [user]);
-
   const [characters, setCharacters] = useState<Character[]>([]);
   const [wengines, setWengines] = useState<WEngine[]>([]);
   const [draftPicks, setDraftPicks] = useState<(DraftPick | null)[]>(
@@ -263,15 +197,16 @@ export default function ZzzDraftPage() {
   const [wengineSearch, setWengineSearch] = useState("");
   const [keyboardSearch, setKeyboardSearch] = useState("");
 
-  const [scoresFinalized, setScoresFinalized] = useState(false);
-
-  const eidolonRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const superimposeRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [blueScores, setBlueScores] = useState<number[]>(
+    is3v3 ? [0, 0, 0] : [0, 0]
+  );
+  const [redScores, setRedScores] = useState<number[]>(
+    is3v3 ? [0, 0, 0] : [0, 0]
+  );
 
   const draftComplete = currentTurn >= draftSequence.length;
-  const isComplete = draftComplete && scoresFinalized;
 
-  // Player labels extracted from pipes for scoreboard
+  // Player labels
   const nPlayers = is3v3 ? 3 : 2;
   const rawTeam1List = (team1Raw || "")
     .split("|")
@@ -281,50 +216,113 @@ export default function ZzzDraftPage() {
     .split("|")
     .map((s) => s.trim())
     .filter(Boolean);
-
-  const blueLabels = buildNameLabels(rawTeam1List, nPlayers);
-  const redLabels = buildNameLabels(rawTeam2List, nPlayers);
-
-  const team1Name = team1Raw; // show pipes in the big header as requested
+  const team1Name = team1Raw;
   const team2Name = team2Raw;
 
   function buildNameLabels(rawList: string[], count: number): string[] {
-    const primary = rawList.find(Boolean) || ""; // first non-empty, or empty
+    const primary = rawList.find(Boolean) || "";
     return Array(count)
       .fill("")
       .map((_, i) => rawList[i] || primary);
   }
 
-  const [blueScores, setBlueScores] = useState<number[]>(
-    is3v3 ? [0, 0, 0] : [0, 0]
-  );
-  const [redScores, setRedScores] = useState<number[]>(
-    is3v3 ? [0, 0, 0] : [0, 0]
-  );
+  const blueLabels = buildNameLabels(rawTeam1List, nPlayers);
+  const redLabels = buildNameLabels(rawTeam2List, nPlayers);
 
-  // If scores change after being finalized, un-finalize to prevent accidental stale finalization
+  /* Completion + lock */
+  const allScoresFilled = (arr: number[]) => arr.every((v) => v > 0);
+  const [uiLocked, setUiLocked] = useState(false); // controls read-only UI
+  const canFinalize =
+    draftComplete && allScoresFilled(blueScores) && allScoresFilled(redScores);
+  const isComplete = draftComplete && uiLocked;
+
+  // Build state payload
+  const collectSpectatorState = () => ({
+    draftSequence,
+    currentTurn,
+    picks: draftPicks.map((p) =>
+      p
+        ? {
+            characterCode: p.character.code,
+            eidolon: p.eidolon,
+            wengineId: p.wengine?.id ?? null,
+            superimpose: p.superimpose,
+          }
+        : null
+    ),
+    blueScores,
+    redScores,
+  });
+
+  /* ───────────── Session: auto-create on page load ───────────── */
+  const [creating, setCreating] = useState(false);
+
+  const generateSpectatorSession = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const payload = {
+        team1: team1Name,
+        team2: team2Name,
+        mode,
+        state: collectSpectatorState(),
+      };
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/zzz/sessions`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to create session");
+      const data = await res.json(); // { key, url }
+      setSpectatorKey(data.key);
+      sessionStorage.setItem("zzzSpectatorKey", data.key);
+      // no auto-copy here; button is for manual copy
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   useEffect(() => {
-    setScoresFinalized(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(blueScores), JSON.stringify(redScores)]);
+    if (!user) return;
 
-  // Keep score arrays in sync if mode toggles
+    // if we already have a key in state, done
+    if (spectatorKey) return;
+
+    // hydrate from storage if present (first line of defense)
+    const storedKey = sessionStorage.getItem("zzzSpectatorKey");
+    if (storedKey) {
+      setSpectatorKey(storedKey);
+      return;
+    }
+
+    // StrictMode double-mount / remount guard
+    if (sessionStorage.getItem(CREATE_LOCK_KEY)) return;
+
+    sessionStorage.setItem(CREATE_LOCK_KEY, "1");
+    (async () => {
+      try {
+        await generateSpectatorSession(); // POST creates exactly one session
+      } finally {
+        sessionStorage.removeItem(CREATE_LOCK_KEY);
+      }
+    })();
+  }, [user, spectatorKey]);
+
+  // If user logs out mid-session, clear local key
   useEffect(() => {
-    const len = is3v3 ? 3 : 2;
-    setBlueScores((prev) => {
-      const a = [...prev];
-      a.length = len;
-      for (let i = 0; i < len; i++) a[i] = a[i] || 0;
-      return a;
-    });
-    setRedScores((prev) => {
-      const a = [...prev];
-      a.length = len;
-      for (let i = 0; i < len; i++) a[i] = a[i] || 0;
-      return a;
-    });
-  }, [is3v3]);
+    if (!user && spectatorKey) {
+      sessionStorage.removeItem("zzzSpectatorKey");
+      setSpectatorKey(null);
+    }
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* ───────────── Derived helpers ───────────── */
   const bannedCodes = draftPicks
     .map((pick, i) =>
       draftSequence[i] === "BB" || draftSequence[i] === "RR"
@@ -335,6 +333,7 @@ export default function ZzzDraftPage() {
 
   const lastPayloadRef = useRef<string>("");
 
+  /* ───────────── Autosave PUTs ───────────── */
   useEffect(() => {
     if (!user || !spectatorKey) return;
 
@@ -347,7 +346,6 @@ export default function ZzzDraftPage() {
     lastPayloadRef.current = payload;
 
     const ctrl = new AbortController();
-
     (async () => {
       try {
         const res = await fetch(
@@ -365,11 +363,9 @@ export default function ZzzDraftPage() {
           setSpectatorKey(null);
         }
       } catch (e) {
-        // swallow; we’ll try again on next real change
         console.warn("spectator PUT failed", e);
       }
     })();
-
     return () => ctrl.abort();
   }, [
     user,
@@ -382,7 +378,7 @@ export default function ZzzDraftPage() {
     currentTurn,
   ]);
 
-  // --- add a light keepalive so last_activity_at updates even if idle ---
+  // keepalive so last_activity_at stays fresh
   useEffect(() => {
     if (!user || !spectatorKey) return;
     const id = setInterval(() => {
@@ -392,14 +388,14 @@ export default function ZzzDraftPage() {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ state: collectSpectatorState() }),
+          body: JSON.stringify({}), // <— IMPORTANT: no `state` key here
         }
       ).catch(() => {});
     }, 25_000);
     return () => clearInterval(id);
   }, [user, spectatorKey]);
 
-  /* Row refs + scales (hooks must be outside maps) */
+  /* Row refs + scales */
   const blueRowRef = useRef<HTMLDivElement>(null);
   const redRowRef = useRef<HTMLDivElement>(null);
   const blueCount = draftSequence.filter((s) => s.startsWith("B")).length;
@@ -442,6 +438,9 @@ export default function ZzzDraftPage() {
   }, []);
 
   /* ───────────── Click-outside sliders ───────────── */
+  const eidolonRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const superimposeRefs = useRef<(HTMLDivElement | null)[]>([]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -464,13 +463,13 @@ export default function ZzzDraftPage() {
         setEidolonOpenIndex(null);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [superOpenIndex, eidolonOpenIndex]);
 
   /* ───────────── Draft actions ───────────── */
   const handleCharacterPick = (char: Character) => {
+    if (uiLocked) return;
     if (draftComplete) return;
     const currentStep = draftSequence[currentTurn];
     if (!currentStep) return;
@@ -494,6 +493,7 @@ export default function ZzzDraftPage() {
   };
 
   const handleUndo = () => {
+    if (uiLocked) return;
     if (currentTurn === 0) return;
     const updated = [...draftPicks];
     updated[currentTurn - 1] = null;
@@ -502,6 +502,7 @@ export default function ZzzDraftPage() {
   };
 
   const updateEidolon = (index: number, eidolon: number) => {
+    if (uiLocked) return;
     const updated = [...draftPicks];
     if (updated[index]) {
       updated[index] = { ...updated[index]!, eidolon };
@@ -517,9 +518,8 @@ export default function ZzzDraftPage() {
   };
 
   const openWengineModal = (index: number) => {
-    // guard: don't allow engines on BAN slots
+    if (uiLocked) return;
     if (draftSequence[index] === "BB" || draftSequence[index] === "RR") return;
-
     const currentConeId = draftPicks[index]?.wengine?.id || "";
     setSelectedWengineId(currentConeId);
     setActiveSlotIndex(index);
@@ -527,7 +527,10 @@ export default function ZzzDraftPage() {
   };
 
   const confirmWengine = (index: number) => {
-    // guard: ignore on BAN slots
+    if (uiLocked) {
+      setShowWengineModal(false);
+      return;
+    }
     if (draftSequence[index] === "BB" || draftSequence[index] === "RR") {
       setShowWengineModal(false);
       return;
@@ -553,6 +556,7 @@ export default function ZzzDraftPage() {
   };
 
   const updateSuperimpose = (index: number, superimpose: number) => {
+    if (uiLocked) return;
     const updated = [...draftPicks];
     if (updated[index]) {
       updated[index] = { ...updated[index]!, superimpose };
@@ -674,6 +678,8 @@ export default function ZzzDraftPage() {
                         "--card-w": `${CARD_W}px`,
                         "--card-h": `${CARD_H}px`,
                         "--card-gap": `${CARD_GAP}px`,
+                        pointerEvents: uiLocked ? "none" : "auto",
+                        opacity: uiLocked ? 0.7 : 1,
                       } as React.CSSProperties
                     }
                   >
@@ -690,6 +696,7 @@ export default function ZzzDraftPage() {
                           ].join(" ")}
                           style={{ zIndex: 10 }}
                           onClick={(e) => {
+                            if (uiLocked) return;
                             const isBanSlot = side === "BB" || side === "RR";
                             if (isBanSlot) return;
                             if (
@@ -743,6 +750,7 @@ export default function ZzzDraftPage() {
                                   title={draftPicks[i]!.wengine!.name}
                                   className="engine-badge"
                                   onClick={(e) => {
+                                    if (uiLocked) return;
                                     e.stopPropagation();
                                     openWengineModal(i);
                                   }}
@@ -750,7 +758,7 @@ export default function ZzzDraftPage() {
                               )}
 
                               {/* Mindscape slider */}
-                              {eidolonOpenIndex === i && (
+                              {eidolonOpenIndex === i && !uiLocked && (
                                 <div
                                   className="slider-panel"
                                   ref={(el) => {
@@ -793,7 +801,7 @@ export default function ZzzDraftPage() {
                               )}
 
                               {/* Superimpose slider */}
-                              {superOpenIndex === i && (
+                              {superOpenIndex === i && !uiLocked && (
                                 <div
                                   className="slider-panel"
                                   ref={(el) => {
@@ -855,11 +863,17 @@ export default function ZzzDraftPage() {
 
                                     {!bannedSlot && (
                                       <div className="chip-row">
-                                        {/* Left: Mindscape */}
                                         <span
-                                          className="chip clickable chip-left"
-                                          title="Set Mindscape"
+                                          className={`chip clickable chip-left ${
+                                            uiLocked ? "disabled" : ""
+                                          }`}
+                                          title={
+                                            uiLocked
+                                              ? "Locked"
+                                              : "Set Mindscape"
+                                          }
                                           onClick={(e) => {
+                                            if (uiLocked) return;
                                             e.stopPropagation();
                                             setSuperOpenIndex(null);
                                             setEidolonOpenIndex(
@@ -879,9 +893,14 @@ export default function ZzzDraftPage() {
 
                                         {hasWengine ? (
                                           <span
-                                            className="chip clickable chip-right"
-                                            title="Set Phase"
+                                            className={`chip clickable chip-right ${
+                                              uiLocked ? "disabled" : ""
+                                            }`}
+                                            title={
+                                              uiLocked ? "Locked" : "Set Phase"
+                                            }
                                             onClick={(e) => {
+                                              if (uiLocked) return;
                                               e.stopPropagation();
                                               setEidolonOpenIndex(null);
                                               setSuperOpenIndex(
@@ -918,7 +937,7 @@ export default function ZzzDraftPage() {
           })()}
         </div>
 
-        {/* Search Bar + Undo */}
+        {/* Search Bar + Undo + Copy Link */}
         <div className="mb-3 w-100 d-flex justify-content-center align-items-center gap-2 flex-wrap">
           <input
             type="text"
@@ -926,42 +945,47 @@ export default function ZzzDraftPage() {
             placeholder="Search characters..."
             value={keyboardSearch}
             onChange={(e) => setKeyboardSearch(e.target.value)}
+            disabled={uiLocked}
             style={{
               maxWidth: "300px",
               backgroundColor: "rgba(255,255,255,0.08)",
               color: "white",
               border: "1px solid rgba(255,255,255,0.25)",
+              opacity: uiLocked ? 0.6 : 1,
             }}
           />
           <button
             className="btn back-button-glass"
             onClick={handleUndo}
-            disabled={currentTurn === 0}
+            disabled={currentTurn === 0 || uiLocked}
             style={{ whiteSpace: "nowrap" }}
+            title={uiLocked ? "Locked" : "Undo last pick"}
           >
             ⟲ Undo
           </button>
-          {user &&
-            (spectatorKey ? (
-              <button
-                className="btn back-button-glass"
-                onClick={() => {
-                  const url = `${window.location.origin}/zzz/s/${spectatorKey}`;
-                  navigator.clipboard.writeText(url);
-                }}
-              >
-                Copy Spectator Link
-              </button>
-            ) : (
-              <button
-                className="btn back-button-glass"
-                onClick={generateSpectatorSession}
-                disabled={creating}
-                title="Create a read-only link for spectators"
-              >
-                {creating ? "Generating..." : "Generate Spectator Link"}
-              </button>
-            ))}
+
+          {user && (
+            <button
+              className="btn back-button-glass"
+              onClick={() => {
+                if (!spectatorKey) return;
+                const url = `${window.location.origin}/zzz/s/${spectatorKey}`;
+                navigator.clipboard.writeText(url);
+              }}
+              disabled={!spectatorKey}
+              title={
+                spectatorKey
+                  ? "Copy spectator URL"
+                  : "Preparing spectator link…"
+              }
+            >
+              {spectatorKey
+                ? "Copy Spectator Link"
+                : creating
+                ? "Generating..."
+                : "Preparing Spectator Link..."}
+            </button>
+          )}
         </div>
 
         {/* Character Grid */}
@@ -970,7 +994,13 @@ export default function ZzzDraftPage() {
             className="mb-5 px-2"
             style={{ maxWidth: "1000px", margin: "0 auto" }}
           >
-            <div className="character-pool-scroll">
+            <div
+              className="character-pool-scroll"
+              style={{
+                pointerEvents: uiLocked ? "none" : "auto",
+                opacity: uiLocked ? 0.6 : 1,
+              }}
+            >
               <div className="character-pool-grid upscaled">
                 {characters
                   .filter((char) => {
@@ -1009,6 +1039,7 @@ export default function ZzzDraftPage() {
                     const isOpponentPicked = alreadyPickedByOpponent;
 
                     const isDisabled =
+                      uiLocked ||
                       draftComplete ||
                       isBanned ||
                       (!isAcePickStep &&
@@ -1091,6 +1122,9 @@ export default function ZzzDraftPage() {
                   <div
                     key={side}
                     className={`score-card ${isBlue ? "blue" : "red"} w-100`}
+                    style={{
+                      opacity: uiLocked ? 0.8 : 1,
+                    }}
                   >
                     <div className="score-header">
                       <div className="score-title">{label}</div>
@@ -1114,6 +1148,7 @@ export default function ZzzDraftPage() {
                             inputMode="numeric"
                             min={SCORE_MIN}
                             max={SCORE_MAX}
+                            disabled={uiLocked}
                             value={scores[i] === 0 ? "" : String(scores[i])}
                             onChange={(e) => {
                               const v = e.target.value;
@@ -1165,16 +1200,23 @@ export default function ZzzDraftPage() {
             <div className="text-center mt-3">
               <button
                 className="btn back-button-glass"
-                onClick={() => setScoresFinalized((v) => !v)}
+                onClick={() => {
+                  if (uiLocked) {
+                    setUiLocked(false); // unlock to edit (DB remains completed)
+                  } else if (canFinalize) {
+                    setUiLocked(true); // lock UI and flag as complete
+                  }
+                }}
+                disabled={!uiLocked && !canFinalize}
                 title={
-                  scoresFinalized
-                    ? "Unmark to continue editing scores"
-                    : "Marks this match as complete"
+                  uiLocked
+                    ? "Unlock to edit scores/draft"
+                    : canFinalize
+                    ? "Marks this match as complete and locks editing"
+                    : "Enter all player scores to complete the match"
                 }
               >
-                {scoresFinalized
-                  ? "✓ Match Marked Complete"
-                  : "Mark Match Complete"}
+                {uiLocked ? "Unlock to Edit" : "Mark Match Complete"}
               </button>
             </div>
 
@@ -1218,6 +1260,7 @@ export default function ZzzDraftPage() {
               placeholder="Search W-Engine..."
               value={wengineSearch}
               onChange={(e) => setWengineSearch(e.target.value)}
+              disabled={uiLocked}
             />
             <div style={{ maxHeight: "300px", overflowY: "auto" }}>
               <ul className="list-group">
@@ -1225,8 +1268,8 @@ export default function ZzzDraftPage() {
                   className={`list-group-item list-group-item-action ${
                     selectedWengineId === "" ? "active" : ""
                   }`}
-                  onClick={() => setSelectedWengineId("")}
-                  style={{ cursor: "pointer" }}
+                  onClick={() => !uiLocked && setSelectedWengineId("")}
+                  style={{ cursor: uiLocked ? "not-allowed" : "pointer" }}
                 >
                   None
                 </li>
@@ -1245,6 +1288,7 @@ export default function ZzzDraftPage() {
                     if (name.includes(searchLower) || sub.includes(searchLower))
                       return true;
 
+                    // Signature search hint support
                     for (const [
                       subname,
                       charName,
@@ -1285,11 +1329,14 @@ export default function ZzzDraftPage() {
                         className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${
                           selectedWengineId === String(w.id) ? "active" : ""
                         }`}
-                        onClick={() => setSelectedWengineId(String(w.id))}
+                        onClick={() =>
+                          !uiLocked && setSelectedWengineId(String(w.id))
+                        }
                         style={{
-                          cursor: "pointer",
+                          cursor: uiLocked ? "not-allowed" : "pointer",
                           padding: "6px 10px",
                           gap: "10px",
+                          opacity: uiLocked ? 0.6 : 1,
                         }}
                       >
                         <div className="d-flex align-items-center gap-2">
@@ -1313,15 +1360,7 @@ export default function ZzzDraftPage() {
                           </div>
                         </div>
                         {isSig && (
-                          <span
-                            className="badge bg-warning text-dark"
-                            style={{
-                              fontSize: "0.65rem",
-                              fontWeight: 600,
-                              borderRadius: "6px",
-                              padding: "2px 6px",
-                            }}
-                          >
+                          <span className="badge bg-warning text-dark">
                             💠 Signature
                           </span>
                         )}
@@ -1343,8 +1382,10 @@ export default function ZzzDraftPage() {
             <Button
               variant="primary"
               onClick={() => {
+                if (uiLocked) return;
                 if (activeSlotIndex !== null) confirmWengine(activeSlotIndex);
               }}
+              disabled={uiLocked}
             >
               Confirm
             </Button>
