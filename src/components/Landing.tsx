@@ -450,7 +450,70 @@ export default function Landing() {
     setRandomizeLocked(true);
   };
 
+  /* ─────────── NEW: owner unfinished session handling ─────────── */
+  const [ownerOpen, setOwnerOpen] = useState<null | {
+    key: string;
+    mode: "2v2" | "3v3";
+    team1: string;
+    team2: string;
+  }>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/open`,
+          { credentials: "include" }
+        );
+        if (!res.ok) {
+          setOwnerOpen(null);
+          return;
+        }
+        const row = await res.json();
+        setOwnerOpen({
+          key: row.key,
+          mode: row.mode,
+          team1: row.team1,
+          team2: row.team2,
+        });
+      } catch {
+        setOwnerOpen(null);
+      }
+    })();
+  }, []);
+
+  const resumeUnfinished = () => {
+    if (!ownerOpen) return;
+    sessionStorage.setItem("zzzSpectatorKey", ownerOpen.key);
+    sessionStorage.setItem(
+      "zzzDraftInit",
+      JSON.stringify({
+        team1: ownerOpen.team1,
+        team2: ownerOpen.team2,
+        mode: ownerOpen.mode,
+      })
+    );
+    if (!sessionStorage.getItem("zzzDraftId")) {
+      const draftId =
+        (crypto as any).randomUUID?.() ??
+        `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem("zzzDraftId", draftId);
+    }
+    setLeaving(true);
+    setTimeout(() => navigate("/zzz/draft"), 250);
+  };
+  /* ─────────── END new owner unfinished session handling ─────────── */
+
   const handleStart = () => {
+    // 🧱 Block starting a new draft if the owner has an unfinished one
+    if (ownerOpen) {
+      toast.warn(
+        "You have an unfinished Vivian PvP draft. Please finish it (Mark Match Complete) before starting a new one."
+      );
+      resumeUnfinished();
+      return;
+    }
+
     // 🛑 Block starting ZZZ draft on mobile
     if (gamesel.id === "zzz" && isMobile) {
       toast.warn(
@@ -877,6 +940,13 @@ export default function Landing() {
                           );
                           return;
                         }
+                        if (ownerOpen) {
+                          toast.warn(
+                            "You have an unfinished Vivian PvP draft. Resuming it now."
+                          );
+                          resumeUnfinished();
+                          return;
+                        }
                         setShowDraftModal(true);
                       }}
                       disabled={isMobile}
@@ -900,6 +970,25 @@ export default function Landing() {
                       !
                     </button>
                   </div>
+
+                  {/* NEW: visible resume helper when unfinished draft exists */}
+                  {ownerOpen && (
+                    <div className="mt-2 text-center">
+                      <button
+                        className="btn back-button-glass"
+                        onClick={resumeUnfinished}
+                        title="Return to your unfinished draft"
+                      >
+                        ↩︎ Resume Unfinished Draft
+                      </button>
+                      <div className="text-white-50 small mt-1">
+                        {ownerOpen.team1}{" "}
+                        <span className="text-white-25">vs</span>{" "}
+                        {ownerOpen.team2} • {ownerOpen.mode.toUpperCase()}
+                      </div>
+                    </div>
+                  )}
+
                   {isMobile && (
                     <div className="text-white-50 small">
                       Drafting is <strong>desktop-only</strong>

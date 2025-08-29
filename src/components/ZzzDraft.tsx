@@ -33,6 +33,20 @@ type DraftPick = {
   superimpose: number; // W1..W5 (1..5)
 };
 
+type SpectatorState = {
+  draftSequence: string[];
+  currentTurn: number;
+  picks: Array<{
+    characterCode: string;
+    eidolon: number;
+    wengineId: string | null;
+    superimpose: number;
+  } | null>;
+  blueScores: number[];
+  redScores: number[];
+};
+
+
 const MOBILE_QUERY = "(pointer:coarse), (max-width: 820px)";
 
 const SCORE_MIN = 0;
@@ -45,6 +59,26 @@ const CARD_GAP = 12;
 const CARD_MIN_SCALE = 0.68;
 
 const CREATE_LOCK_KEY = "zzzSpectatorCreateLock";
+
+const SNAPSHOT_PREFIX = "zzzDraftLocal:";
+
+function writeLocalSnapshot(key: string, state: SpectatorState) {
+  try {
+    const payload = { updatedAt: Date.now(), state };
+    sessionStorage.setItem(SNAPSHOT_PREFIX + key, JSON.stringify(payload));
+  } catch {}
+}
+function tryReadLocalSnapshot(key: string): SpectatorState | null {
+  try {
+    const raw = sessionStorage.getItem(SNAPSHOT_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.state ?? null;
+  } catch {
+    return null;
+  }
+}
+
 
 function useRowScale<T extends HTMLElement>(
   ref: React.MutableRefObject<T | null>,
@@ -159,7 +193,6 @@ export default function ZzzDraftPage() {
     }
   }, [cameFromStart, isMobile, navigate]);
 
-
   useEffect(() => {
     if (!cameFromStart) return; // ⬅️ do nothing if they didn’t start correctly
     if (location.search) {
@@ -252,6 +285,9 @@ export default function ZzzDraftPage() {
     is3v3 ? [0, 0, 0] : [0, 0]
   );
 
+  const [hydrated, setHydrated] = useState(false);
+  const pendingServerStateRef = useRef<SpectatorState | null>(null);
+
   const draftComplete = currentTurn >= draftSequence.length;
 
   // Player labels
@@ -328,7 +364,7 @@ export default function ZzzDraftPage() {
       const data = await res.json(); // { key, url }
       setSpectatorKey(data.key);
       sessionStorage.setItem("zzzSpectatorKey", data.key);
-      // no auto-copy here; button is for manual copy
+      setHydrated(true);
     } catch (e) {
       console.error(e);
     } finally {
@@ -381,16 +417,79 @@ export default function ZzzDraftPage() {
 
   const lastPayloadRef = useRef<string>("");
 
+  // 🔄 Hydrate from server state as soon as we have a key (GET is public)
+  useEffect(() => {
+    if (!spectatorKey) return; // need a key
+    if (hydrated) return; // already hydrated
+
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`,
+          { credentials: "include", signal: ctrl.signal }
+        );
+        if (!res.ok) {
+          // nothing on server; allow autosave to proceed
+          setHydrated(true);
+          return;
+        }
+        const data = await res.json(); // { mode, team1, team2, state, ... }
+
+        // keep landing header/mode in sync with this session (one-time)
+        try {
+          const init = JSON.parse(
+            sessionStorage.getItem("zzzDraftInit") || "null"
+          );
+          if (!init || !init.team1 || !init.team2 || !init.mode) {
+            sessionStorage.setItem(
+              "zzzDraftInit",
+              JSON.stringify({
+                team1: data.team1,
+                team2: data.team2,
+                mode: data.mode,
+              })
+            );
+          }
+        } catch {}
+
+        // prefer server state if present; if not, try local snapshot fallback (added below)
+        if (data?.state) {
+          pendingServerStateRef.current = data.state as SpectatorState;
+        } else {
+          // try local snapshot fallback
+          const local = tryReadLocalSnapshot(spectatorKey);
+          if (local) {
+            pendingServerStateRef.current = local;
+          } else {
+            setHydrated(true);
+          }
+        }
+      } catch {
+        // on error, try local snapshot; else unlock autosave
+        const local = tryReadLocalSnapshot(spectatorKey);
+        if (local) {
+          pendingServerStateRef.current = local;
+        } else {
+          setHydrated(true);
+        }
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [spectatorKey, hydrated]);
+
   /* ───────────── Autosave PUTs ───────────── */
   useEffect(() => {
     if (!user || !spectatorKey) return;
+    if (!hydrated) return; // don't overwrite server with empty local state
 
     const payload = JSON.stringify({
       state: collectSpectatorState(),
       isComplete: isComplete || undefined,
     });
 
-    if (payload === lastPayloadRef.current) return; // nothing changed
+    if (payload === lastPayloadRef.current) return;
     lastPayloadRef.current = payload;
 
     const ctrl = new AbortController();
@@ -406,6 +505,12 @@ export default function ZzzDraftPage() {
             signal: ctrl.signal,
           }
         );
+
+        if (res.ok) {
+          // ✅ keep a local fallback copy in case GET races or you refresh quickly
+          writeLocalSnapshot(spectatorKey, collectSpectatorState());
+        }
+
         if (res.status === 401 || res.status === 404) {
           sessionStorage.removeItem("zzzSpectatorKey");
           setSpectatorKey(null);
@@ -418,6 +523,7 @@ export default function ZzzDraftPage() {
   }, [
     user,
     spectatorKey,
+    hydrated,
     isComplete,
     draftComplete,
     draftPicks,
@@ -484,6 +590,45 @@ export default function ZzzDraftPage() {
         setError("Failed to load data");
       });
   }, []);
+
+  // When characters & wengines are loaded, convert server picks -> local DraftPick[]
+  useEffect(() => {
+    if (hydrated) return;
+    const pending = pendingServerStateRef.current;
+    if (!pending) return;
+    if (characters.length === 0 || wengines.length === 0) return;
+
+    const mapped: (DraftPick | null)[] = pending.picks.map((p) => {
+      if (!p) return null;
+      const character = characters.find((c) => c.code === p.characterCode);
+      if (!character) return null;
+      const wengine =
+        p.wengineId != null
+          ? wengines.find((w) => String(w.id) === String(p.wengineId))
+          : undefined;
+
+      return {
+        character,
+        eidolon: p.eidolon,
+        wengine,
+        superimpose: p.superimpose,
+      };
+    });
+
+    setDraftPicks(mapped);
+    setCurrentTurn(
+      Math.max(0, Math.min(pending.draftSequence.length, pending.currentTurn))
+    );
+
+    if (Array.isArray(pending.blueScores) && pending.blueScores.length)
+      setBlueScores(pending.blueScores);
+    if (Array.isArray(pending.redScores) && pending.redScores.length)
+      setRedScores(pending.redScores);
+
+    // Clear and allow autosave from now on
+    pendingServerStateRef.current = null;
+    setHydrated(true);
+  }, [characters, wengines, hydrated]);
 
   /* ───────────── Click-outside sliders ───────────── */
   const eidolonRefs = useRef<(HTMLDivElement | null)[]>([]);
