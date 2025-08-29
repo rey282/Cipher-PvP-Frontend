@@ -5,7 +5,6 @@ import "../components/Landing.css";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Modal, Button } from "react-bootstrap";
 import { useAuth } from "../context/AuthContext";
-import { toast } from "react-toastify";
 
 
 /* ───────────── Types ───────────── */
@@ -151,13 +150,11 @@ export default function ZzzDraftPage() {
 
   useEffect(() => {
     if (!isMobile) return;
-    toast.info("Vivian PvP draft is desktop-only for now.");
     navigate("/", { replace: true, state: { blocked: "zzz-draft-mobile" } });
   }, [isMobile, navigate]);
 
   useEffect(() => {
     if (!cameFromStart && !isMobile) {
-      toast.info("Please start a draft from the landing page.");
       navigate("/", { replace: true, state: { blocked: "zzz-draft-no-team" } });
     }
   }, [cameFromStart, isMobile, navigate]);

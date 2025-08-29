@@ -389,6 +389,27 @@ export default function Landing() {
   };
 
   useEffect(() => {
+    const s = location.state as { blocked?: string } | null;
+    const blocked = s?.blocked;
+
+    if (!blocked) return;
+
+    const msg =
+      blocked === "zzz-draft-mobile"
+        ? "Vivian PvP draft is desktop-only for now."
+        : blocked === "zzz-draft-no-team"
+        ? "Please start a draft from the landing page."
+        : blocked === "zzz-spectator-mobile"
+        ? "Spectator view is desktop-only for now."
+        : "Redirected.";
+
+    toast.info(msg);
+
+    // Clear the state so it won't fire again on internal nav
+    navigate(location.pathname + location.search, { replace: true, state: {} });
+  }, [location.state, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
     fetchProfiles(hsrTeamIds, "hsr", setHsrTeamProfiles);
     fetchProfiles(genshinTeamIds, "genshin", setGenshinTeamProfiles);
     fetchProfiles(zzzTeamIds, "zzz", setZzzTeamProfiles);
