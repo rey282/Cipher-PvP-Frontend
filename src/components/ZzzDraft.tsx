@@ -5,6 +5,8 @@ import "../components/Landing.css";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Modal, Button } from "react-bootstrap";
 import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
+
 
 /* ───────────── Types ───────────── */
 type Character = {
@@ -31,6 +33,8 @@ type DraftPick = {
   wengine?: WEngine;
   superimpose: number; // W1..W5 (1..5)
 };
+
+const MOBILE_QUERY = "(pointer:coarse), (max-width: 820px)";
 
 const SCORE_MIN = 0;
 const SCORE_MAX = 65000;
@@ -121,14 +125,61 @@ export default function ZzzDraftPage() {
   const team1Raw = seed.team1 || query.get("team1") || "Blue Team";
   const team2Raw = seed.team2 || query.get("team2") || "Red Team";
 
+  const hasAnyName = (s?: string) =>
+    (s || "")
+      .split("|")
+      .map((x) => x.trim())
+      .filter(Boolean).length > 0;
+
+  const cameFromStart =
+    !!(navState as any)?.draftId ||
+    (!!stored && (hasAnyName(stored.team1) || hasAnyName(stored.team2)));
+
+  // HARD mobile/narrow-touch guard
+  const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else mq.addListener(update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    toast.info("Vivian PvP draft is desktop-only for now.");
+    navigate("/", { replace: true, state: { blocked: "zzz-draft-mobile" } });
+  }, [isMobile, navigate]);
+
+  useEffect(() => {
+    if (!cameFromStart && !isMobile) {
+      toast.info("Please start a draft from the landing page.");
+      navigate("/", { replace: true, state: { blocked: "zzz-draft-no-team" } });
+    }
+  }, [cameFromStart, isMobile, navigate]);
+
+
+  useEffect(() => {
+    if (!cameFromStart) return; // ⬅️ do nothing if they didn’t start correctly
     if (location.search) {
       navigate(location.pathname, {
         replace: true,
         state: { team1: team1Raw, team2: team2Raw, mode },
       });
     }
-  }, [location.pathname, location.search, team1Raw, team2Raw, mode, navigate]);
+  }, [
+    cameFromStart,
+    location.pathname,
+    location.search,
+    team1Raw,
+    team2Raw,
+    mode,
+    navigate,
+  ]);
 
   const { user } = useAuth(); // truthy if logged in
   const [spectatorKey, setSpectatorKey] = useState<string | null>(null);
@@ -590,6 +641,8 @@ export default function ZzzDraftPage() {
     const penaltyPoints = Math.floor(penalty / 0.25) * PENALTY_PER_POINT;
     return { total: Number(total.toFixed(2)), penaltyPoints };
   };
+
+  if (isMobile || !cameFromStart) return null;
 
   /* ───────────── Render ───────────── */
   return (

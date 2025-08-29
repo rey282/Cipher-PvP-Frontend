@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import "../components/Landing.css";
 
@@ -44,6 +44,8 @@ type SessionRow = {
   last_activity_at?: string;
   completed_at?: string | null;
 };
+
+const MOBILE_QUERY = "(pointer:coarse), (max-width: 820px)";
 
 /* ───────────── Sizing (match ZzzDraft) ───────────── */
 const CARD_W = 170; // px
@@ -129,6 +131,29 @@ export default function ZzzSpectatorPage() {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
+  const navigate = useNavigate();
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else mq.addListener(update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) {
+      navigate("/", {
+        replace: true,
+        state: { blocked: "zzz-spectator-mobile" },
+      });
+    }
+  }, [isMobile, navigate]);
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [wengines, setWengines] = useState<WEngine[]>([]);
@@ -219,7 +244,7 @@ export default function ZzzSpectatorPage() {
 
   /* Subscribe to live spectator session via SSE (with reconnect flag) */
   useEffect(() => {
-    if (!key) return;
+    if (!key || isMobile) return;
 
     setLoading(true);
     setNotFound(false);
@@ -300,6 +325,8 @@ export default function ZzzSpectatorPage() {
     blueScores.reduce((a, b) => a + b, 0) - team1Cost.penaltyPoints;
   const redTotal =
     redScores.reduce((a, b) => a + b, 0) - team2Cost.penaltyPoints;
+
+  if (isMobile) return null;
 
   /* ───────────── Render ───────────── */
   return (

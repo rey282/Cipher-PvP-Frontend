@@ -92,9 +92,30 @@ const ZzzRules: React.FC = () => (
 
 /* ───────────────── Game data ───────────────── */
 const games = [
-  { id: "zzz", name: "Vivian PvP", bg: "/zzz-bg.webp", icon: "/zzz-icon.jpeg", live: true, link: "/zzz" },
-  { id: "hsr", name: "Cipher PvP", bg: "/HsrBackground.webp", icon: "/cipher-icon.webp", live: true, link: "/cipher" },
-  { id: "hsr2", name: "Cerydra PvP", bg: "/cerydra-bg.webp", icon: "/cerydra-icon.jpg", live: true, link: "/cerydra" },
+  {
+    id: "zzz",
+    name: "Vivian PvP",
+    bg: "/zzz-bg.webp",
+    icon: "/zzz-icon.jpeg",
+    live: true,
+    link: "/zzz",
+  },
+  {
+    id: "hsr",
+    name: "Cipher PvP",
+    bg: "/HsrBackground.webp",
+    icon: "/cipher-icon.webp",
+    live: true,
+    link: "/cipher",
+  },
+  {
+    id: "hsr2",
+    name: "Cerydra PvP",
+    bg: "/cerydra-bg.webp",
+    icon: "/cerydra-icon.jpg",
+    live: true,
+    link: "/cerydra",
+  },
 ];
 
 // Team member IDs + roles
@@ -126,8 +147,14 @@ const zzzTeamIds: { id: string; role: string }[] = [
 ];
 
 // ─── In-memory cache ───
-const teamCache: { hsr: any[] | null; genshin: any[] | null; zzz: any[] | null } = {
-  hsr: null, genshin: null, zzz: null,
+const teamCache: {
+  hsr: any[] | null;
+  genshin: any[] | null;
+  zzz: any[] | null;
+} = {
+  hsr: null,
+  genshin: null,
+  zzz: null,
 };
 
 function shuffle<T>(arr: T[]): T[] {
@@ -157,16 +184,34 @@ export default function Landing() {
   const [leaving, setLeaving] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
 
+  // 🛑 Desktop-only guard for ZZZ draft
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer:coarse), (max-width: 820px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else mq.addListener(update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+    };
+  }, []);
+
   // Start Draft modal
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [mode, setMode] = useState<"2v2" | "3v3">("2v2");
-  const modeRef = useRef<"2v2" | "3v3">("2v2"); // mirror to avoid stale mode on click
+  const modeRef = useRef<"2v2" | "3v3">("2v2");
   const is3v3 = mode === "3v3";
   const nPlayers = is3v3 ? 3 : 2;
 
   // ORIGINAL: per-player inputs
-  const [team1Names, setTeam1Names] = useState<string[]>(Array(nPlayers).fill(""));
-  const [team2Names, setTeam2Names] = useState<string[]>(Array(nPlayers).fill(""));
+  const [team1Names, setTeam1Names] = useState<string[]>(
+    Array(nPlayers).fill("")
+  );
+  const [team2Names, setTeam2Names] = useState<string[]>(
+    Array(nPlayers).fill("")
+  );
 
   // Rules modal
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -259,8 +304,16 @@ export default function Landing() {
     setLoadingMatches(true);
     try {
       const [liveRes, recentRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/matches/live?limit=8&minutes=2`, { credentials: "include" }),
-        fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/matches/recent?limit=20`, { credentials: "include" }),
+        fetch(
+          `${
+            import.meta.env.VITE_API_BASE
+          }/api/zzz/matches/live?limit=8&minutes=2`,
+          { credentials: "include" }
+        ),
+        fetch(
+          `${import.meta.env.VITE_API_BASE}/api/zzz/matches/recent?limit=20`,
+          { credentials: "include" }
+        ),
       ]);
       const liveJson = liveRes.ok ? await liveRes.json() : { data: [] };
       const recentJson = recentRes.ok ? await recentRes.json() : { data: [] };
@@ -279,7 +332,6 @@ export default function Landing() {
     fetchMatches();
   };
 
-  // optional: quick helper
   const goSpectator = (key: string) => {
     setLeaving(true);
     setTimeout(() => navigate(`/zzz/s/${key}`), 250);
@@ -312,7 +364,10 @@ export default function Landing() {
     }
     const results = await Promise.all(
       teamList.map((member) =>
-        fetch(`${import.meta.env.VITE_API_BASE}/api/player/${member.id}/summary`, { credentials: "include" })
+        fetch(
+          `${import.meta.env.VITE_API_BASE}/api/player/${member.id}/summary`,
+          { credentials: "include" }
+        )
           .then((res) => (res.ok ? res.json() : null))
           .then((data) =>
             data
@@ -339,7 +394,7 @@ export default function Landing() {
     fetchProfiles(zzzTeamIds, "zzz", setZzzTeamProfiles);
   }, []);
 
-  /* Keep player arrays in sync when mode changes (pad/truncate safely) */
+  /* Keep player arrays in sync when mode changes */
   useEffect(() => {
     const len = is3v3 ? 3 : 2;
     setTeam1Names((prev) => ensureLen(prev, len));
@@ -348,12 +403,10 @@ export default function Landing() {
 
   /* Randomize using only what’s typed in the two team boxes */
   const handleRandomizeFromFields = () => {
-    if (randomizeLocked) return; // already used once this open
-
+    if (randomizeLocked) return;
     const m = modeRef.current;
     const len = m === "3v3" ? 3 : 2;
 
-    // 💪 Guard undefined -> ""
     const pool = [...ensureLen(team1Names, len), ...ensureLen(team2Names, len)]
       .map((s) => (s ?? "").trim())
       .filter(Boolean);
@@ -373,12 +426,18 @@ export default function Landing() {
 
     setTeam1Names(next1);
     setTeam2Names(next2);
-
-    // 🔒 lock until modal is reopened
     setRandomizeLocked(true);
   };
 
   const handleStart = () => {
+    // 🛑 Block starting ZZZ draft on mobile
+    if (gamesel.id === "zzz" && isMobile) {
+      toast.warn(
+        "Vivian PvP draft is desktop-only for now. Please use a laptop/desktop."
+      );
+      return;
+    }
+
     const m = modeRef.current;
     const len = m === "3v3" ? 3 : 2;
 
@@ -394,26 +453,28 @@ export default function Landing() {
     const t1 = safe1.filter(Boolean).join("|");
     const t2 = safe2.filter(Boolean).join("|");
 
-    // randomize sides
     const [team1, team2] = Math.random() < 0.5 ? [t1, t2] : [t2, t1];
     const payload = { team1, team2, mode: m };
 
-    // 🔑 forget any old spectator session when starting a new draft
     sessionStorage.removeItem("zzzSpectatorKey");
 
-    // unique id for this new draft
     const draftId =
-      (crypto as any).randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      (crypto as any).randomUUID?.() ??
+      `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     sessionStorage.setItem("zzzDraftId", draftId);
     sessionStorage.setItem("zzzDraftInit", JSON.stringify(payload));
 
     navigate("/zzz/draft", { state: { ...payload, draftId } });
   };
 
-  // Pre-fill from URL: ?game=zzz&draft=1&mode=3v3&team1=a|b|c&team2=x|y|z
+  // Pre-fill from URL; do NOT auto-open draft on mobile
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("game") === "zzz" && params.get("draft") === "1") {
+      if (isMobile) {
+        toast.info("Vivian PvP draft is desktop-only for now.");
+        return;
+      }
       setShowDraftModal(true);
 
       const m = (params.get("mode") as "2v2" | "3v3") || "2v2";
@@ -427,18 +488,29 @@ export default function Landing() {
       setTeam1Names(ensureLen(t1, len));
       setTeam2Names(ensureLen(t2, len));
     }
-  }, [location.search]);
+  }, [location.search, isMobile]);
 
   return (
     <div className={`landing-wrapper ${leaving ? "fade-out" : ""}`}>
-      <div className="bg-layer" style={{ backgroundImage: `url(${currentBg})` }} />
-      {bgFading && <div className="bg-layer fading-in" style={{ backgroundImage: `url(${fadeBg})` }} />}
+      <div
+        className="bg-layer"
+        style={{ backgroundImage: `url(${currentBg})` }}
+      />
+      {bgFading && (
+        <div
+          className="bg-layer fading-in"
+          style={{ backgroundImage: `url(${fadeBg})` }}
+        />
+      )}
       <div className="overlay" />
 
-      <div className="position-relative z-2 text-white d-flex flex-column px-4" style={{ minHeight: "100vh" }}>
+      <div
+        className="position-relative z-2 text-white d-flex flex-column px-4"
+        style={{ minHeight: "100vh" }}
+      >
         <Navbar />
 
-        {/* ───────────────── Start Draft Modal (ORIGINAL PER-PLAYER INPUTS) ───────────────── */}
+        {/* ───────────────── Start Draft Modal ───────────────── */}
         <Modal
           show={showDraftModal}
           onHide={() => setShowDraftModal(false)}
@@ -452,9 +524,10 @@ export default function Landing() {
 
           <Modal.Body>
             <div className="text-white-50 mb-3" style={{ fontSize: ".95rem" }}>
-              Enter player names in the team boxes below. You can either <strong>Start</strong> with teams exactly as
-              written, or click <strong>Randomize Teams</strong> to shuffle names into teams. Sides are randomized on
-              start too.
+              Enter player names in the team boxes below. You can either{" "}
+              <strong>Start</strong> with teams exactly as written, or click{" "}
+              <strong>Randomize Teams</strong> to shuffle names into teams.
+              Sides are randomized on start too.
             </div>
 
             {/* Mode */}
@@ -508,7 +581,7 @@ export default function Landing() {
                         type="text"
                         className="form-control mb-2"
                         placeholder={`Player ${i + 1} name`}
-                        value={team1Names[i] ?? ""} // guard undefined
+                        value={team1Names[i] ?? ""}
                         maxLength={40}
                         onChange={(e) => {
                           const next = ensureLen(team1Names, nPlayers);
@@ -542,7 +615,7 @@ export default function Landing() {
                         type="text"
                         className="form-control mb-2"
                         placeholder={`Player ${i + 1} name`}
-                        value={team2Names[i] ?? ""} // guard undefined
+                        value={team2Names[i] ?? ""}
                         maxLength={40}
                         onChange={(e) => {
                           const next = ensureLen(team2Names, nPlayers);
@@ -563,7 +636,10 @@ export default function Landing() {
 
           <Modal.Footer className="d-flex justify-content-between">
             <div className="d-flex gap-2">
-              <Button variant="secondary" onClick={() => setShowDraftModal(false)}>
+              <Button
+                variant="secondary"
+                onClick={() => setShowDraftModal(false)}
+              >
                 Cancel
               </Button>
             </div>
@@ -572,7 +648,11 @@ export default function Landing() {
                 variant="outline-light"
                 onClick={handleRandomizeFromFields}
                 disabled={randomizeLocked}
-                title={randomizeLocked ? "Locked: close and reopen this dialog to randomize again" : ""}
+                title={
+                  randomizeLocked
+                    ? "Locked: close and reopen this dialog to randomize again"
+                    : ""
+                }
               >
                 🎲 {randomizeLocked ? "Randomize (Locked)" : "Randomize Teams"}
               </Button>
@@ -599,7 +679,10 @@ export default function Landing() {
             <ZzzRules />
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowRulesModal(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowRulesModal(false)}
+            >
               Close
             </Button>
           </Modal.Footer>
@@ -639,10 +722,13 @@ export default function Landing() {
                         >
                           <div>
                             <div className="fw-semibold">
-                              {m.team1} <span className="text-white-50">vs</span> {m.team2}
+                              {m.team1}{" "}
+                              <span className="text-white-50">vs</span>{" "}
+                              {m.team2}
                             </div>
                             <div className="small text-white-50">
-                              Mode: {m.mode?.toUpperCase?.() || m.mode} • Last activity: {fmtWhen(m.lastActivityAt)}
+                              Mode: {m.mode?.toUpperCase?.() || m.mode} • Last
+                              activity: {fmtWhen(m.lastActivityAt)}
                             </div>
                           </div>
                           <span className="badge bg-danger">LIVE</span>
@@ -669,10 +755,12 @@ export default function Landing() {
                       >
                         <div>
                           <div className="fw-semibold">
-                            {m.team1} <span className="text-white-50">vs</span> {m.team2}
+                            {m.team1} <span className="text-white-50">vs</span>{" "}
+                            {m.team2}
                           </div>
                           <div className="small text-white-50">
-                            Mode: {m.mode?.toUpperCase?.() || m.mode} • Completed: {fmtWhen(m.completedAt)}
+                            Mode: {m.mode?.toUpperCase?.() || m.mode} •
+                            Completed: {fmtWhen(m.completedAt)}
                           </div>
                         </div>
                         <span className="badge bg-success">Done</span>
@@ -685,7 +773,10 @@ export default function Landing() {
           </Modal.Body>
 
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowMatchesModal(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowMatchesModal(false)}
+            >
               Close
             </Button>
           </Modal.Footer>
@@ -716,7 +807,9 @@ export default function Landing() {
                         className="member-avatar"
                       />
                       <div className="member-info">
-                        <div className="member-name">{m.global_name || m.username}</div>
+                        <div className="member-name">
+                          {m.global_name || m.username}
+                        </div>
                         <div className="member-role">{m.role}</div>
                       </div>
                     </div>
@@ -726,38 +819,77 @@ export default function Landing() {
             )}
 
             {/* CTA */}
-            <div className="animate__animated animate__fadeInUp mt-4 px-3" style={{ maxWidth: 700, margin: "0 auto" }}>
+            <div
+              className="animate__animated animate__fadeInUp mt-4 px-3"
+              style={{ maxWidth: 700, margin: "0 auto" }}
+            >
               <p className="lead text-white mb-4">
                 {gamesel.id === "zzz" ? (
-                  <>Vivian PvP is a custom Zenless Zone Zero PvP mode for 2v2 and 3v3 on Deadly Assault...</>
+                  <>
+                    Vivian PvP is a custom Zenless Zone Zero PvP mode for 2v2
+                    and 3v3 on Deadly Assault...
+                  </>
                 ) : gamesel.id === "hsr" ? (
-                  <>Cipher PvP is a custom Honkai: Star Rail PvP mode featuring strategic drafts and preban mechanics...</>
+                  <>
+                    Cipher PvP is a custom Honkai: Star Rail PvP mode featuring
+                    strategic drafts and preban mechanics...
+                  </>
                 ) : (
-                  <>Cerydra PvP is a custom Honkai: Star Rail PvP mode with unit and Eidolon costs...</>
+                  <>
+                    Cerydra PvP is a custom Honkai: Star Rail PvP mode with unit
+                    and Eidolon costs...
+                  </>
                 )}
               </p>
             </div>
 
             <div className="mt-3">
               {gamesel.id === "zzz" ? (
-                <div className="d-flex justify-content-center align-items-center gap-2">
-                  <button className="btn angled-btn" onClick={() => setShowDraftModal(true)}>
-                    Start Now
-                  </button>
-                  <button
-                    className="btn btn-info-circle"
-                    title="Match History"
-                    onClick={openMatches}
-                    style={{ fontSize: "1.2rem", zIndex: 5 }}
-                  >
-                    📖
-                  </button>
-                  <button className="btn btn-info-circle" onClick={() => setShowRulesModal(true)} title="View Rules">
-                    !
-                  </button>
+                <div className="d-flex flex-column justify-content-center align-items-center gap-2">
+                  <div className="d-flex justify-content-center align-items-center gap-2">
+                    <button
+                      className={`btn angled-btn ${isMobile ? "disabled" : ""}`}
+                      onClick={() => {
+                        if (isMobile) {
+                          toast.info(
+                            "Vivian PvP draft is desktop-only for now. Please use a laptop/desktop."
+                          );
+                          return;
+                        }
+                        setShowDraftModal(true);
+                      }}
+                      disabled={isMobile}
+                      title={isMobile ? "Desktop only" : "Start draft"}
+                    >
+                      Start Now
+                    </button>
+                    <button
+                      className="btn btn-info-circle"
+                      title="Match History"
+                      onClick={openMatches}
+                      style={{ fontSize: "1.2rem", zIndex: 5 }}
+                    >
+                      📖
+                    </button>
+                    <button
+                      className="btn btn-info-circle"
+                      onClick={() => setShowRulesModal(true)}
+                      title="View Rules"
+                    >
+                      !
+                    </button>
+                  </div>
+                  {isMobile && (
+                    <div className="text-white-50 small">
+                      Drafting is <strong>desktop-only</strong>
+                    </div>
+                  )}
                 </div>
               ) : gamesel.live ? (
-                <button className="btn angled-btn" onClick={() => gotoLivePage(gamesel.link!)}>
+                <button
+                  className="btn angled-btn"
+                  onClick={() => gotoLivePage(gamesel.link!)}
+                >
                   Start Now
                 </button>
               ) : (
