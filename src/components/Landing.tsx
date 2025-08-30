@@ -645,7 +645,7 @@ export default function Landing() {
                 Tip: for a 1v1, just fill one name and leave the rest empty.
               </small>
               <br />
-              <small className="text-warning">
+              <small className="text-white-50">
                 Note: You must be logged in for the match to be recorded.
               </small>
             </Form.Group>
