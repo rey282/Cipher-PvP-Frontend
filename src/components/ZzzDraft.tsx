@@ -337,6 +337,16 @@ export default function ZzzDraftPage() {
   const [hydrated, setHydrated] = useState(false);
   const pendingServerStateRef = useRef<SpectatorState | null>(null);
 
+  // DB timing for "LIVE" status (no keepalive)
+  const [createdAtMs, setCreatedAtMs] = useState<number | null>(null);
+  const [finishedFromServer, setFinishedFromServer] = useState<boolean>(false);
+
+  // derived "live": created < 2h ago AND not finished
+  const isLive =
+    !!createdAtMs &&
+    !finishedFromServer &&
+    Date.now() - createdAtMs < 2 * 60 * 60 * 1000; // 2 hours
+
   const draftComplete = currentTurn >= draftSequence.length;
 
   // Player labels (derive from stateful names)
@@ -464,8 +474,54 @@ export default function ZzzDraftPage() {
 
   const lastPayloadRef = useRef<string>("");
 
+  // Save trigger: increments when we want to persist to DB
+  const [saveSeq, setSaveSeq] = useState(0);
+  const saveTimerRef = useRef<number | null>(null);
+
+  function requestSave(delayMs = 0) {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    if (delayMs > 0) {
+      saveTimerRef.current = window.setTimeout(() => {
+        setSaveSeq((s) => s + 1);
+        saveTimerRef.current = null;
+      }, delayMs) as unknown as number;
+    } else {
+      setSaveSeq((s) => s + 1);
+    }
+  }
+
   /* ───────────── SSE: subscribe like spectator (owner + players) ───────────── */
+
   const esRef = useRef<EventSource | null>(null);
+
+  const ignoreSseUntilRef = useRef<number>(0);
+  const expectedTurnRef = useRef<number | null>(null);
+  const expectedModeRef = useRef<"ge" | "le" | "eq" | null>(null);
+
+  // widen the window a bit to absorb latency spikes (optional)
+  const bumpIgnoreSse = (
+    expectedTurn?: number,
+    mode: "ge" | "le" | "eq" = "ge"
+  ) => {
+    ignoreSseUntilRef.current = Date.now() + 1200; // was 800
+    expectedTurnRef.current = expectedTurn ?? null;
+    expectedModeRef.current = expectedTurn != null ? mode : null;
+  };
+
+  // owner convenience
+  function ownerOptimisticSave(
+    delayMs = 0,
+    expectedTurn?: number,
+    mode: "ge" | "le" | "eq" = "ge"
+  ) {
+    bumpIgnoreSse(expectedTurn, mode);
+    requestSave(delayMs);
+  }
+
+
 
   const mapServerStateToLocal = (state: SpectatorState) => {
     const mapped: (DraftPick | null)[] = state.picks.map((p) => {
@@ -503,10 +559,25 @@ export default function ZzzDraftPage() {
     if (!spectatorKey) return;
 
     esRef.current?.close();
-    const url = `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}/stream`;
+    const url = `${
+      import.meta.env.VITE_API_BASE
+    }/api/zzz/sessions/${spectatorKey}/stream`;
     const es = new EventSource(url);
 
     const handleSnapshotOrUpdate = (payload: any) => {
+      // Pick up DB timestamps / completion for "live" without polling
+      if (payload?.createdAt || payload?.created_at) {
+        const ts = new Date(payload.createdAt || payload.created_at).getTime();
+        if (!Number.isNaN(ts)) setCreatedAtMs(ts);
+      }
+
+      // Prefer explicit isComplete; otherwise infer from completedAt if present
+      if (typeof payload?.isComplete === "boolean") {
+        setFinishedFromServer(payload.isComplete);
+      } else if (payload?.completedAt || payload?.completed_at) {
+        setFinishedFromServer(true);
+      }
+
       // sync mode/team names from server truth
       if (payload?.mode === "2v2" || payload?.mode === "3v3") {
         setMode(payload.mode);
@@ -526,6 +597,26 @@ export default function ZzzDraftPage() {
 
       const serverState: SpectatorState | undefined = payload?.state;
       if (!serverState) return;
+
+      if (Date.now() < ignoreSseUntilRef.current) {
+        const exp = expectedTurnRef.current;
+        const mode = expectedModeRef.current;
+        if (typeof exp === "number" && mode) {
+          const srv = serverState.currentTurn;
+          const drop =
+            (mode === "ge" && srv < exp) ||
+            (mode === "le" && srv > exp) ||
+            (mode === "eq" && srv !== exp);
+          if (drop) return;
+          // accept & clear expectation
+          expectedTurnRef.current = null;
+          expectedModeRef.current = null;
+        } else {
+          // fallback: drop echoes that don't move the turn
+          if (serverState.currentTurn === currentTurn) return;
+        }
+      }
+
 
       // If characters/wengines not loaded yet, store and wait
       if (characters.length === 0 || wengines.length === 0) {
@@ -570,7 +661,7 @@ export default function ZzzDraftPage() {
     esRef.current = es;
     return () => es.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spectatorKey, characters, wengines]);
+  }, [spectatorKey, characters, wengines, currentTurn]);
 
   /* ───────────── Fallback initial GET (in case SSE races) ───────────── */
   useEffect(() => {
@@ -595,6 +686,17 @@ export default function ZzzDraftPage() {
         if (data?.mode === "2v2" || data?.mode === "3v3") setMode(data.mode);
         if (typeof data?.team1 === "string") setTeam1Name(data.team1);
         if (typeof data?.team2 === "string") setTeam2Name(data.team2);
+        // Capture DB timing/completion for "live"
+        if (data?.createdAt || data?.created_at) {
+          const ts = new Date(data.createdAt || data.created_at).getTime();
+          if (!Number.isNaN(ts)) setCreatedAtMs(ts);
+        }
+        if (typeof data?.isComplete === "boolean") {
+          setFinishedFromServer(data.isComplete);
+        } else if (data?.completedAt || data?.completed_at) {
+          setFinishedFromServer(true);
+        }
+
         try {
           sessionStorage.setItem(
             "zzzDraftInit",
@@ -651,36 +753,11 @@ export default function ZzzDraftPage() {
         console.warn("spectator PUT failed", e);
       }
     })();
-    return () => ctrl.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    user,
-    spectatorKey,
-    hydrated,
-    isComplete,
-    draftComplete,
-    draftPicks,
-    blueScores,
-    redScores,
-    currentTurn,
-    blueLocked,
-    redLocked,
-    isPlayerClient,
-  ]);
 
-  // keepalive so last_activity_at stays fresh (owner only)
-  useEffect(() => {
-    if (!user || !spectatorKey || isPlayerClient) return;
-    const id = setInterval(() => {
-      fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}), // IMPORTANT: no `state` key here
-      }).catch(() => {});
-    }, 25_000);
-    return () => clearInterval(id);
-  }, [user, spectatorKey, isPlayerClient]);
+    return () => ctrl.abort();
+    // ✅ only run when saveSeq increments
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveSeq]);
 
   /* Row refs + scales */
   const blueRowRef = useRef<HTMLDivElement>(null);
@@ -804,23 +881,29 @@ export default function ZzzDraftPage() {
     return side === playerSide;
   })();
 
-  /* ───────────── Player Action POST helper ───────────── */
   async function postPlayerAction(action: any) {
     if (!spectatorKey) return;
     try {
-      await fetch(
-        `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}/actions`,
+      const res = await fetch(
+        `${
+          import.meta.env.VITE_API_BASE
+        }/api/zzz/sessions/${spectatorKey}/actions`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(action),
-          credentials: "include", // optional; your route can be public
+          credentials: "include",
         }
       );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.warn("player action failed", res.status, err);
+      }
     } catch (e) {
-      console.warn("player action failed", e);
+      console.warn("player action network error", e);
     }
   }
+
 
   /* ───────────── Draft Side Lock helpers ───────────── */
   const sideOfIndex = (index: number) =>
@@ -834,15 +917,17 @@ export default function ZzzDraftPage() {
     if (isPlayer) {
       if (playerSide !== side) return;
       if (!nextLocked) return; // block unlock on player client
-      postPlayerAction({ op: "setLock", side, locked: true });
-      // optimistic; SSE will sync
+      // 🟦 OPTIMISTIC: update immediately
       if (side === "B") setBlueLocked(true);
       else setRedLocked(true);
+      bumpIgnoreSse();
+      postPlayerAction({ op: "setLock", side, locked: true });
       return;
     }
     // Owner: toggle locally; autosave will persist
     if (side === "B") setBlueLocked(nextLocked);
     else setRedLocked(nextLocked);
+    requestSave(0);
   };
 
   /* ───────────── Draft actions ───────────── */
@@ -852,11 +937,25 @@ export default function ZzzDraftPage() {
     const currentStep = draftSequence[currentTurn];
     if (!currentStep) return;
 
-    // pick only on your turn
     const mySideNow = currentStep.startsWith("B") ? "B" : "R";
+
+    // Common validations (ban/pick duplication rules are handled by grid flags)
+    if (bannedCodes.includes(char.code)) return;
+
     if (isPlayer) {
       if (mySideNow !== playerSide) return;
-      // send to server; rely on SSE to update all clients
+
+      // 🟦 OPTIMISTIC: local apply first
+      setDraftPicks((prev) => {
+        const updated = [...prev];
+        updated[currentTurn] = { character: char, eidolon: 0, superimpose: 1 };
+        return updated;
+      });
+      setCurrentTurn((t) => t + 1);
+      setKeyboardSearch("");
+      bumpIgnoreSse(currentTurn + 1, "ge");
+
+      // fire-and-forget server action
       postPlayerAction({
         op: "pick",
         side: playerSide,
@@ -868,7 +967,6 @@ export default function ZzzDraftPage() {
 
     // owner local update, autosave will PUT
     const mySide = mySideNow;
-    if (bannedCodes.includes(char.code)) return;
     const myTeamPicks = draftPicks.filter((_, i) =>
       draftSequence[i].startsWith(mySide)
     );
@@ -882,23 +980,70 @@ export default function ZzzDraftPage() {
     setDraftPicks(updated);
     setCurrentTurn((prev) => prev + 1);
     setKeyboardSearch("");
+
+    ownerOptimisticSave(0, currentTurn + 1, "ge");
   };
 
   const handleUndo = () => {
-    // Prevent undo if any side is locked (avoids server errors)
-    if (uiLocked || blueLocked || redLocked) return;
     if (currentTurn === 0) return;
-    // Player clients cannot undo; only the owner can.
-    if (isPlayer) return;
 
-    const updated = [...draftPicks];
-    updated[currentTurn - 1] = null;
-    setDraftPicks(updated);
-    setCurrentTurn((prev) => prev - 1);
+    const lastIdx = currentTurn - 1;
+    const lastTok = draftSequence[lastIdx];
+    const lastSide = sideOfToken(lastTok);
+
+    // ban slots can't be undone
+    if (slotIsBan(lastIdx)) return;
+
+    // OWNER flow
+    if (!isPlayer) {
+      // prevent undo if any side is locked or UI is locked
+      if (uiLocked || blueLocked || redLocked) return;
+
+      // optimistic revert
+      setDraftPicks((prev) => {
+        const next = [...prev];
+        next[lastIdx] = null;
+        return next;
+      });
+      setCurrentTurn(lastIdx);
+
+      // stop SSE echo flicker, then persist
+      ownerOptimisticSave(0, lastIdx, "le");
+      return;
+    }
+
+    // PLAYER flow
+    // must be my side’s last pick, not locked, and draft not complete
+    if (draftComplete) return;
+    if (playerSide !== lastSide) return;
+    if (sideLocked(playerSide)) return;
+
+    // optimistic revert
+    setDraftPicks((prev) => {
+      const next = [...prev];
+      next[lastIdx] = null;
+      return next;
+    });
+    setCurrentTurn(lastIdx);
+    bumpIgnoreSse(currentTurn - 1, "le");
+
+    // send undo to server (include index for compatibility)
+    postPlayerAction({
+      op: "undoLast",
+      side: playerSide,
+      index: lastIdx, // safe both for old (requires index) and new (ignores it)
+    });
   };
 
-  const slotIsBan = (index: number) =>
-    draftSequence[index] === "BB" || draftSequence[index] === "RR";
+
+
+  const slotIsBan = (i: number) =>
+    draftSequence[i] === "BB" || draftSequence[i] === "RR";
+  const sideOfToken = (tok: string) =>
+    tok?.startsWith("B") ? "B" : tok?.startsWith("R") ? "R" : "";
+  const sideLocked = (side: "B" | "R") =>
+    side === "B" ? blueLocked : redLocked;
+
 
   const updateEidolon = (index: number, eidolon: number) => {
     if (uiLocked) return;
@@ -910,6 +1055,15 @@ export default function ZzzDraftPage() {
 
     if (isPlayer) {
       if (side !== playerSide) return;
+
+      // 🟦 OPTIMISTIC
+      setDraftPicks((prev) => {
+        const updated = [...prev];
+        if (updated[index]) updated[index] = { ...updated[index]!, eidolon };
+        return updated;
+      });
+      bumpIgnoreSse();
+
       postPlayerAction({
         op: "setMindscape",
         side: playerSide,
@@ -923,6 +1077,9 @@ export default function ZzzDraftPage() {
     const updated = [...draftPicks];
     updated[index] = { ...updated[index]!, eidolon };
     setDraftPicks(updated);
+    requestSave(250);
+
+    ownerOptimisticSave(150);
   };
 
   const isSignatureWengine = (weng: WEngine, char: Character | undefined) => {
@@ -975,12 +1132,35 @@ export default function ZzzDraftPage() {
         setShowWengineModal(false);
         return;
       }
+
+      // 🟦 OPTIMISTIC
+      setDraftPicks((prev) => {
+        const updated = [...prev];
+        if (updated[index]) {
+          if (selected === null) {
+            const { wengine, ...rest } = updated[index]!;
+            updated[index] = { ...rest, wengine: undefined };
+          } else {
+            const weObj = wengines.find(
+              (w) => String(w.id) === String(selected)
+            );
+            updated[index] = {
+              ...updated[index]!,
+              wengine: weObj ?? undefined,
+            };
+          }
+        }
+        return updated;
+      });
+      bumpIgnoreSse();
+
       postPlayerAction({
         op: "setWengine",
         side: playerSide,
         index,
         wengineId: selected,
       });
+
       setShowWengineModal(false);
       setTimeout(() => setActiveSlotIndex(null), 100);
       setSelectedWengineId("");
@@ -1007,6 +1187,7 @@ export default function ZzzDraftPage() {
     setTimeout(() => setActiveSlotIndex(null), 100);
     setSelectedWengineId("");
     setWengineSearch("");
+    ownerOptimisticSave(150);
   };
 
   const updateSuperimpose = (index: number, superimpose: number) => {
@@ -1018,6 +1199,16 @@ export default function ZzzDraftPage() {
 
     if (isPlayer) {
       if (side !== playerSide) return;
+
+      // 🟦 OPTIMISTIC
+      setDraftPicks((prev) => {
+        const updated = [...prev];
+        if (updated[index])
+          updated[index] = { ...updated[index]!, superimpose };
+        return updated;
+      });
+      bumpIgnoreSse();
+
       postPlayerAction({
         op: "setSuperimpose",
         side: playerSide,
@@ -1030,6 +1221,8 @@ export default function ZzzDraftPage() {
     const updated = [...draftPicks];
     updated[index] = { ...updated[index]!, superimpose };
     setDraftPicks(updated);
+
+    ownerOptimisticSave(150);
   };
 
   /* For signature sort hinting */
@@ -1116,8 +1309,7 @@ export default function ZzzDraftPage() {
             fontWeight: 700,
           }}
         >
-          You are drafting for{" "}
-          {playerSide === "B" ? "Blue" : "Red"} Team
+          You are drafting for {playerSide === "B" ? "Blue" : "Red"} Team
           {draftComplete
             ? " • Draft Complete"
             : isMyTurn
@@ -1164,6 +1356,9 @@ export default function ZzzDraftPage() {
                       style={{ backgroundColor: color }}
                     />
                     {name}
+                    {isLive && !draftComplete && (
+                      <span className="badge bg-danger ms-2">LIVE</span>
+                    )}
                     {draftComplete && locked && (
                       <span
                         className="badge bg-secondary ms-2"
@@ -1535,23 +1730,35 @@ export default function ZzzDraftPage() {
           <button
             className="btn back-button-glass"
             onClick={handleUndo}
-            disabled={
-              currentTurn === 0 ||
-              uiLocked ||
-              isPlayer ||
-              blueLocked ||
-              redLocked
-            }
+            disabled={(() => {
+              if (currentTurn === 0) return true;
+
+              const lastIdx = currentTurn - 1;
+              const lastTok = draftSequence[lastIdx];
+              const lastSide = sideOfToken(lastTok);
+
+              if (slotIsBan(lastIdx)) return true;
+
+              if (!isPlayer) {
+                // owner: only blocked by UI lock or any side lock
+                return uiLocked || blueLocked || redLocked;
+              }
+
+              // player: only undo last move of *their* side, not locked, not complete
+              if (draftComplete) return true;
+              if (playerSide !== lastSide) return true;
+              if (sideLocked(playerSide)) return true;
+
+              return false;
+            })()}
+            title={(() => {
+              if (currentTurn === 0) return "Nothing to undo";
+              if (!isPlayer && (uiLocked || blueLocked || redLocked))
+                return "Locked";
+              if (isPlayer && draftComplete) return "Draft complete";
+              return "Undo last pick";
+            })()}
             style={{ whiteSpace: "nowrap" }}
-            title={
-              uiLocked
-                ? "Locked"
-                : isPlayer
-                ? "Owner only"
-                : blueLocked || redLocked
-                ? "Undo disabled while a draft is locked"
-                : "Undo last pick"
-            }
           >
             ⟲ Undo
           </button>
@@ -1805,6 +2012,7 @@ export default function ZzzDraftPage() {
                                 Math.min(SCORE_MAX, updated[i] || 0)
                               );
                               setScores(updated);
+                              requestSave(0);
                             }}
                           />
                         </div>
@@ -1840,6 +2048,7 @@ export default function ZzzDraftPage() {
                       setUiLocked(false); // unlock to edit scores/draft (DB remains completed)
                     } else if (canFinalize) {
                       setUiLocked(true); // lock UI and flag as complete
+                      requestSave(0);
                     }
                   }}
                   disabled={!uiLocked && !canFinalize}
@@ -2065,7 +2274,8 @@ export default function ZzzDraftPage() {
                 />
                 <Button
                   onClick={() =>
-                    bluePlayerUrl && navigator.clipboard.writeText(bluePlayerUrl)
+                    bluePlayerUrl &&
+                    navigator.clipboard.writeText(bluePlayerUrl)
                   }
                   disabled={!bluePlayerUrl}
                   variant="secondary"
