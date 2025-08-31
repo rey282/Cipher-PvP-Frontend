@@ -930,7 +930,6 @@ export default function ZzzDraftPage() {
     requestSave(0);
   };
 
-  /* ───────────── Draft actions ───────────── */
   const handleCharacterPick = (char: Character) => {
     if (uiLocked || draftComplete) return;
 
@@ -938,14 +937,15 @@ export default function ZzzDraftPage() {
     if (!currentStep) return;
 
     const mySideNow = currentStep.startsWith("B") ? "B" : "R";
+    const isBanSlot = currentStep === "BB" || currentStep === "RR";
 
-    // Common validations (ban/pick duplication rules are handled by grid flags)
+    // Common validations
     if (bannedCodes.includes(char.code)) return;
 
     if (isPlayer) {
       if (mySideNow !== playerSide) return;
 
-      // 🟦 OPTIMISTIC: local apply first
+      // 🟦 OPTIMISTIC local apply
       setDraftPicks((prev) => {
         const updated = [...prev];
         updated[currentTurn] = { character: char, eidolon: 0, superimpose: 1 };
@@ -955,9 +955,9 @@ export default function ZzzDraftPage() {
       setKeyboardSearch("");
       bumpIgnoreSse(currentTurn + 1, "ge");
 
-      // fire-and-forget server action
+      // Persist to server (ban vs pick)
       postPlayerAction({
-        op: "pick",
+        op: isBanSlot ? "ban" : "pick",
         side: playerSide,
         index: currentTurn,
         characterCode: char.code,
@@ -965,7 +965,7 @@ export default function ZzzDraftPage() {
       return;
     }
 
-    // owner local update, autosave will PUT
+    // OWNER path unchanged (PUT will persist ban/pick alike)
     const mySide = mySideNow;
     const myTeamPicks = draftPicks.filter((_, i) =>
       draftSequence[i].startsWith(mySide)
@@ -973,7 +973,7 @@ export default function ZzzDraftPage() {
     const alreadyPickedByMyTeam = myTeamPicks.some(
       (p) => p?.character.code === char.code
     );
-    if (alreadyPickedByMyTeam) return;
+    if (!isBanSlot && alreadyPickedByMyTeam) return;
 
     const updated = [...draftPicks];
     updated[currentTurn] = { character: char, eidolon: 0, superimpose: 1 };
@@ -984,15 +984,13 @@ export default function ZzzDraftPage() {
     ownerOptimisticSave(0, currentTurn + 1, "ge");
   };
 
+
   const handleUndo = () => {
     if (currentTurn === 0) return;
 
     const lastIdx = currentTurn - 1;
     const lastTok = draftSequence[lastIdx];
     const lastSide = sideOfToken(lastTok);
-
-    // ban slots can't be undone
-    if (slotIsBan(lastIdx)) return;
 
     // OWNER flow
     if (!isPlayer) {
@@ -1736,8 +1734,6 @@ export default function ZzzDraftPage() {
               const lastIdx = currentTurn - 1;
               const lastTok = draftSequence[lastIdx];
               const lastSide = sideOfToken(lastTok);
-
-              if (slotIsBan(lastIdx)) return true;
 
               if (!isPlayer) {
                 // owner: only blocked by UI lock or any side lock
