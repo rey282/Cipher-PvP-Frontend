@@ -308,11 +308,15 @@ export default function Landing() {
           `${
             import.meta.env.VITE_API_BASE
           }/api/zzz/matches/live?limit=8&minutes=2`,
-          { credentials: "include" }
+          {
+            credentials: "include",
+          }
         ),
         fetch(
           `${import.meta.env.VITE_API_BASE}/api/zzz/matches/recent?limit=20`,
-          { credentials: "include" }
+          {
+            credentials: "include",
+          }
         ),
       ]);
       const liveJson = liveRes.ok ? await liveRes.json() : { data: [] };
@@ -366,7 +370,9 @@ export default function Landing() {
       teamList.map((member) =>
         fetch(
           `${import.meta.env.VITE_API_BASE}/api/player/${member.id}/summary`,
-          { credentials: "include" }
+          {
+            credentials: "include",
+          }
         )
           .then((res) => (res.ok ? res.json() : null))
           .then((data) =>
@@ -450,7 +456,7 @@ export default function Landing() {
     setRandomizeLocked(true);
   };
 
-  /* ─────────── NEW: owner unfinished session handling ─────────── */
+  /* ─────────── owner unfinished session handling ─────────── */
   const [ownerOpen, setOwnerOpen] = useState<null | {
     key: string;
     mode: "2v2" | "3v3";
@@ -458,12 +464,18 @@ export default function Landing() {
     team2: string;
   }>(null);
 
+  // NEW: confirm-delete modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/open`,
-          { credentials: "include" }
+          {
+            credentials: "include",
+          }
         );
         if (!res.ok) {
           setOwnerOpen(null);
@@ -481,6 +493,14 @@ export default function Landing() {
       }
     })();
   }, []);
+
+  const clearLocalDraftKeys = () => {
+    try {
+      sessionStorage.removeItem("zzzSpectatorKey");
+      sessionStorage.removeItem("zzzDraftInit");
+      sessionStorage.removeItem("zzzDraftId");
+    } catch {}
+  };
 
   const resumeUnfinished = () => {
     if (!ownerOpen) return;
@@ -502,15 +522,48 @@ export default function Landing() {
     setLeaving(true);
     setTimeout(() => navigate("/zzz/draft"), 250);
   };
-  /* ─────────── END new owner unfinished session handling ─────────── */
+
+  // NEW: delete unfinished draft
+  const confirmDeleteUnfinished = async () => {
+    if (!ownerOpen) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${ownerOpen.key}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+      if (!res.ok) {
+        const msg = await res
+          .json()
+          .catch(() => ({ error: "Failed to delete" }));
+        toast.error(msg.error || "Failed to delete draft.");
+        return;
+      }
+      // success
+      clearLocalDraftKeys();
+      setOwnerOpen(null);
+      setShowDeleteModal(false);
+      toast.success("Unfinished draft deleted.");
+
+      // Open the Start Draft modal so they can start a new one immediately
+      setShowDraftModal(true);
+    } catch (e) {
+      toast.error("Network error deleting draft.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+  /* ─────────── END owner unfinished session handling ─────────── */
 
   const handleStart = () => {
-    // 🧱 Block starting a new draft if the owner has an unfinished one
+    // If an unfinished draft exists, show resume/delete guidance instead
     if (ownerOpen) {
       toast.warn(
-        "You have an unfinished Vivian PvP draft. Please finish it (Mark Match Complete) before starting a new one."
+        "You have an unfinished Vivian PvP draft. You can resume it, or delete it to start fresh."
       );
-      resumeUnfinished();
       return;
     }
 
@@ -650,7 +703,7 @@ export default function Landing() {
               </small>
             </Form.Group>
 
-            {/* Player inputs (unchanged layout) */}
+            {/* Player inputs */}
             <div className="row g-3">
               <div className="col-12 col-md-6">
                 <div
@@ -870,6 +923,57 @@ export default function Landing() {
           </Modal.Footer>
         </Modal>
 
+        {/* ───────────────── Confirm Delete Unfinished Draft ───────────────── */}
+        <Modal
+          show={showDeleteModal}
+          onHide={() => setShowDeleteModal(false)}
+          centered
+          contentClassName="custom-dark-modal"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Delete Unfinished Draft?</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <p className="mb-2">
+              This will permanently delete your unfinished draft:
+            </p>
+            <div
+              className="p-2 rounded-3 mb-3"
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <div className="fw-semibold">
+                {ownerOpen?.team1} <span className="text-white-50">vs</span>{" "}
+                {ownerOpen?.team2}
+              </div>
+              <div className="small text-white-50">
+                Mode: {ownerOpen?.mode.toUpperCase()}
+              </div>
+            </div>
+            <p className="text-white-50 mb-0">
+              You won’t be able to recover it. Continue?
+            </p>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowDeleteModal(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={confirmDeleteUnfinished}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting…" : "Delete Draft"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
         {/* ───── Hero Section ───── */}
         <div className="flex-grow-1 d-flex flex-column justify-content-center align-items-center text-center">
           <div className="hero animate__animated animate__fadeInDown text-white">
@@ -936,7 +1040,9 @@ export default function Landing() {
                 <div className="d-flex flex-column justify-content-center align-items-center gap-2">
                   <div className="d-flex justify-content-center align-items-center gap-2">
                     <button
-                      className={`btn angled-btn ${isMobile ? "disabled" : ""}`}
+                      className={`btn angled-btn ${
+                        isMobile || ownerOpen ? "disabled" : ""
+                      }`}
                       onClick={() => {
                         if (isMobile) {
                           toast.info(
@@ -946,18 +1052,24 @@ export default function Landing() {
                         }
                         if (ownerOpen) {
                           toast.warn(
-                            "You have an unfinished Vivian PvP draft. Resuming it now."
+                            "Complete or delete your unfinished draft before starting a new one."
                           );
-                          resumeUnfinished();
                           return;
                         }
                         setShowDraftModal(true);
                       }}
-                      disabled={isMobile}
-                      title={isMobile ? "Desktop only" : "Start draft"}
+                      disabled={isMobile || !!ownerOpen}
+                      title={
+                        isMobile
+                          ? "Desktop only"
+                          : ownerOpen
+                          ? "Complete or delete unfinished draft first"
+                          : "Start draft"
+                      }
                     >
                       Start Now
                     </button>
+
                     <button
                       className="btn btn-info-circle"
                       title="Match History"
@@ -975,16 +1087,29 @@ export default function Landing() {
                     </button>
                   </div>
 
-                  {/* NEW: visible resume helper when unfinished draft exists */}
+                  {/* NEW: visible resume/delete when unfinished draft exists */}
                   {ownerOpen && (
-                    <div className="mt-2 text-center">
-                      <button
-                        className="btn back-button-glass"
-                        onClick={resumeUnfinished}
-                        title="Return to your unfinished draft"
-                      >
-                        ↩︎ Resume Unfinished Draft
-                      </button>
+                    <div className="mt-2 text-center d-flex flex-column align-items-center gap-2">
+                      <div className="d-flex gap-2 flex-wrap justify-content-center">
+                        <button
+                          className="btn back-button-glass"
+                          onClick={resumeUnfinished}
+                          title="Return to your unfinished draft"
+                        >
+                          ↩︎ Resume Unfinished Draft
+                        </button>
+                        <button
+                          className="btn btn-info-circle"
+                          onClick={() => setShowDeleteModal(true)}
+                          title="Delete unfinished draft"
+                          style={{
+                            backgroundColor: "#b91c1c",
+                            borderColor: "#b91c1c",
+                          }}
+                        >
+                          🗑
+                        </button>
+                      </div>
                       <div className="text-white-50 small mt-1">
                         {ownerOpen.team1}{" "}
                         <span className="text-white-25">vs</span>{" "}
