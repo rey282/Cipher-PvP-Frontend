@@ -139,13 +139,39 @@ export default function ZzzDraftPage() {
   const query = new URLSearchParams(location.search);
   type DraftInit = { team1?: string; team2?: string; mode?: "2v2" | "3v3" };
 
-  /* ───────── Player mode detection from URL ─────────
-     ?key=SESSION_KEY&player=1&side=B|R
-  */
+  /* ───────── Player mode via token ─────────
+   ?key=SESSION_KEY&pt=PLAYER_TOKEN
+*/
   const keyFromUrl = query.get("key");
-  const isPlayerClient = query.get("player") === "1";
-  const playerSide =
-    query.get("side") === "R" ? "R" : query.get("side") === "B" ? "B" : null;
+  const [playerToken, setPlayerToken] = useState<string | null>(null);
+  const [playerSide, setPlayerSide] = useState<"B" | "R" | null>(null);
+  const isPlayerClient = !!(keyFromUrl && playerToken);
+
+  const [blueToken, setBlueToken] = useState<string | null>(null);
+  const [redToken, setRedToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const k = query.get("key");
+    const pt = query.get("pt");
+    if (!k || !pt) return;
+
+    (async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_BASE
+          }/api/zzz/sessions/${k}/resolve-token?pt=${encodeURIComponent(pt)}`,
+          { credentials: "include" }
+        );
+        if (!res.ok) return; // invalid token -> read-only
+        const data = await res.json(); // { side: "B" | "R" }
+        setPlayerToken(pt);
+        setPlayerSide(data.side);
+        setSpectatorKey(k);
+        sessionStorage.setItem("zzzSpectatorKey", k);
+      } catch {}
+    })();
+  }, [location.search]);
 
   // allow link joins + prior session keys
   const joiningViaLink = !!keyFromUrl;
@@ -224,12 +250,13 @@ export default function ZzzDraftPage() {
     }
   }, [cameFromStart, isMobile, navigate, joiningViaLink]);
 
-  // Only strip the querystring if it’s the owner flow (keep ?key for players)
+  // Only strip the querystring if it’s the owner flow (keep ?key or ?pt for players)
   useEffect(() => {
     if (!cameFromStart) return;
     if (!location.search) return;
+
     const qs = new URLSearchParams(location.search);
-    if (qs.get("key") || qs.get("player") || qs.get("side")) return;
+    if (qs.get("key") || qs.get("pt")) return;
 
     navigate(location.pathname, {
       replace: true,
@@ -420,9 +447,19 @@ export default function ZzzDraftPage() {
         }
       );
       if (!res.ok) throw new Error("Failed to create session");
-      const data = await res.json(); // { key, url }
+      const data = await res.json(); // { key, url, blueToken?, redToken? }
       setSpectatorKey(data.key);
       sessionStorage.setItem("zzzSpectatorKey", data.key);
+
+      if (data.blueToken) {
+        setBlueToken(data.blueToken);
+        sessionStorage.setItem("zzzBlueToken", data.blueToken);
+      }
+      if (data.redToken) {
+        setRedToken(data.redToken);
+        sessionStorage.setItem("zzzRedToken", data.redToken);
+      }
+
       setHydrated(true);
     } catch (e) {
       console.error(e);
@@ -430,6 +467,41 @@ export default function ZzzDraftPage() {
       setCreating(false);
     }
   };
+
+  useEffect(() => {
+    if (blueToken && redToken) return;
+
+    const fromSSBlue = sessionStorage.getItem("zzzBlueToken");
+    const fromSSRed = sessionStorage.getItem("zzzRedToken");
+    if (fromSSBlue || fromSSRed) {
+      if (fromSSBlue) setBlueToken(fromSSBlue);
+      if (fromSSRed) setRedToken(fromSSRed);
+      return;
+    }
+
+    (async () => {
+      try {
+        const r = await fetch(
+          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/open`,
+          { credentials: "include" }
+        );
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d?.blueToken) {
+          setBlueToken(d.blueToken);
+          sessionStorage.setItem("zzzBlueToken", d.blueToken);
+        }
+        if (d?.redToken) {
+          setRedToken(d.redToken);
+          sessionStorage.setItem("zzzRedToken", d.redToken);
+        }
+        if (d?.key && !spectatorKey) {
+          setSpectatorKey(d.key);
+          sessionStorage.setItem("zzzSpectatorKey", d.key);
+        }
+      } catch {}
+    })();
+  }, [blueToken, redToken, spectatorKey]);
 
   // Owner auto-create (skip if we already have a key or URL carries a key)
   useEffect(() => {
@@ -520,8 +592,6 @@ export default function ZzzDraftPage() {
     bumpIgnoreSse(expectedTurn, mode);
     requestSave(delayMs);
   }
-
-
 
   const mapServerStateToLocal = (state: SpectatorState) => {
     const mapped: (DraftPick | null)[] = state.picks.map((p) => {
@@ -616,7 +686,6 @@ export default function ZzzDraftPage() {
           if (serverState.currentTurn === currentTurn) return;
         }
       }
-
 
       // If characters/wengines not loaded yet, store and wait
       if (characters.length === 0 || wengines.length === 0) {
@@ -882,7 +951,7 @@ export default function ZzzDraftPage() {
   })();
 
   async function postPlayerAction(action: any) {
-    if (!spectatorKey) return;
+    if (!spectatorKey || !playerToken) return;
     try {
       const res = await fetch(
         `${
@@ -891,7 +960,7 @@ export default function ZzzDraftPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(action),
+          body: JSON.stringify({ ...action, pt: playerToken }),
           credentials: "include",
         }
       );
@@ -903,7 +972,6 @@ export default function ZzzDraftPage() {
       console.warn("player action network error", e);
     }
   }
-
 
   /* ───────────── Draft Side Lock helpers ───────────── */
   const sideOfIndex = (index: number) =>
@@ -984,7 +1052,6 @@ export default function ZzzDraftPage() {
     ownerOptimisticSave(0, currentTurn + 1, "ge");
   };
 
-
   const handleUndo = () => {
     if (currentTurn === 0) return;
 
@@ -1033,15 +1100,12 @@ export default function ZzzDraftPage() {
     });
   };
 
-
-
   const slotIsBan = (i: number) =>
     draftSequence[i] === "BB" || draftSequence[i] === "RR";
   const sideOfToken = (tok: string) =>
     tok?.startsWith("B") ? "B" : tok?.startsWith("R") ? "R" : "";
   const sideLocked = (side: "B" | "R") =>
     side === "B" ? blueLocked : redLocked;
-
 
   const updateEidolon = (index: number, eidolon: number) => {
     if (uiLocked) return;
@@ -1254,16 +1318,20 @@ export default function ZzzDraftPage() {
   const [showShareModal, setShowShareModal] = useState(false);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const spectatorUrl = spectatorKey ? `${origin}/zzz/s/${spectatorKey}` : "";
-  const bluePlayerUrl = spectatorKey
-    ? `${origin}/zzz/draft?key=${encodeURIComponent(
-        spectatorKey
-      )}&player=1&side=B`
-    : "";
-  const redPlayerUrl = spectatorKey
-    ? `${origin}/zzz/draft?key=${encodeURIComponent(
-        spectatorKey
-      )}&player=1&side=R`
-    : "";
+
+  const bluePlayerUrl =
+    spectatorKey && blueToken
+      ? `${origin}/zzz/draft?key=${encodeURIComponent(
+          spectatorKey
+        )}&pt=${encodeURIComponent(blueToken)}`
+      : "";
+
+  const redPlayerUrl =
+    spectatorKey && redToken
+      ? `${origin}/zzz/draft?key=${encodeURIComponent(
+          spectatorKey
+        )}&pt=${encodeURIComponent(redToken)}`
+      : "";
 
   if (isMobile || !cameFromStart) return null;
 
