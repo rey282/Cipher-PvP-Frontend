@@ -307,7 +307,7 @@ export default function Landing() {
         fetch(
           `${
             import.meta.env.VITE_API_BASE
-          }/api/zzz/matches/live?limit=8&minutes=2`,
+          }/api/zzz/matches/live?limit=8&minutes=120`,
           {
             credentials: "include",
           }
