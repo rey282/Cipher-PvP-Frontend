@@ -52,12 +52,31 @@ type SpectatorState = {
 };
 
 type FeaturedCfg = {
-  code: string;
+  kind: "character" | "wengine";
+  code?: string; // for characters
+  id?: string; // for W-Engines
   name?: string;
   image_url?: string;
   rule: "none" | "globalBan" | "globalPick";
-  customCost?: number | null; // overrides agent cost when set
+  customCost?: number | null;
 };
+
+function normalizeFeatured(list: any[]): FeaturedCfg[] {
+  return (Array.isArray(list) ? list : []).map((f: any) => {
+    const kind: "character" | "wengine" =
+      f?.kind === "wengine" || f?.id ? "wengine" : "character";
+    return {
+      kind,
+      code: f.code ?? undefined,
+      id: f.id ?? undefined,
+      name: f.name ?? undefined,
+      image_url: f.image_url ?? undefined,
+      rule: f.rule === "globalBan" || f.rule === "globalPick" ? f.rule : "none",
+      customCost: typeof f.customCost === "number" ? f.customCost : null,
+    };
+  });
+}
+
 
 const MOBILE_QUERY = "(pointer:coarse), (max-width: 820px)";
 const SCORE_MIN = 0;
@@ -131,13 +150,23 @@ function calcAgentCost(agent: Character, mindscape: number): number {
   return 0;
 }
 
-function calcWEngineCost(we: WEngine | undefined, refine: number): number {
+function calcWEngineCost(we: WEngine | undefined, phase: number): number {
   if (!we) return 0;
-  const r = Math.max(0, Math.min(5, refine));
+  const p = Math.max(1, Math.min(5, phase));
+
+  // New: all 4★ (and lower) are free at every phase
   if (we.rarity <= 4) return 0;
-  if (we.limited) return r >= 3 ? 0.5 : 0.25;
-  return r >= 3 ? 0.25 : 0;
+
+  if (we.limited) {
+    // Limited 5★: P1–P2 0.25, P3–P4 0.5, P5 0.75
+    if (p <= 2) return 0.25;
+    if (p <= 4) return 0.5;
+    return 0.75; // P5
+  }
+
+  return p >= 3 ? 0.25 : 0;
 }
+
 
 /* ───────────── Penalty ───────────── */
 const PENALTY_PER_POINT = 2500;
@@ -211,30 +240,66 @@ export default function ZzzDraftPage() {
 
   // Featured config (owner sets it on Start, players receive via GET/SSE)
   const [featuredList, setFeaturedList] = useState<FeaturedCfg[]>(
-    Array.isArray(seed.featured) ? seed.featured : []
+    Array.isArray(seed.featured) ? normalizeFeatured(seed.featured) : []
   );
 
-  // Fast lookups derived from featuredList
   const featuredGlobalBan = useMemo(
     () =>
       new Set(
-        featuredList.filter((f) => f.rule === "globalBan").map((f) => f.code)
+        featuredList
+          .filter((f) => f.kind === "character" && f.rule === "globalBan")
+          .map((f) => f.code as string)
+          .filter(Boolean)
       ),
     [featuredList]
   );
+
   const featuredGlobalPick = useMemo(
     () =>
       new Set(
-        featuredList.filter((f) => f.rule === "globalPick").map((f) => f.code)
+        featuredList
+          .filter((f) => f.kind === "character" && f.rule === "globalPick")
+          .map((f) => f.code as string)
+          .filter(Boolean)
       ),
     [featuredList]
   );
+
   const featuredCostOverride = useMemo(
     () =>
       new Map<string, number>(
         featuredList
-          .filter((f) => typeof f.customCost === "number")
-          .map((f) => [f.code, f.customCost as number])
+          .filter(
+            (f) =>
+              f.kind === "character" &&
+              typeof f.customCost === "number" &&
+              f.code
+          )
+          .map((f) => [f.code as string, f.customCost as number])
+      ),
+    [featuredList]
+  );
+
+  const featuredWeCostOverride = useMemo(
+    () =>
+      new Map<string, number>(
+        featuredList
+          .filter(
+            (f) =>
+              f.kind === "wengine" && typeof f.customCost === "number" && f.id
+          )
+          .map((f) => [String(f.id), f.customCost as number])
+      ),
+    [featuredList]
+  );
+
+  // W-Engine universal bans (server ignores "globalPick" for WEs)
+  const wengineGlobalBan = useMemo(
+    () =>
+      new Set(
+        featuredList
+          .filter((f) => f.kind === "wengine" && f.rule === "globalBan")
+          .map((f) => String(f.id))
       ),
     [featuredList]
   );
@@ -468,6 +533,115 @@ export default function ZzzDraftPage() {
     redLocked,
   });
 
+  // Compact Featured preview / popup
+  const [showFeaturedPopup, setShowFeaturedPopup] = useState(false);
+
+  const resolveFeaturedMeta = (f: FeaturedCfg) => {
+    if (f.kind === "character") {
+      const c = characters.find((x) => x.code === f.code);
+      return {
+        name: c?.name ?? f.name ?? (f.code || "Unknown"),
+        image_url: c?.image_url ?? f.image_url ?? "",
+      };
+    } else {
+      const w = wengines.find((x) => String(x.id) === String(f.id));
+      return {
+        name: w?.name ?? f.name ?? (f.id ? String(f.id) : "Unknown"),
+        image_url: w?.image_url ?? f.image_url ?? "",
+      };
+    }
+  };
+
+  // ⬇️ replace the beginning of renderFeaturedPill with this
+  const renderFeaturedPill = (f: FeaturedCfg) => {
+    const ruleColor =
+      f.rule === "globalBan"
+        ? "#ef4444"
+        : f.rule === "globalPick"
+        ? "#f59e0b"
+        : "rgba(255,255,255,0.28)";
+    const ruleLabel =
+      f.rule === "globalBan"
+        ? "Uni Ban"
+        : f.rule === "globalPick"
+        ? "Uni Pick"
+        : "No Rule";
+
+    const meta = resolveFeaturedMeta(f); // ✅ get name & image from catalogs
+    const title = meta.name;
+    const img = meta.image_url;
+
+    return (
+      <div
+        key={f.kind === "character" ? f.code : `we-${f.id}`}
+        className="d-inline-flex align-items-center"
+        style={{
+          gap: 10,
+          padding: "6px 8px",
+          borderRadius: 999,
+          background: "rgba(255,255,255,0.06)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          minWidth: 0,
+          maxWidth: 260,
+          cursor: "pointer",
+        }}
+        title={ruleLabel}
+        onClick={() => setShowFeaturedPopup(true)} // whole pill opens modal
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            overflow: "hidden",
+            background: "rgba(0,0,0,0.3)",
+            flex: "0 0 28px",
+          }}
+        >
+          {img ? (
+            <img
+              src={img}
+              alt={title}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : null}
+        </div>
+
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            className="text-truncate"
+            style={{ fontWeight: 600, lineHeight: 1 }}
+          >
+            {title}
+          </div>
+          <div
+            className="d-flex align-items-center gap-2"
+            style={{ marginTop: 2 }}
+          >
+            <span
+              className="badge"
+              style={{
+                backgroundColor: ruleColor,
+                border: "1px solid rgba(0,0,0,0.25)",
+                color: f.rule === "none" ? "rgba(255,255,255,0.85)" : "white",
+              }}
+            >
+              {ruleLabel}
+            </span>
+            {typeof f.customCost === "number" && (
+              <span className="text-white-50 small">
+                Cost:{" "}
+                <strong style={{ color: "white" }}>
+                  {f.customCost.toFixed(2)}
+                </strong>
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   /* ───────────── Session: auto-create on page load (Owner only) ───────────── */
   const [creating, setCreating] = useState(false);
 
@@ -624,7 +798,6 @@ export default function ZzzDraftPage() {
   const expectedTurnRef = useRef<number | null>(null);
   const expectedModeRef = useRef<"ge" | "le" | "eq" | null>(null);
 
-  // widen the window a bit to absorb latency spikes (optional)
   const bumpIgnoreSse = (
     expectedTurn?: number,
     mode: "ge" | "le" | "eq" = "ge"
@@ -709,7 +882,7 @@ export default function ZzzDraftPage() {
 
       // right after syncing mode/team names
       if (Array.isArray(payload?.featured)) {
-        setFeaturedList(payload.featured);
+        setFeaturedList(normalizeFeatured(payload.featured));
       }
 
       try {
@@ -835,7 +1008,7 @@ export default function ZzzDraftPage() {
 
         // hydrate featured even if SSE missed it
         if (Array.isArray(data?.featured)) {
-          setFeaturedList(data.featured);
+          setFeaturedList(normalizeFeatured(data.featured));
         }
 
         // Capture DB timing/completion for "live"
@@ -868,7 +1041,6 @@ export default function ZzzDraftPage() {
     })();
     return () => ctrl.abort();
   }, [spectatorKey, hydrated, featuredList.length]);
-
 
   /* ───────────── Autosave PUTs (OWNER ONLY) ───────────── */
   useEffect(() => {
@@ -927,21 +1099,37 @@ export default function ZzzDraftPage() {
   function getSlotCost(pick: DraftPick | null | undefined) {
     if (!pick) return { agentCost: 0, weCost: 0, total: 0 };
 
-    // normal costs
+    // ——— Character cost: base at M0 (override if set) + delta(Mx - M0)
     const normalAtM0 = calcAgentCost(pick.character, 0);
     const normalAtMx = calcAgentCost(pick.character, pick.eidolon);
-    const delta = Number((normalAtMx - normalAtM0).toFixed(2));
+    const mDelta = Number((normalAtMx - normalAtM0).toFixed(2));
 
-    // featured base (M0) if present, else normal M0
-    const featuredBase =
+    const featuredBaseChar =
       typeof featuredCostOverride.get(pick.character.code) === "number"
         ? (featuredCostOverride.get(pick.character.code) as number)
         : normalAtM0;
 
-    const agentCost = Number((featuredBase + delta).toFixed(2));
-    const weCost = calcWEngineCost(pick.wengine, pick.superimpose);
-    const total = Number((agentCost + weCost).toFixed(2));
+    const agentCost = Number((featuredBaseChar + mDelta).toFixed(2));
 
+    // ——— W-Engine cost: base at P1 (override if set) + delta(Px - P1)
+    let weCost = 0;
+    if (pick.wengine) {
+      const normalAtP1 = calcWEngineCost(pick.wengine, 1);
+      const normalAtPx = calcWEngineCost(pick.wengine, pick.superimpose);
+      const pDelta = Number((normalAtPx - normalAtP1).toFixed(2));
+
+      const weOverride =
+        pick.wengine.id != null
+          ? featuredWeCostOverride.get(String(pick.wengine.id))
+          : undefined;
+
+      const featuredBaseWE =
+        typeof weOverride === "number" ? weOverride : normalAtP1;
+
+      weCost = Number((featuredBaseWE + pDelta).toFixed(2));
+    }
+
+    const total = Number((agentCost + weCost).toFixed(2));
     return { agentCost, weCost, total };
   }
 
@@ -1317,6 +1505,17 @@ export default function ZzzDraftPage() {
         ? null
         : wengines.find((w) => String(w.id) === String(selectedWengineId))
             ?.id ?? null;
+
+    // ❌ If globally banned, block immediately (no optimistic update, no POST)
+    if (selected !== null && wengineGlobalBan.has(String(selected))) {
+      toast.error("That W-Engine is universally banned.");
+      setShowWengineModal(false);
+      setTimeout(() => setActiveSlotIndex(null), 100);
+      setSelectedWengineId("");
+      setWengineSearch("");
+      return;
+    }
+
 
     if (isPlayer) {
       if (side !== playerSide) {
@@ -1947,7 +2146,7 @@ export default function ZzzDraftPage() {
           })()}
         </div>
 
-        {/* ───────────── Featured section (below all drafting cards) ───────────── */}
+        {/* ───────────── Featured (clickable section opens modal) ───────────── */}
         {featuredList.length > 0 && (
           <div
             className="featured-wrap"
@@ -1958,133 +2157,33 @@ export default function ZzzDraftPage() {
               borderRadius: 12,
               background: "rgba(255,255,255,0.06)",
               border: "1px solid rgba(255,255,255,0.1)",
+              cursor: "pointer", // clickable area
             }}
+            onClick={() => setShowFeaturedPopup(true)} // ✅ whole bar opens modal
           >
+            {/* header */}
             <div
               className="d-flex align-items-center justify-content-between flex-wrap gap-2"
-              style={{ marginBottom: 10 }}
+              style={{ marginBottom: 8 }}
             >
               <div className="d-flex align-items-center gap-2">
-                <span style={{ fontWeight: 700 }}>Featured Characters</span>
+                <span style={{ fontWeight: 700 }}>Featured</span>
                 <span className="text-white-50 small">
                   ({featuredList.length}
                   {featuredList.length === 1 ? " item" : " items"})
                 </span>
               </div>
               <div className="text-white-50 small">
-                Cost shown is the M0 override (if set). Rules still apply during
-                draft.
+                Cost shown is the M0 (or WE) override if set. Rules still apply.
               </div>
             </div>
 
+            {/* row */}
             <div
-              className="featured-grid"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                gap: 10,
-              }}
+              className="d-flex align-items-center gap-2 flex-wrap"
+              style={{ overflow: "hidden", whiteSpace: "nowrap" }}
             >
-              {featuredList.map((f) => {
-                const ruleColor =
-                  f.rule === "globalBan"
-                    ? "#ef4444"
-                    : f.rule === "globalPick"
-                    ? "#f59e0b"
-                    : "rgba(255,255,255,0.18)";
-                const ruleLabel =
-                  f.rule === "globalBan"
-                    ? "Uni Ban"
-                    : f.rule === "globalPick"
-                    ? "Uni Pick"
-                    : "No Rule";
-
-                return (
-                  <div
-                    key={f.code}
-                    className="featured-card"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: 10,
-                      borderRadius: 10,
-                      background:
-                        "linear-gradient(0deg, rgba(255,255,255,0.03), rgba(255,255,255,0.03))",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                    }}
-                    title={ruleLabel}
-                  >
-                    <div
-                      style={{
-                        width: 52,
-                        height: 52,
-                        borderRadius: 8,
-                        overflow: "hidden",
-                        flex: "0 0 52px",
-                        background: "rgba(0,0,0,0.3)",
-                      }}
-                    >
-                      {f.image_url ? (
-                        <img
-                          src={f.image_url}
-                          alt={f.name || f.code}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                            display: "block",
-                          }}
-                        />
-                      ) : (
-                        <div
-                          className="d-flex align-items-center justify-content-center text-white-50"
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            fontSize: 12,
-                          }}
-                        >
-                          {f.code}
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div
-                        className="text-truncate"
-                        style={{ fontWeight: 600, lineHeight: 1.2 }}
-                      >
-                        {f.name || f.code}
-                      </div>
-
-                      <div className="d-flex align-items-center gap-2 mt-1">
-                        <span
-                          className="badge"
-                          style={{
-                            backgroundColor: ruleColor,
-                            border: "1px solid rgba(0,0,0,0.2)",
-                            color:
-                              f.rule === "none"
-                                ? "rgba(255,255,255,0.85)"
-                                : "white",
-                          }}
-                        >
-                          {ruleLabel}
-                        </span>
-                        {typeof f.customCost === "number" && (
-                          <span className="text-white-50 small">
-                            Cost:{" "}
-                            <strong style={{ color: "white" }}>
-                              {f.customCost.toFixed(2)}
-                            </strong>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {featuredList.map(renderFeaturedPill)}
             </div>
           </div>
         )}
@@ -2516,47 +2615,56 @@ export default function ZzzDraftPage() {
                   return filteredWengines.map((w: WEngine) => {
                     const isSig =
                       !!activeChar && isSignatureWengine(w, activeChar);
+                    const isBannedWE = wengineGlobalBan.has(String(w.id));
+
                     return (
                       <li
                         key={w.id}
-                        className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${
-                          selectedWengineId === String(w.id) ? "active" : ""
+                        className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center
+        ${selectedWengineId === String(w.id) ? "active" : ""} ${
+                          isBannedWE ? "disabled" : ""
                         }`}
-                        onClick={() =>
-                          !uiLocked && setSelectedWengineId(String(w.id))
-                        }
+                        onClick={() => {
+                          if (uiLocked || isBannedWE) return; // 🔒 no selection if banned
+                          setSelectedWengineId(String(w.id));
+                        }}
                         style={{
-                          cursor: uiLocked ? "not-allowed" : "pointer",
+                          cursor:
+                            uiLocked || isBannedWE ? "not-allowed" : "pointer",
                           padding: "6px 10px",
                           gap: "10px",
-                          opacity: uiLocked ? 0.6 : 1,
+                          opacity: uiLocked || isBannedWE ? 0.5 : 1,
                         }}
+                        title={isBannedWE ? "Universally banned" : w.name}
                       >
                         <div className="d-flex align-items-center gap-2">
                           <img
                             src={w.image_url}
                             alt={w.name}
                             style={{
-                              width: "32px",
-                              height: "32px",
+                              width: 32,
+                              height: 32,
                               objectFit: "cover",
-                              borderRadius: "4px",
+                              borderRadius: 4,
                               border: "1px solid rgba(255,255,255,0.1)",
                             }}
                           />
                           <div>
                             <div style={{ fontWeight: 600 }}>{w.name}</div>
                             <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
-                              {w.subname || "(no subname)"} ({w.rarity}★)
+                              {w.subname ? `${w.subname} ` : ""}({w.rarity}★)
                               {w.limited ? " • Limited" : ""}
                             </div>
                           </div>
                         </div>
-                        {isSig && (
+
+                        {isBannedWE ? (
+                          <span className="badge bg-danger">Uni Ban</span>
+                        ) : isSig ? (
                           <span className="badge bg-warning text-dark">
                             💠 Signature
                           </span>
-                        )}
+                        ) : null}
                       </li>
                     );
                   });
@@ -2578,9 +2686,148 @@ export default function ZzzDraftPage() {
                 if (uiLocked) return;
                 if (activeSlotIndex !== null) confirmWengine(activeSlotIndex);
               }}
-              disabled={uiLocked}
+              disabled={
+                uiLocked ||
+                (selectedWengineId !== "" &&
+                  wengineGlobalBan.has(String(selectedWengineId)))
+              }
             >
               Confirm
+            </Button>
+          </Modal.Footer>
+        </Modal>
+        {/* Featured: full list popup (landing-style tiles) */}
+        <Modal
+          show={showFeaturedPopup}
+          onHide={() => setShowFeaturedPopup(false)}
+          centered
+          contentClassName="custom-dark-modal"
+          size="lg"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>All Featured</Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                gap: 12,
+              }}
+            >
+              {featuredList.map((f) => {
+                const fk = f.kind === "character" ? f.code! : `we-${f.id!}`;
+                const ruleColor =
+                  f.rule === "globalBan"
+                    ? "#ef4444"
+                    : f.rule === "globalPick"
+                    ? "#f59e0b"
+                    : "rgba(255,255,255,0.18)";
+                const ruleLabel =
+                  f.rule === "globalBan"
+                    ? "Uni Ban"
+                    : f.rule === "globalPick"
+                    ? "Uni Pick"
+                    : "No Rule";
+
+                const meta = resolveFeaturedMeta(f); // ✅ hydrate from catalogs
+
+                return (
+                  <div
+                    key={`full-${fk}`}
+                    style={{
+                      padding: 12,
+                      borderRadius: 12,
+                      background:
+                        "linear-gradient(0deg, rgba(255,255,255,0.04), rgba(255,255,255,0.04))",
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      minWidth: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        background: "rgba(0,0,0,0.28)",
+                        flex: "0 0 56px",
+                      }}
+                    >
+                      {meta.image_url ? (
+                        <img
+                          src={meta.image_url}
+                          alt={meta.name}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : null}
+                    </div>
+
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
+                        title={meta.name}
+                        style={{
+                          fontWeight: 700,
+                          lineHeight: 1.15,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {meta.name}
+                      </div>
+
+                      <div
+                        className="d-flex align-items-center flex-wrap"
+                        style={{ gap: 8, marginTop: 6 }}
+                      >
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: ruleColor,
+                            border: "1px solid rgba(0,0,0,0.2)",
+                            color:
+                              f.rule === "none"
+                                ? "rgba(255,255,255,0.9)"
+                                : "white",
+                          }}
+                        >
+                          {ruleLabel}
+                        </span>
+
+                        {typeof f.customCost === "number" && (
+                          <span
+                            className="text-white-50 small"
+                            style={{ whiteSpace: "nowrap" }}
+                          >
+                            Cost:{" "}
+                            <strong style={{ color: "white" }}>
+                              {f.customCost.toFixed(2)}
+                            </strong>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Modal.Body>
+
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowFeaturedPopup(false)}
+            >
+              Close
             </Button>
           </Modal.Footer>
         </Modal>

@@ -22,13 +22,24 @@ type WEngine = {
   limited: boolean;
 };
 
-type FeaturedCfg = {
-  code: string;
-  name?: string;
-  image_url?: string;
-  rule: "none" | "globalBan" | "globalPick";
-  customCost?: number | null;
-};
+/** Featured now supports characters and W-Engines (union) */
+type FeaturedCfg =
+  | {
+      kind: "character";
+      code: string;
+      name?: string;
+      image_url?: string;
+      rule: "none" | "globalBan" | "globalPick";
+      customCost?: number | null;
+    }
+  | {
+      kind: "wengine";
+      id: string;
+      name?: string;
+      image_url?: string;
+      rule: "none" | "globalBan"; // spectator ignores globalPick for W-Engines
+      customCost?: number | null;
+    };
 
 type SpectatorState = {
   draftSequence: string[];
@@ -50,7 +61,7 @@ type SessionRow = {
   team1: string;
   team2: string;
   state: SpectatorState;
-  featured?: FeaturedCfg[]; 
+  featured?: FeaturedCfg[];
   is_complete?: boolean;
   last_activity_at?: string;
   completed_at?: string | null;
@@ -99,7 +110,7 @@ function useRowScale<T extends HTMLElement>(
   return scale;
 }
 
-/* ───────────── Cost rules (match ZzzDraft) ───────────── */
+/* ───────────── Cost rules (match Draft) ───────────── */
 function calcAgentCost(agent: Character, mindscape: number): number {
   const ms = Math.max(0, Math.min(6, mindscape));
   if (agent.rarity === 4) return 0.5;
@@ -113,13 +124,51 @@ function calcAgentCost(agent: Character, mindscape: number): number {
   }
   return 0;
 }
-function calcWEngineCost(we: WEngine | undefined, refine: number): number {
+
+/** Base WE cost at a given phase using the updated rules:
+ *  - 4★ => 0 always
+ *  - 5★ Limited: base 0.25 at P1, then +0 (P2), +0.25 (P3), +0.25 (P4), +0.25 (P5) => P5 = 0.75
+ *  - 5★ Non-limited: base 0, then +0 (P2), +0.25 (P3), +0.25 (P4), +0.25 (P5) => P5 = 0.75
+ */
+function calcWEngineCostRaw(we: WEngine | undefined, refine: number): number {
   if (!we) return 0;
-  const r = Math.max(0, Math.min(5, refine));
+  const r = Math.max(1, Math.min(5, refine)); // P1..P5
   if (we.rarity <= 4) return 0;
-  if (we.limited) return r >= 3 ? 0.5 : 0.25;
-  return r >= 3 ? 0.25 : 0;
+
+  if (we.limited) {
+    // P1 0.25, P2 +0, P3 +0.25, P4 +0.25, P5 +0.25
+    let total = 0.25;
+    if (r >= 3) total += 0.25;
+    if (r >= 4) total += 0.25;
+    if (r >= 5) total += 0.25; // P5 => 0.75
+    return Number(total.toFixed(2));
+  } else {
+    // non-limited: P1 0, P2 +0, P3 +0.25, P4 +0.25, P5 +0.25
+    let total = 0;
+    if (r >= 3) total += 0.25;
+    if (r >= 4) total += 0.25;
+    if (r >= 5) total += 0.25; // P5 => 0.75
+    return Number(total.toFixed(2));
+  }
 }
+
+/** Like characters: base-at-P1 + delta(Px - P1); base may be overridden by featured customCost */
+function calcWEngineCostWithBase(
+  we: WEngine | undefined,
+  refine: number,
+  featuredBaseOverride: number | undefined
+): number {
+  if (!we) return 0;
+  const normalAtP1 = calcWEngineCostRaw(we, 1);
+  const normalAtPx = calcWEngineCostRaw(we, refine);
+  const delta = Number((normalAtPx - normalAtP1).toFixed(2));
+  const base =
+    typeof featuredBaseOverride === "number"
+      ? featuredBaseOverride
+      : normalAtP1;
+  return Number((base + delta).toFixed(2));
+}
+
 const PENALTY_PER_POINT = 2500;
 
 /* ───────────── Floating reconnect badge ───────────── */
@@ -216,16 +265,61 @@ export default function ZzzSpectatorPage() {
     return m;
   }, [wengines]);
 
-  // Featured helpers (cost override)
-  const featuredList: FeaturedCfg[] = Array.isArray(session?.featured)
-    ? (session!.featured as FeaturedCfg[])
-    : [];
+  /* ───────── Featured helpers (hydrate + overrides) ───────── */
+  const normalizeFeatured = (list: any[]): FeaturedCfg[] => {
+    return (Array.isArray(list) ? list : []).map((f: any) => {
+      if (f?.kind === "wengine" || f?.id) {
+        return {
+          kind: "wengine" as const,
+          id: String(f.id),
+          name: f.name ?? undefined,
+          image_url: f.image_url ?? undefined,
+          // spectator only cares about none/globalBan for WE
+          rule: f.rule === "globalBan" ? "globalBan" : "none",
+          customCost: typeof f.customCost === "number" ? f.customCost : null,
+        };
+      }
+      // default: character
+      return {
+        kind: "character" as const,
+        code: String(f.code),
+        name: f.name ?? undefined,
+        image_url: f.image_url ?? undefined,
+        rule:
+          f.rule === "globalBan" || f.rule === "globalPick" ? f.rule : "none",
+        customCost: typeof f.customCost === "number" ? f.customCost : null,
+      };
+    });
+  };
+
+  const featuredList: FeaturedCfg[] = normalizeFeatured(
+    session?.featured || []
+  );
+
   const featuredCostOverride = useMemo(
     () =>
       new Map<string, number>(
         featuredList
-          .filter((f) => typeof f.customCost === "number")
+          .filter(
+            (f): f is Extract<FeaturedCfg, { kind: "character" }> =>
+              f.kind === "character"
+          )
+          .filter((f) => typeof f.customCost === "number" && !!f.code)
           .map((f) => [f.code, f.customCost as number])
+      ),
+    [featuredList]
+  );
+
+  const featuredWeCostOverride = useMemo(
+    () =>
+      new Map<string, number>(
+        featuredList
+          .filter(
+            (f): f is Extract<FeaturedCfg, { kind: "wengine" }> =>
+              f.kind === "wengine"
+          )
+          .filter((f) => typeof f.customCost === "number" && !!f.id)
+          .map((f) => [String(f.id), f.customCost as number])
       ),
     [featuredList]
   );
@@ -332,30 +426,35 @@ export default function ZzzSpectatorPage() {
     const char = charByCode.get(p.characterCode);
     const we = p.wengineId ? weById.get(String(p.wengineId)) : undefined;
 
+    // Character: base override at M0 + delta(Mx - M0)
     let agentCost = 0;
     if (char) {
-      // normal costs
       const normalAtM0 = calcAgentCost(char, 0);
       const normalAtMx = calcAgentCost(char, p.eidolon);
       const delta = Number((normalAtMx - normalAtM0).toFixed(2));
-
-      // featured base override
       const featuredBase =
         typeof featuredCostOverride.get(char.code) === "number"
           ? (featuredCostOverride.get(char.code) as number)
           : normalAtM0;
-
       agentCost = Number((featuredBase + delta).toFixed(2));
     }
 
-    const weCost = we ? calcWEngineCost(we, p.superimpose) : 0;
+    // W-Engine: base override at P1 + delta(Px - P1)
+    const weBaseOverride =
+      we && featuredWeCostOverride.has(String(we.id))
+        ? featuredWeCostOverride.get(String(we.id))
+        : undefined;
+
+    const weCost = we
+      ? calcWEngineCostWithBase(we, p.superimpose, weBaseOverride)
+      : 0;
+
     return {
       agentCost,
       weCost,
       total: Number((agentCost + weCost).toFixed(2)),
     };
   }
-
 
   const getTeamCost = (prefix: "B" | "R") => {
     let total = 0;
@@ -385,6 +484,23 @@ export default function ZzzSpectatorPage() {
     (state?.currentTurn ?? 0) >= (state?.draftSequence?.length ?? 0);
   const blueLocked = !!state?.blueLocked;
   const redLocked = !!state?.redLocked;
+
+  // Featured metadata hydration for display
+  const resolveFeaturedMeta = (f: FeaturedCfg) => {
+    if (f.kind === "character") {
+      const c = f.code ? charByCode.get(f.code) : undefined;
+      return {
+        title: c?.name ?? f.name ?? (f.code || "Unknown"),
+        image: c?.image_url ?? f.image_url ?? "",
+      };
+    } else {
+      const w = f.id ? weById.get(String(f.id)) : undefined;
+      return {
+        title: w?.name ?? f.name ?? (f.id ? String(f.id) : "Unknown"),
+        image: w?.image_url ?? f.image_url ?? "",
+      };
+    }
+  };
 
   if (isMobile) return null;
 
@@ -420,7 +536,7 @@ export default function ZzzSpectatorPage() {
           <div
             className="position-absolute"
             style={{
-              top: "70px", // adjust depending on your Navbar height
+              top: "70px",
               right: "20px",
               zIndex: 10,
             }}
@@ -647,7 +763,8 @@ export default function ZzzSpectatorPage() {
             );
           })}
         </div>
-        {/* ───────────── Featured section (below all drafting cards) ───────────── */}
+
+        {/* ───────────── Featured (characters + W-Engines, hydrated) ───────────── */}
         {featuredList.length > 0 && (
           <div
             className="featured-wrap"
@@ -665,15 +782,14 @@ export default function ZzzSpectatorPage() {
               style={{ marginBottom: 10 }}
             >
               <div className="d-flex align-items-center gap-2">
-                <span style={{ fontWeight: 700 }}>Featured Characters</span>
+                <span style={{ fontWeight: 700 }}>Featured</span>
                 <span className="text-white-50 small">
                   ({featuredList.length}
                   {featuredList.length === 1 ? " item" : " items"})
                 </span>
               </div>
               <div className="text-white-50 small">
-                Cost shown is the M0 override. Rules still apply during
-                draft.
+                Cost shown is the M0 (or P1) override if set. Rules still apply.
               </div>
             </div>
 
@@ -698,10 +814,13 @@ export default function ZzzSpectatorPage() {
                     : f.rule === "globalPick"
                     ? "Uni Pick"
                     : "No Rule";
-                    
+
+                const meta = resolveFeaturedMeta(f);
+                const keyStr = f.kind === "character" ? f.code : `we-${f.id}`;
+
                 return (
                   <div
-                    key={f.code}
+                    key={keyStr}
                     className="featured-card"
                     style={{
                       display: "flex",
@@ -725,10 +844,10 @@ export default function ZzzSpectatorPage() {
                         background: "rgba(0,0,0,0.3)",
                       }}
                     >
-                      {f.image_url ? (
+                      {meta.image ? (
                         <img
-                          src={f.image_url}
-                          alt={f.name || f.code}
+                          src={meta.image}
+                          alt={meta.title}
                           style={{
                             width: "100%",
                             height: "100%",
@@ -745,7 +864,9 @@ export default function ZzzSpectatorPage() {
                             fontSize: 12,
                           }}
                         >
-                          {f.code}
+                          {f.kind === "character"
+                            ? (f as any).code
+                            : (f as any).id}
                         </div>
                       )}
                     </div>
@@ -754,8 +875,9 @@ export default function ZzzSpectatorPage() {
                       <div
                         className="text-truncate"
                         style={{ fontWeight: 600, lineHeight: 1.2 }}
+                        title={meta.title}
                       >
-                        {f.name || f.code}
+                        {meta.title}
                       </div>
 
                       <div className="d-flex align-items-center gap-2 mt-1">
@@ -772,11 +894,11 @@ export default function ZzzSpectatorPage() {
                         >
                           {ruleLabel}
                         </span>
-                        {typeof f.customCost === "number" && (
+                        {typeof (f as any).customCost === "number" && (
                           <span className="text-white-50 small">
                             Cost:{" "}
                             <strong style={{ color: "white" }}>
-                              {f.customCost.toFixed(2)}
+                              {(f as any).customCost.toFixed(2)}
                             </strong>
                           </span>
                         )}
