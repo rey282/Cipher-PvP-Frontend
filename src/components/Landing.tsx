@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./Landing.css";
 import Navbar from "../components/Navbar";
-import { Modal, Button, Form } from "react-bootstrap";
+import { Modal, Button, Form, Dropdown } from "react-bootstrap";
 import { toast } from "react-toastify";
+import { useAuth } from "../context/AuthContext";
 
 /* ───────────────── Rules ───────────────── */
-const ZzzRules: React.FC = () => (
+const ZzzRules = () => (
   <div className="rules-card">
     <strong>Rules:</strong>
     <p>
@@ -205,6 +206,41 @@ export default function Landing() {
   const is3v3 = mode === "3v3";
   const nPlayers = is3v3 ? 3 : 2;
 
+  // Featured Character config
+  type FeaturedCfg = {
+    code: string;
+    name: string;
+    image_url: string;
+    customCost?: number | null;
+    rule: "none" | "globalBan" | "globalPick";
+  };
+
+  const [showFeaturedModal, setShowFeaturedModal] = useState(false);
+  const [featuredList, setFeaturedList] = useState<FeaturedCfg[]>([]);
+
+  // local character pool for picker
+  type ZzzChar = { code: string; name: string; image_url: string };
+  const [charPool, setCharPool] = useState<ZzzChar[]>([]);
+  useEffect(() => {
+    if (!showFeaturedModal || charPool.length) return;
+    fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/characters`, {
+      credentials: "include",
+    })
+      .then((r) => r.json())
+      .then((d) =>
+        setCharPool(
+          (d?.data ?? []).map((c: any) => ({
+            code: c.code,
+            name: c.name,
+            image_url: c.image_url,
+          }))
+        )
+      )
+      .catch(() => setCharPool([]));
+  }, [showFeaturedModal, charPool.length]);
+
+  const { user } = useAuth();
+
   // ORIGINAL: per-player inputs
   const [team1Names, setTeam1Names] = useState<string[]>(
     Array(nPlayers).fill("")
@@ -300,6 +336,10 @@ export default function Landing() {
   const [liveDrafts, setLiveDrafts] = useState<any[]>([]);
   const [recentMatches, setRecentMatches] = useState<any[]>([]);
 
+  // Match History pagination (Completed)
+  const RECENT_PAGE_SIZE = 10;
+  const [recentPage, setRecentPage] = useState(1);
+
   const fetchMatches = async () => {
     setLoadingMatches(true);
     try {
@@ -308,21 +348,18 @@ export default function Landing() {
           `${
             import.meta.env.VITE_API_BASE
           }/api/zzz/matches/live?limit=8&minutes=120`,
-          {
-            credentials: "include",
-          }
+          { credentials: "include" }
         ),
         fetch(
-          `${import.meta.env.VITE_API_BASE}/api/zzz/matches/recent?limit=20`,
-          {
-            credentials: "include",
-          }
-        ),
+          `${import.meta.env.VITE_API_BASE}/api/zzz/matches/recent?limit=50`,
+          { credentials: "include" }
+        ), // was 20
       ]);
       const liveJson = liveRes.ok ? await liveRes.json() : { data: [] };
       const recentJson = recentRes.ok ? await recentRes.json() : { data: [] };
       setLiveDrafts(Array.isArray(liveJson.data) ? liveJson.data : []);
       setRecentMatches(Array.isArray(recentJson.data) ? recentJson.data : []);
+      setRecentPage(1); // reset to first page on refresh
     } catch {
       setLiveDrafts([]);
       setRecentMatches([]);
@@ -333,8 +370,20 @@ export default function Landing() {
 
   const openMatches = () => {
     setShowMatchesModal(true);
+    setRecentPage(1); // ensure we open on page 1
     fetchMatches();
   };
+
+  // keep page in range if new fetch shrinks the list
+  useEffect(() => {
+    if (!showMatchesModal) return;
+    const totalPages = Math.max(
+      1,
+      Math.ceil(recentMatches.length / RECENT_PAGE_SIZE)
+    );
+    if (recentPage > totalPages) setRecentPage(totalPages);
+  }, [recentMatches.length, showMatchesModal]);
+
 
   const goSpectator = (key: string) => {
     setLeaving(true);
@@ -349,12 +398,6 @@ export default function Landing() {
       return "";
     }
   };
-
-  useEffect(() => {
-    if (!showMatchesModal) return;
-    const id = setInterval(fetchMatches, 25000);
-    return () => clearInterval(id);
-  }, [showMatchesModal]);
 
   // Cached fetch of team avatars
   const fetchProfiles = async (
@@ -393,6 +436,12 @@ export default function Landing() {
     teamCache[cacheKey] = filtered;
     setter(filtered);
   };
+
+  useEffect(() => {
+    if (showDraftModal && !user) {
+      toast.warning("You are not logged in — this match will NOT be recorded.");
+    }
+  }, [showDraftModal, user]);
 
   useEffect(() => {
     const s = location.state as { blocked?: string } | null;
@@ -591,15 +640,38 @@ export default function Landing() {
     const t2 = safe2.filter(Boolean).join("|");
 
     const [team1, team2] = Math.random() < 0.5 ? [t1, t2] : [t2, t1];
-    const payload = { team1, team2, mode: m };
 
-    sessionStorage.removeItem("zzzSpectatorKey");
+    // Featured validation: every item must have a rule or custom cost
+    const invalidFeatured = featuredList.some(
+      (f) => f.rule === "none" && typeof f.customCost !== "number"
+    );
+    if (invalidFeatured) {
+      setShowFeaturedModal(true);
+      toast.error(
+        "Fix featured characters: add a rule or a custom cost to each."
+      );
+      return;
+    }
 
+    const payload = {
+      team1,
+      team2,
+      mode: m,
+      featured: featuredList.map((f) => ({
+        code: f.code,
+        customCost: typeof f.customCost === "number" ? f.customCost : null,
+        rule: f.rule, // "none" | "globalBan" | "globalPick"
+        name: f.name, // for UI convenience
+        image_url: f.image_url, // for UI convenience
+      })),
+    };
     const draftId =
       (crypto as any).randomUUID?.() ??
       `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
     sessionStorage.setItem("zzzDraftId", draftId);
     sessionStorage.setItem("zzzDraftInit", JSON.stringify(payload));
+    sessionStorage.removeItem("zzzSpectatorKey");
 
     navigate("/zzz/draft", { state: { ...payload, draftId } });
   };
@@ -626,6 +698,21 @@ export default function Landing() {
       setTeam2Names(ensureLen(t2, len));
     }
   }, [location.search, isMobile]);
+
+  const canSaveFeatured = featuredList.every(
+    (f) => f.rule !== "none" || typeof f.customCost === "number"
+  );
+
+  const totalRecentPages = Math.max(
+    1,
+    Math.ceil(recentMatches.length / RECENT_PAGE_SIZE)
+  );
+  const recentStart = (recentPage - 1) * RECENT_PAGE_SIZE;
+  const recentPageItems = recentMatches.slice(
+    recentStart,
+    recentStart + RECENT_PAGE_SIZE
+  );
+
 
   return (
     <div className={`landing-wrapper ${leaving ? "fade-out" : ""}`}>
@@ -702,6 +789,70 @@ export default function Landing() {
                 Note: You must be logged in for the match to be recorded.
               </small>
             </Form.Group>
+            {featuredList.length > 0 && (
+              <div
+                className="p-2 rounded-3 mb-3"
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                <div className="fw-semibold mb-2">
+                  Featured Characters ({featuredList.length})
+                </div>
+                <div className="d-flex flex-wrap gap-2">
+                  {featuredList.map((f) => (
+                    <div
+                      key={f.code}
+                      className="d-flex align-items-center gap-2 px-2 py-1 rounded"
+                      style={{
+                        background: "rgba(255,255,255,0.08)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                      }}
+                    >
+                      <img
+                        src={f.image_url}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 6,
+                          objectFit: "cover",
+                        }}
+                      />
+                      <div className="small">
+                        <div className="fw-semibold">{f.name}</div>
+                        <div className="text-white-50">
+                          {f.rule === "globalBan"
+                            ? "Global Ban"
+                            : f.rule === "globalPick"
+                            ? "Global Pick"
+                            : "None"}
+                          {typeof f.customCost === "number"
+                            ? ` • Cost ${f.customCost.toFixed(2)}`
+                            : ""}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 d-flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline-warning"
+                    onClick={() => setShowFeaturedModal(true)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline-light"
+                    onClick={() => setFeaturedList([])}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Player inputs */}
             <div className="row g-3">
@@ -786,6 +937,17 @@ export default function Landing() {
             </div>
             <div className="d-flex gap-2">
               <Button
+                variant={featuredList.length ? "warning" : "outline-warning"}
+                onClick={() => setShowFeaturedModal(true)}
+                title="Configure featured characters (global ban/pick and cost overrides)"
+              >
+                ⭐{" "}
+                {featuredList.length
+                  ? `Edit Featured (${featuredList.length})`
+                  : "Featured Characters"}
+              </Button>
+
+              <Button
                 variant="outline-light"
                 onClick={handleRandomizeFromFields}
                 disabled={randomizeLocked}
@@ -825,6 +987,279 @@ export default function Landing() {
               onClick={() => setShowRulesModal(false)}
             >
               Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        <Modal
+          show={showFeaturedModal}
+          onHide={() => setShowFeaturedModal(false)}
+          centered
+          contentClassName="custom-dark-modal"
+          size="lg"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Featured Characters</Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body>
+            {/* Selected list editor */}
+            <div
+              className="p-2 rounded-3 mb-3"
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <div className="fw-semibold mb-2">
+                Selected ({featuredList.length}/10)
+              </div>
+
+              {featuredList.length === 0 ? (
+                <div className="text-white-50">No featured characters yet.</div>
+              ) : (
+                <div
+                  className="d-flex flex-column gap-2"
+                  style={{ maxHeight: 280, overflowY: "auto", paddingRight: 4 }}
+                >
+                  {featuredList.map((f, idx) => (
+                    <div
+                      key={f.code}
+                      className="d-flex align-items-center gap-2 p-2 rounded-3"
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                      }}
+                    >
+                      <img
+                        src={f.image_url}
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 6,
+                          objectFit: "cover",
+                        }}
+                      />
+                      <div className="flex-grow-1">
+                        <div className="fw-semibold">{f.name}</div>
+                        <div className="small text-white-50">
+                          {f.rule === "globalBan"
+                            ? "Global Ban"
+                            : f.rule === "globalPick"
+                            ? "Global Pick"
+                            : "None"}
+                          {typeof f.customCost === "number"
+                            ? ` • Cost ${f.customCost.toFixed(2)}`
+                            : ""}
+                        </div>
+                      </div>
+
+                      {/* Rule selector */}
+                      {/* RIGHT controls: rule + cost + remove */}
+                      <div className="d-flex align-items-center gap-2 ms-auto">
+                        <Dropdown
+                          className="featured-dd"
+                          align="end"
+                          drop="down"
+                        >
+                          <Dropdown.Toggle
+                            variant="dark"
+                            className="text-start"
+                            style={{ width: 180 }} // fixed width so menu can match it
+                            id={`feat-rule-${f.code}`}
+                          >
+                            {f.rule === "globalBan"
+                              ? "Universal Ban"
+                              : f.rule === "globalPick"
+                              ? "Universal Pick"
+                              : "No special rule"}
+                          </Dropdown.Toggle>
+
+                          <Dropdown.Menu
+                            variant="dark"
+                            className="featured-dd-menu"
+                            renderOnMount
+                            flip={false}
+                            popperConfig={{
+                              strategy: "fixed",
+                              modifiers: [
+                                {
+                                  name: "preventOverflow",
+                                  options: { boundary: "viewport" },
+                                },
+                                { name: "offset", options: { offset: [0, 6] } },
+                              ],
+                            }}
+                          >
+                            <Dropdown.Item
+                              onClick={() => {
+                                setFeaturedList((list) => {
+                                  const next = [...list];
+                                  next[idx] = { ...f, rule: "none" };
+                                  return next;
+                                });
+                              }}
+                            >
+                              No special rule
+                            </Dropdown.Item>
+                            <Dropdown.Item
+                              onClick={() => {
+                                setFeaturedList((list) => {
+                                  const next = [...list];
+                                  next[idx] = { ...f, rule: "globalBan" };
+                                  return next;
+                                });
+                              }}
+                            >
+                              Universal Ban
+                            </Dropdown.Item>
+                            <Dropdown.Item
+                              onClick={() => {
+                                setFeaturedList((list) => {
+                                  const next = [...list];
+                                  next[idx] = { ...f, rule: "globalPick" };
+                                  return next;
+                                });
+                              }}
+                            >
+                              Universal Pick
+                            </Dropdown.Item>
+                          </Dropdown.Menu>
+                        </Dropdown>
+
+                        <input
+                          type="number"
+                          step="0.25"
+                          min={0}
+                          max={100}
+                          className="form-control"
+                          style={{ width: 130 }}
+                          placeholder="Custom cost"
+                          value={
+                            typeof f.customCost === "number"
+                              ? String(f.customCost)
+                              : ""
+                          }
+                          onChange={(e) => {
+                            const raw = e.target.value.trim();
+                            setFeaturedList((list) => {
+                              const next = [...list];
+                              // allow blank to clear; otherwise clamp 0..100 and handle NaN
+                              if (raw === "") {
+                                next[idx] = { ...f, customCost: null };
+                              } else {
+                                let val = Number(raw);
+                                if (isNaN(val)) val = 0;
+                                val = Math.min(100, Math.max(0, val));
+                                next[idx] = { ...f, customCost: val };
+                              }
+                              return next;
+                            });
+                          }}
+                        />
+
+                        <Button
+                          size="sm"
+                          variant="outline-light"
+                          onClick={() =>
+                            setFeaturedList((list) =>
+                              list.filter((x) => x.code !== f.code)
+                            )
+                          }
+                          title="Remove"
+                        >
+                          ✖
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Picker grid */}
+            <div className="fw-semibold mb-2">Add characters</div>
+            <div
+              className="d-flex flex-wrap gap-2"
+              style={{ maxHeight: 320, overflowY: "auto" }}
+            >
+              {charPool
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((c) => {
+                  const selected = featuredList.some((f) => f.code === c.code);
+                  const disabled = !selected && featuredList.length >= 10;
+                  return (
+                    <button
+                      key={c.code}
+                      onClick={() => {
+                        if (selected) {
+                          setFeaturedList((list) =>
+                            list.filter((f) => f.code !== c.code)
+                          );
+                        } else {
+                          if (featuredList.length >= 10) return;
+                          setFeaturedList((list) => [
+                            ...list,
+                            {
+                              code: c.code,
+                              name: c.name,
+                              image_url: c.image_url,
+                              rule: "none",
+                              customCost: null,
+                            },
+                          ]);
+                        }
+                      }}
+                      className={`btn ${
+                        selected ? "btn-warning" : "btn-outline-light"
+                      }`}
+                      style={{
+                        width: 72,
+                        height: 72,
+                        padding: 0,
+                        borderRadius: 8,
+                        backgroundImage: `url(${c.image_url})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        outline: selected ? "2px solid #f6c453" : "none",
+                        opacity: disabled ? 0.5 : 1,
+                        cursor: disabled ? "not-allowed" : "pointer",
+                      }}
+                      title={selected ? `Remove ${c.name}` : `Add ${c.name}`}
+                      disabled={disabled}
+                    />
+                  );
+                })}
+            </div>
+          </Modal.Body>
+
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowFeaturedModal(false)}
+            >
+              Close
+            </Button>
+            <Button
+              variant="warning"
+              disabled={!canSaveFeatured}
+              onClick={() => {
+                if (!canSaveFeatured) {
+                  toast.error(
+                    "Each featured character needs either a rule or a custom cost."
+                  );
+                  return;
+                }
+                setShowFeaturedModal(false);
+              }}
+              title={
+                canSaveFeatured
+                  ? "Save featured characters"
+                  : "Each item must have a rule or a custom cost"
+              }
+            >
+              Save
             </Button>
           </Modal.Footer>
         </Modal>
@@ -887,26 +1322,70 @@ export default function Landing() {
                   <div className="text-white-50">No completed matches yet.</div>
                 ) : (
                   <div className="list-group">
-                    {recentMatches.map((m) => (
-                      <button
-                        key={`done-${m.key}`}
-                        className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                        onClick={() => goSpectator(m.key)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <div>
-                          <div className="fw-semibold">
-                            {m.team1} <span className="text-white-50">vs</span>{" "}
-                            {m.team2}
-                          </div>
-                          <div className="small text-white-50">
-                            Mode: {m.mode?.toUpperCase?.() || m.mode} •
-                            Completed: {fmtWhen(m.completedAt)}
-                          </div>
+                    {recentMatches.length === 0 ? (
+                      <div className="text-white-50">
+                        No completed matches yet.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="list-group">
+                          {recentPageItems.map((m) => (
+                            <button
+                              key={`done-${m.key}`}
+                              className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                              onClick={() => goSpectator(m.key)}
+                              style={{ cursor: "pointer" }}
+                            >
+                              <div>
+                                <div className="fw-semibold">
+                                  {m.team1}{" "}
+                                  <span className="text-white-50">vs</span>{" "}
+                                  {m.team2}
+                                </div>
+                                <div className="small text-white-50">
+                                  Mode: {m.mode?.toUpperCase?.() || m.mode} •
+                                  Completed: {fmtWhen(m.completedAt)}
+                                </div>
+                              </div>
+                              <span className="badge bg-success">Done</span>
+                            </button>
+                          ))}
                         </div>
-                        <span className="badge bg-success">Done</span>
-                      </button>
-                    ))}
+
+                        {/* Pagination controls */}
+                        {totalRecentPages > 1 && (
+                          <div className="d-flex justify-content-between align-items-center mt-3">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-light"
+                              onClick={() =>
+                                setRecentPage((p) => Math.max(1, p - 1))
+                              }
+                              disabled={recentPage === 1}
+                            >
+                              ‹ Prev
+                            </button>
+
+                            <div className="text-white-50 small">
+                              Page {recentPage} / {totalRecentPages}
+                            </div>
+
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-light"
+                              onClick={() =>
+                                setRecentPage((p) =>
+                                  Math.min(totalRecentPages, p + 1)
+                                )
+                              }
+                              disabled={recentPage === totalRecentPages}
+                            >
+                              Next ›
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </>

@@ -22,6 +22,14 @@ type WEngine = {
   limited: boolean;
 };
 
+type FeaturedCfg = {
+  code: string;
+  name?: string;
+  image_url?: string;
+  rule: "none" | "globalBan" | "globalPick";
+  customCost?: number | null;
+};
+
 type SpectatorState = {
   draftSequence: string[];
   currentTurn: number;
@@ -33,6 +41,8 @@ type SpectatorState = {
   } | null>;
   blueScores: number[];
   redScores: number[];
+  blueLocked?: boolean;
+  redLocked?: boolean;
 };
 
 type SessionRow = {
@@ -40,6 +50,7 @@ type SessionRow = {
   team1: string;
   team2: string;
   state: SpectatorState;
+  featured?: FeaturedCfg[]; 
   is_complete?: boolean;
   last_activity_at?: string;
   completed_at?: string | null;
@@ -48,12 +59,12 @@ type SessionRow = {
 const MOBILE_QUERY = "(pointer:coarse), (max-width: 820px)";
 
 /* ───────────── Sizing (match ZzzDraft) ───────────── */
-const CARD_W = 170; // px
-const CARD_H = 240; // px
-const CARD_GAP = 12; // px
-const CARD_MIN_SCALE = 0.68; // same minimum scale
+const CARD_W = 170;
+const CARD_H = 240;
+const CARD_GAP = 12;
+const CARD_MIN_SCALE = 0.68;
 
-/* ───────────── Responsive row sizing (robust) ───────────── */
+/* ───────────── Responsive row sizing ───────────── */
 function useRowScale<T extends HTMLElement>(
   ref: React.MutableRefObject<T | null>,
   cardCount: number
@@ -66,10 +77,6 @@ function useRowScale<T extends HTMLElement>(
 
     const compute = () => {
       const available = el.clientWidth || 0;
-      if (!Number.isFinite(cardCount) || cardCount <= 0) {
-        setScale(1);
-        return;
-      }
       const gaps = Math.max(0, cardCount - 1);
       const needed = cardCount * CARD_W + gaps * CARD_GAP;
       const s = Math.min(
@@ -158,7 +165,7 @@ export default function ZzzSpectatorPage() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [wengines, setWengines] = useState<WEngine[]>([]);
 
-  // Refs + row scales (always exist)
+  // Refs + row scales
   const blueRowRef = useRef<HTMLDivElement>(null);
   const redRowRef = useRef<HTMLDivElement>(null);
 
@@ -183,7 +190,7 @@ export default function ZzzSpectatorPage() {
   const blueScale = useRowScale(blueRowRef, blueCount);
   const redScale = useRowScale(redRowRef, redCount);
 
-  // Name labels (generic; you stored only team strings)
+  // Name labels
   const buildNameLabels = (raw: string, count: number) => {
     const parts = (raw || "")
       .split("|")
@@ -208,6 +215,28 @@ export default function ZzzSpectatorPage() {
     for (const w of wengines) m.set(String(w.id), w);
     return m;
   }, [wengines]);
+
+  // Featured helpers (cost override)
+  const featuredList: FeaturedCfg[] = Array.isArray(session?.featured)
+    ? (session!.featured as FeaturedCfg[])
+    : [];
+  const featuredCostOverride = useMemo(
+    () =>
+      new Map<string, number>(
+        featuredList
+          .filter((f) => typeof f.customCost === "number")
+          .map((f) => [f.code, f.customCost as number])
+      ),
+    [featuredList]
+  );
+
+  // LIVE badge (optional, to match draft page vibe)
+  const isComplete = !!session?.is_complete || !!session?.completed_at;
+  const isLive =
+    !isComplete &&
+    !!session?.last_activity_at &&
+    Date.now() - new Date(session.last_activity_at).getTime() <
+      2 * 60 * 60 * 1000;
 
   /* Load static data once */
   useEffect(() => {
@@ -242,7 +271,7 @@ export default function ZzzSpectatorPage() {
     };
   }, []);
 
-  /* Subscribe to live spectator session via SSE (with reconnect flag) */
+  /* Subscribe to live spectator session via SSE */
   useEffect(() => {
     if (!key || isMobile) return;
 
@@ -294,7 +323,40 @@ export default function ZzzSpectatorPage() {
     };
   }, [key]);
 
-  /* Helpers */
+  function getSlotCost(p: SpectatorState["picks"][number]): {
+    agentCost: number;
+    weCost: number;
+    total: number;
+  } {
+    if (!p) return { agentCost: 0, weCost: 0, total: 0 };
+    const char = charByCode.get(p.characterCode);
+    const we = p.wengineId ? weById.get(String(p.wengineId)) : undefined;
+
+    let agentCost = 0;
+    if (char) {
+      // normal costs
+      const normalAtM0 = calcAgentCost(char, 0);
+      const normalAtMx = calcAgentCost(char, p.eidolon);
+      const delta = Number((normalAtMx - normalAtM0).toFixed(2));
+
+      // featured base override
+      const featuredBase =
+        typeof featuredCostOverride.get(char.code) === "number"
+          ? (featuredCostOverride.get(char.code) as number)
+          : normalAtM0;
+
+      agentCost = Number((featuredBase + delta).toFixed(2));
+    }
+
+    const weCost = we ? calcWEngineCost(we, p.superimpose) : 0;
+    return {
+      agentCost,
+      weCost,
+      total: Number((agentCost + weCost).toFixed(2)),
+    };
+  }
+
+
   const getTeamCost = (prefix: "B" | "R") => {
     let total = 0;
     const picks = state?.picks ?? [];
@@ -303,16 +365,9 @@ export default function ZzzSpectatorPage() {
       if (!step.startsWith(prefix)) continue;
       if (step === "BB" || step === "RR") continue;
 
-      const p = picks[i];
-      if (!p) continue;
-
-      const char = charByCode.get(p.characterCode);
-      if (!char) continue; // not resolved yet
-      const we = p.wengineId ? weById.get(String(p.wengineId)) : undefined;
-
-      const agentCost = calcAgentCost(char, p.eidolon);
-      const weCost = calcWEngineCost(we, p.superimpose);
-      total += agentCost + weCost;
+      const slot = picks[i];
+      const { total: t } = getSlotCost(slot);
+      total += t;
     }
     const penalty = Math.max(0, total - COST_LIMIT);
     const penaltyPoints = Math.floor(penalty / 0.25) * PENALTY_PER_POINT;
@@ -325,6 +380,11 @@ export default function ZzzSpectatorPage() {
     blueScores.reduce((a, b) => a + b, 0) - team1Cost.penaltyPoints;
   const redTotal =
     redScores.reduce((a, b) => a + b, 0) - team2Cost.penaltyPoints;
+
+  const draftComplete =
+    (state?.currentTurn ?? 0) >= (state?.draftSequence?.length ?? 0);
+  const blueLocked = !!state?.blueLocked;
+  const redLocked = !!state?.redLocked;
 
   if (isMobile) return null;
 
@@ -355,6 +415,24 @@ export default function ZzzSpectatorPage() {
       />
       <div className="position-relative z-2 text-white px-4">
         <Navbar />
+        {/* Global LIVE badge (below navbar, top-right) */}
+        {isLive && !draftComplete && (
+          <div
+            className="position-absolute"
+            style={{
+              top: "70px", // adjust depending on your Navbar height
+              right: "20px",
+              zIndex: 10,
+            }}
+          >
+            <span
+              className="badge bg-danger"
+              style={{ fontWeight: 800, letterSpacing: 1, padding: "8px 12px" }}
+            >
+              LIVE
+            </span>
+          </div>
+        )}
       </div>
 
       <div
@@ -384,6 +462,7 @@ export default function ZzzSpectatorPage() {
             const ref = prefix === "B" ? blueRowRef : redRowRef;
             const scale = prefix === "B" ? blueScale : redScale;
             const cost = prefix === "B" ? team1Cost : team2Cost;
+            const locked = prefix === "B" ? blueLocked : redLocked;
 
             return (
               <div className="w-100 text-center" key={prefix}>
@@ -394,6 +473,14 @@ export default function ZzzSpectatorPage() {
                       style={{ backgroundColor: color }}
                     />
                     {name}
+                    {draftComplete && locked && (
+                      <span
+                        className="badge bg-secondary ms-2"
+                        title="Draft locked"
+                      >
+                        🔒 Locked
+                      </span>
+                    )}
                   </div>
                   <div
                     className={`team-cost ${
@@ -403,13 +490,11 @@ export default function ZzzSpectatorPage() {
                     Cost: {cost.total} / {COST_LIMIT}
                   </div>
                 </div>
-
                 <div ref={ref} className="draft-row-wrap">
                   <div
                     className="draft-row"
                     style={
                       {
-                        // CSS variables used by the stylesheet:
                         "--card-scale": scale,
                         "--card-w": `${CARD_W}px`,
                         "--card-h": `${CARD_H}px`,
@@ -430,6 +515,21 @@ export default function ZzzSpectatorPage() {
                           ].join(" ")}
                           style={{ zIndex: 10 }}
                         >
+                          {draftComplete && locked && (
+                            <div
+                              title="Draft locked"
+                              style={{
+                                position: "absolute",
+                                top: 6,
+                                left: 6,
+                                fontSize: 16,
+                                opacity: 0.9,
+                              }}
+                            >
+                              🔒
+                            </div>
+                          )}
+
                           {/* Ribbon when empty */}
                           {(() => {
                             const p = state?.picks?.[i] ?? null;
@@ -457,21 +557,14 @@ export default function ZzzSpectatorPage() {
                                 </div>
                               );
                             }
+
                             const char = charByCode.get(p.characterCode);
                             const we = p.wengineId
                               ? weById.get(String(p.wengineId))
                               : undefined;
                             const isBanSlot = side === "BB" || side === "RR";
 
-                            const agentCost = char
-                              ? calcAgentCost(char, p.eidolon)
-                              : 0;
-                            const weCost = we
-                              ? calcWEngineCost(we, p.superimpose)
-                              : 0;
-                            const total = Number(
-                              (agentCost + weCost).toFixed(2)
-                            );
+                            const { agentCost, weCost, total } = getSlotCost(p);
 
                             return (
                               <>
@@ -554,6 +647,147 @@ export default function ZzzSpectatorPage() {
             );
           })}
         </div>
+        {/* ───────────── Featured section (below all drafting cards) ───────────── */}
+        {featuredList.length > 0 && (
+          <div
+            className="featured-wrap"
+            style={{
+              marginTop: 16,
+              marginBottom: 12,
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <div
+              className="d-flex align-items-center justify-content-between flex-wrap gap-2"
+              style={{ marginBottom: 10 }}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <span style={{ fontWeight: 700 }}>Featured Characters</span>
+                <span className="text-white-50 small">
+                  ({featuredList.length}
+                  {featuredList.length === 1 ? " item" : " items"})
+                </span>
+              </div>
+              <div className="text-white-50 small">
+                Cost shown is the M0 override. Rules still apply during
+                draft.
+              </div>
+            </div>
+
+            <div
+              className="featured-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                gap: 10,
+              }}
+            >
+              {featuredList.map((f) => {
+                const ruleColor =
+                  f.rule === "globalBan"
+                    ? "#ef4444"
+                    : f.rule === "globalPick"
+                    ? "#f59e0b"
+                    : "rgba(255,255,255,0.18)";
+                const ruleLabel =
+                  f.rule === "globalBan"
+                    ? "Uni Ban"
+                    : f.rule === "globalPick"
+                    ? "Uni Pick"
+                    : "No Rule";
+                    
+                return (
+                  <div
+                    key={f.code}
+                    className="featured-card"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: 10,
+                      borderRadius: 10,
+                      background:
+                        "linear-gradient(0deg, rgba(255,255,255,0.03), rgba(255,255,255,0.03))",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}
+                    title={ruleLabel}
+                  >
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        flex: "0 0 52px",
+                        background: "rgba(0,0,0,0.3)",
+                      }}
+                    >
+                      {f.image_url ? (
+                        <img
+                          src={f.image_url}
+                          alt={f.name || f.code}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          className="d-flex align-items-center justify-content-center text-white-50"
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            fontSize: 12,
+                          }}
+                        >
+                          {f.code}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
+                        className="text-truncate"
+                        style={{ fontWeight: 600, lineHeight: 1.2 }}
+                      >
+                        {f.name || f.code}
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2 mt-1">
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: ruleColor,
+                            border: "1px solid rgba(0,0,0,0.2)",
+                            color:
+                              f.rule === "none"
+                                ? "rgba(255,255,255,0.85)"
+                                : "white",
+                          }}
+                        >
+                          {ruleLabel}
+                        </span>
+                        {typeof f.customCost === "number" && (
+                          <span className="text-white-50 small">
+                            Cost:{" "}
+                            <strong style={{ color: "white" }}>
+                              {f.customCost.toFixed(2)}
+                            </strong>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Read-only scoring */}
         {state && (
@@ -644,7 +878,6 @@ export default function ZzzSpectatorPage() {
         )}
       </div>
 
-      {/* floating, layout-safe reconnect badge */}
       <ReconnectingBadge show={reconnecting && !loading && !notFound} />
     </div>
   );

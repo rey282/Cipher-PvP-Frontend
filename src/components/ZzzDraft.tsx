@@ -1,10 +1,11 @@
 // components/ZzzDraft.tsx
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import "../components/Landing.css";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Modal, Button } from "react-bootstrap";
 import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
 
 /* ───────────── Types ───────────── */
 type Character = {
@@ -48,6 +49,14 @@ type SpectatorState = {
   // per-side draft locks after draft complete
   blueLocked?: boolean;
   redLocked?: boolean;
+};
+
+type FeaturedCfg = {
+  code: string;
+  name?: string;
+  image_url?: string;
+  rule: "none" | "globalBan" | "globalPick";
+  customCost?: number | null; // overrides agent cost when set
 };
 
 const MOBILE_QUERY = "(pointer:coarse), (max-width: 820px)";
@@ -137,7 +146,12 @@ export default function ZzzDraftPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search);
-  type DraftInit = { team1?: string; team2?: string; mode?: "2v2" | "3v3" };
+  type DraftInit = {
+    team1?: string;
+    team2?: string;
+    mode?: "2v2" | "3v3";
+    featured?: FeaturedCfg[];
+  };
 
   /* ───────── Player mode via token ─────────
    ?key=SESSION_KEY&pt=PLAYER_TOKEN
@@ -194,6 +208,36 @@ export default function ZzzDraftPage() {
   })();
 
   const seed = navState ?? stored ?? {};
+
+  // Featured config (owner sets it on Start, players receive via GET/SSE)
+  const [featuredList, setFeaturedList] = useState<FeaturedCfg[]>(
+    Array.isArray(seed.featured) ? seed.featured : []
+  );
+
+  // Fast lookups derived from featuredList
+  const featuredGlobalBan = useMemo(
+    () =>
+      new Set(
+        featuredList.filter((f) => f.rule === "globalBan").map((f) => f.code)
+      ),
+    [featuredList]
+  );
+  const featuredGlobalPick = useMemo(
+    () =>
+      new Set(
+        featuredList.filter((f) => f.rule === "globalPick").map((f) => f.code)
+      ),
+    [featuredList]
+  );
+  const featuredCostOverride = useMemo(
+    () =>
+      new Map<string, number>(
+        featuredList
+          .filter((f) => typeof f.customCost === "number")
+          .map((f) => [f.code, f.customCost as number])
+      ),
+    [featuredList]
+  );
 
   /* ───────── Make mode & names stateful (will be overwritten by SSE/GET) ───────── */
   const [mode, setMode] = useState<"2v2" | "3v3">(
@@ -435,6 +479,7 @@ export default function ZzzDraftPage() {
         team1: team1Name,
         team2: team2Name,
         mode,
+        featured: featuredList,
         state: collectSpectatorState(),
       };
       const res = await fetch(
@@ -542,7 +587,13 @@ export default function ZzzDraftPage() {
         ? pick?.character.code
         : null
     )
-    .filter(Boolean) as string[];
+    .filter((c): c is string => !!c);
+
+  // Add featured global bans (but never consider a globalPick as banned)
+  const effectiveBanned = new Set([
+    ...bannedCodes.filter((c) => !featuredGlobalPick.has(c)),
+    ...Array.from(featuredGlobalBan).filter((c) => !featuredGlobalPick.has(c)),
+  ]);
 
   const lastPayloadRef = useRef<string>("");
 
@@ -652,8 +703,15 @@ export default function ZzzDraftPage() {
       if (payload?.mode === "2v2" || payload?.mode === "3v3") {
         setMode(payload.mode);
       }
+
       if (typeof payload?.team1 === "string") setTeam1Name(payload.team1);
       if (typeof payload?.team2 === "string") setTeam2Name(payload.team2);
+
+      // right after syncing mode/team names
+      if (Array.isArray(payload?.featured)) {
+        setFeaturedList(payload.featured);
+      }
+
       try {
         sessionStorage.setItem(
           "zzzDraftInit",
@@ -661,6 +719,9 @@ export default function ZzzDraftPage() {
             team1: payload.team1,
             team2: payload.team2,
             mode: payload.mode,
+            featured: Array.isArray(payload?.featured)
+              ? payload.featured
+              : featuredList,
           })
         );
       } catch {}
@@ -702,6 +763,21 @@ export default function ZzzDraftPage() {
       setBlueLocked(mapped.blueLocked);
       setRedLocked(mapped.redLocked);
       setHydrated(true);
+
+      if (
+        !Array.isArray(payload?.featured) &&
+        featuredList.length === 0 &&
+        spectatorKey
+      ) {
+        fetch(
+          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`
+        )
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d && Array.isArray(d.featured)) setFeaturedList(d.featured);
+          })
+          .catch(() => {});
+      }
     };
 
     es.addEventListener("snapshot", (ev: MessageEvent) => {
@@ -735,14 +811,14 @@ export default function ZzzDraftPage() {
   /* ───────────── Fallback initial GET (in case SSE races) ───────────── */
   useEffect(() => {
     if (!spectatorKey) return;
-    if (hydrated) return;
+    // run GET if we aren't hydrated OR we don't have featured yet
+    if (hydrated && featuredList.length > 0) return;
     const ctrl = new AbortController();
     (async () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`,
           {
-            credentials: "include",
             signal: ctrl.signal,
           }
         );
@@ -752,9 +828,16 @@ export default function ZzzDraftPage() {
           return;
         }
         const data = await res.json();
+
         if (data?.mode === "2v2" || data?.mode === "3v3") setMode(data.mode);
         if (typeof data?.team1 === "string") setTeam1Name(data.team1);
         if (typeof data?.team2 === "string") setTeam2Name(data.team2);
+
+        // hydrate featured even if SSE missed it
+        if (Array.isArray(data?.featured)) {
+          setFeaturedList(data.featured);
+        }
+
         // Capture DB timing/completion for "live"
         if (data?.createdAt || data?.created_at) {
           const ts = new Date(data.createdAt || data.created_at).getTime();
@@ -773,6 +856,9 @@ export default function ZzzDraftPage() {
               team1: data.team1,
               team2: data.team2,
               mode: data.mode,
+              featured: Array.isArray(data?.featured)
+                ? data.featured
+                : featuredList,
             })
           );
         } catch {}
@@ -781,7 +867,8 @@ export default function ZzzDraftPage() {
       } catch {}
     })();
     return () => ctrl.abort();
-  }, [spectatorKey, hydrated]);
+  }, [spectatorKey, hydrated, featuredList.length]);
+
 
   /* ───────────── Autosave PUTs (OWNER ONLY) ───────────── */
   useEffect(() => {
@@ -789,6 +876,7 @@ export default function ZzzDraftPage() {
     if (!hydrated) return; // don't overwrite server with empty local state
 
     const payload = JSON.stringify({
+      featured: featuredList,
       state: collectSpectatorState(),
       isComplete: isComplete || undefined,
     });
@@ -838,14 +926,25 @@ export default function ZzzDraftPage() {
 
   function getSlotCost(pick: DraftPick | null | undefined) {
     if (!pick) return { agentCost: 0, weCost: 0, total: 0 };
-    const agentCost = calcAgentCost(pick.character, pick.eidolon);
+
+    // normal costs
+    const normalAtM0 = calcAgentCost(pick.character, 0);
+    const normalAtMx = calcAgentCost(pick.character, pick.eidolon);
+    const delta = Number((normalAtMx - normalAtM0).toFixed(2));
+
+    // featured base (M0) if present, else normal M0
+    const featuredBase =
+      typeof featuredCostOverride.get(pick.character.code) === "number"
+        ? (featuredCostOverride.get(pick.character.code) as number)
+        : normalAtM0;
+
+    const agentCost = Number((featuredBase + delta).toFixed(2));
     const weCost = calcWEngineCost(pick.wengine, pick.superimpose);
-    return {
-      agentCost,
-      weCost,
-      total: Number((agentCost + weCost).toFixed(2)),
-    };
+    const total = Number((agentCost + weCost).toFixed(2));
+
+    return { agentCost, weCost, total };
   }
+
 
   /* ───────────── Data Fetch (characters & W-engines) ───────────── */
   useEffect(() => {
@@ -973,6 +1072,13 @@ export default function ZzzDraftPage() {
     }
   }
 
+  useEffect(() => {
+    // only warn for owner-ish flow (not player link joins)
+    if (!user && !isPlayer && cameFromStart) {
+      toast.warning("You are not logged in — this match will NOT be recorded.");
+    }
+  }, [user, isPlayer, cameFromStart]);
+
   /* ───────────── Draft Side Lock helpers ───────────── */
   const sideOfIndex = (index: number) =>
     draftSequence[index]?.startsWith("B") ? "B" : "R";
@@ -1007,9 +1113,13 @@ export default function ZzzDraftPage() {
     const mySideNow = currentStep.startsWith("B") ? "B" : "R";
     const isBanSlot = currentStep === "BB" || currentStep === "RR";
 
-    // Common validations
-    if (bannedCodes.includes(char.code)) return;
+    // Cannot ban a global-pick
+    if (isBanSlot && featuredGlobalPick.has(char.code)) return;
 
+    // Common validations (respect featured rules)
+    if (effectiveBanned.has(char.code)) return;
+
+    // ───── Player flow ─────
     if (isPlayer) {
       if (mySideNow !== playerSide) return;
 
@@ -1033,22 +1143,41 @@ export default function ZzzDraftPage() {
       return;
     }
 
-    // OWNER path unchanged (PUT will persist ban/pick alike)
+    // ───── Owner flow ─────
     const mySide = mySideNow;
+
+    // prevent duplicate per team
     const myTeamPicks = draftPicks.filter((_, i) =>
       draftSequence[i].startsWith(mySide)
     );
     const alreadyPickedByMyTeam = myTeamPicks.some(
       (p) => p?.character.code === char.code
     );
-    if (!isBanSlot && alreadyPickedByMyTeam) return;
 
-    const updated = [...draftPicks];
-    updated[currentTurn] = { character: char, eidolon: 0, superimpose: 1 };
-    setDraftPicks(updated);
+    if (!isBanSlot) {
+      if (alreadyPickedByMyTeam) return; // one per team
+
+      if (!featuredGlobalPick.has(char.code)) {
+        // Normal rule: can’t take opponent’s pick unless ACE
+        const opponentSide = mySide === "B" ? "R" : "B";
+        const opponentHas = draftPicks
+          .filter((_, i) => draftSequence[i].startsWith(opponentSide))
+          .some((p) => p?.character.code === char.code);
+        const isAce = currentStep.includes("ACE");
+        if (opponentHas && !isAce) return;
+      }
+    }
+
+    // ✅ Actually write the pick/ban locally and advance turn
+    setDraftPicks((prev) => {
+      const updated = [...prev];
+      updated[currentTurn] = { character: char, eidolon: 0, superimpose: 1 };
+      return updated;
+    });
     setCurrentTurn((prev) => prev + 1);
     setKeyboardSearch("");
 
+    // persist via owner autosave
     ownerOptimisticSave(0, currentTurn + 1, "ge");
   };
 
@@ -1304,11 +1433,9 @@ export default function ZzzDraftPage() {
       const pick = draftPicks[i];
       if (!pick) continue;
 
-      const charCost = calcAgentCost(pick.character, pick.eidolon);
-      const weCost = calcWEngineCost(pick.wengine, pick.superimpose);
-      total += charCost + weCost;
+      const { total: slotTotal } = getSlotCost(pick);
+      total += slotTotal;
     }
-
     const penalty = Math.max(0, total - COST_LIMIT);
     const penaltyPoints = Math.floor(penalty / 0.25) * PENALTY_PER_POINT;
     return { total: Number(total.toFixed(2)), penaltyPoints };
@@ -1422,16 +1549,60 @@ export default function ZzzDraftPage() {
                       style={{ backgroundColor: color }}
                     />
                     {name}
+
+                    {/* keep LIVE tag (pre-draft) */}
                     {isLive && !draftComplete && (
                       <span className="badge bg-danger ms-2">LIVE</span>
                     )}
-                    {draftComplete && locked && (
-                      <span
-                        className="badge bg-secondary ms-2"
-                        title="Draft locked"
-                      >
-                        🔒 Locked
-                      </span>
+
+                    {/* inline lock controls once draft is complete */}
+                    {draftComplete && (
+                      <>
+                        {locked ? (
+                          <>
+                            <span
+                              className="badge bg-secondary ms-2"
+                              title="Draft locked"
+                            >
+                              🔒 Locked
+                            </span>
+                            {/* Owner only unlocks */}
+                            {!isPlayer && (
+                              <button
+                                className="btn back-button-glass ms-2"
+                                onClick={() => toggleSideLock(prefix, false)}
+                                title="Unlock this team's draft"
+                              >
+                                🔓 Unlock
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {/* Owner sees all lock buttons */}
+                            {!isPlayer && (
+                              <button
+                                className="btn back-button-glass ms-2"
+                                onClick={() => toggleSideLock(prefix, true)}
+                                title="Lock this team's draft"
+                              >
+                                🔒 Lock
+                              </button>
+                            )}
+
+                            {/* Player sees only their own team button */}
+                            {isPlayer && playerSide === prefix && (
+                              <button
+                                className="btn back-button-glass ms-2"
+                                onClick={() => toggleSideLock(prefix, true)}
+                                title="Lock your draft"
+                              >
+                                🔒 Lock
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -1776,6 +1947,148 @@ export default function ZzzDraftPage() {
           })()}
         </div>
 
+        {/* ───────────── Featured section (below all drafting cards) ───────────── */}
+        {featuredList.length > 0 && (
+          <div
+            className="featured-wrap"
+            style={{
+              marginTop: 16,
+              marginBottom: 12,
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <div
+              className="d-flex align-items-center justify-content-between flex-wrap gap-2"
+              style={{ marginBottom: 10 }}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <span style={{ fontWeight: 700 }}>Featured Characters</span>
+                <span className="text-white-50 small">
+                  ({featuredList.length}
+                  {featuredList.length === 1 ? " item" : " items"})
+                </span>
+              </div>
+              <div className="text-white-50 small">
+                Cost shown is the M0 override (if set). Rules still apply during
+                draft.
+              </div>
+            </div>
+
+            <div
+              className="featured-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                gap: 10,
+              }}
+            >
+              {featuredList.map((f) => {
+                const ruleColor =
+                  f.rule === "globalBan"
+                    ? "#ef4444"
+                    : f.rule === "globalPick"
+                    ? "#f59e0b"
+                    : "rgba(255,255,255,0.18)";
+                const ruleLabel =
+                  f.rule === "globalBan"
+                    ? "Uni Ban"
+                    : f.rule === "globalPick"
+                    ? "Uni Pick"
+                    : "No Rule";
+
+                return (
+                  <div
+                    key={f.code}
+                    className="featured-card"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: 10,
+                      borderRadius: 10,
+                      background:
+                        "linear-gradient(0deg, rgba(255,255,255,0.03), rgba(255,255,255,0.03))",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}
+                    title={ruleLabel}
+                  >
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        flex: "0 0 52px",
+                        background: "rgba(0,0,0,0.3)",
+                      }}
+                    >
+                      {f.image_url ? (
+                        <img
+                          src={f.image_url}
+                          alt={f.name || f.code}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          className="d-flex align-items-center justify-content-center text-white-50"
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            fontSize: 12,
+                          }}
+                        >
+                          {f.code}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
+                        className="text-truncate"
+                        style={{ fontWeight: 600, lineHeight: 1.2 }}
+                      >
+                        {f.name || f.code}
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2 mt-1">
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: ruleColor,
+                            border: "1px solid rgba(0,0,0,0.2)",
+                            color:
+                              f.rule === "none"
+                                ? "rgba(255,255,255,0.85)"
+                                : "white",
+                          }}
+                        >
+                          {ruleLabel}
+                        </span>
+                        {typeof f.customCost === "number" && (
+                          <span className="text-white-50 small">
+                            Cost:{" "}
+                            <strong style={{ color: "white" }}>
+                              {f.customCost.toFixed(2)}
+                            </strong>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Search Bar + Undo + Share */}
         <div className="mb-3 w-100 d-flex justify-content-center align-items-center gap-2 flex-wrap">
           <input
@@ -1889,18 +2202,38 @@ export default function ZzzDraftPage() {
                       (p) => p?.character.code === char.code
                     );
 
-                    const isBanned = bannedCodes.includes(char.code);
+                    const isBanned = effectiveBanned.has(char.code);
                     const isAcePickStep = currentStep.includes("ACE");
                     const isOpponentPicked = alreadyPickedByOpponent;
 
+                    const isBanSlot =
+                      currentStep === "BB" || currentStep === "RR";
+
                     let isDisabled =
                       uiLocked ||
-                      isBanned ||
-                      (!isAcePickStep &&
-                        (alreadyPickedByMe || alreadyPickedByOpponent)) ||
-                      (isAcePickStep && alreadyPickedByMe);
+                      (isBanSlot && featuredGlobalPick.has(char.code)) || // cannot ban global-pick
+                      isBanned;
 
-                    // Player: can only click to pick on your own turn
+                    // Picking rules
+                    if (!isDisabled) {
+                      if (featuredGlobalPick.has(char.code)) {
+                        // Both teams can pick once per team, anytime (like ACE), still unique per team
+                        if (alreadyPickedByMe) isDisabled = true;
+                      } else {
+                        // Normal rules: needs ACE to steal opponent’s pick
+                        if (
+                          !isAcePickStep &&
+                          (alreadyPickedByMe || alreadyPickedByOpponent)
+                        ) {
+                          isDisabled = true;
+                        }
+                        if (isAcePickStep && alreadyPickedByMe) {
+                          isDisabled = true; // still one copy per team
+                        }
+                      }
+                    }
+
+                    // Player turn gating (unchanged)
                     if (isPlayer && mySide !== playerSide) isDisabled = true;
 
                     return (
@@ -1948,55 +2281,6 @@ export default function ZzzDraftPage() {
             </div>
           </div>
         )}
-
-        {/* ───────────── Per-side Lock Controls (after draft) ───────────── */}
-        {draftComplete && (
-          <div className="text-center mt-3 d-flex justify-content-center gap-3 flex-wrap">
-            {/* Blue Control (owner always; player only if blue) */}
-            {(!isPlayer || playerSide === "B") && (
-              <button
-                className="btn back-button-glass"
-                onClick={() => toggleSideLock("B", !blueLocked)}
-                disabled={isPlayer && playerSide === "B" && blueLocked}
-                title={
-                  blueLocked
-                    ? isPlayer
-                      ? "Locked"
-                      : "Unlock Blue to allow editing their draft"
-                    : "Lock Blue draft to proceed"
-                }
-              >
-                {blueLocked
-                  ? isPlayer && playerSide === "B"
-                    ? "🔒 Blue Locked"
-                    : "🔓 Unlock Blue Draft"
-                  : "🔒 Lock Blue Draft"}
-              </button>
-            )}
-            {/* Red Control (owner always; player only if red) */}
-            {(!isPlayer || playerSide === "R") && (
-              <button
-                className="btn back-button-glass"
-                onClick={() => toggleSideLock("R", !redLocked)}
-                disabled={isPlayer && playerSide === "R" && redLocked}
-                title={
-                  redLocked
-                    ? isPlayer
-                      ? "Locked"
-                      : "Unlock Red to allow editing their draft"
-                    : "Lock Red draft to proceed"
-                }
-              >
-                {redLocked
-                  ? isPlayer && playerSide === "R"
-                    ? "🔒 Red Locked"
-                    : "🔓 Unlock Red Draft"
-                  : "🔒 Lock Red Draft"}
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Post-draft scoring */}
         {draftComplete && (
           <>

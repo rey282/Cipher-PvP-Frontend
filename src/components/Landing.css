@@ -2130,6 +2130,42 @@ input[type="range"].big-slider {
   }
 }
 
+.custom-dark-modal select.form-select {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.custom-dark-modal select.form-select:focus {
+  border-color: rgba(246, 196, 83, 0.65) !important;
+  box-shadow: 0 0 0 0.2rem rgba(246, 196, 83, 0.15) !important;
+}
+
+/* Put the dropdown caret on the LEFT for the featured rule control */
+.featured-dd .dropdown-toggle {
+  position: relative;
+  /* so the ::after can be positioned */
+  padding-left: 28px !important;
+  /* room for the caret */
+  padding-right: 12px !important;
+  text-align: left;
+  /* keep label text left-aligned */
+}
+
+/* move bootstrap's caret (::after) to the left */
+.featured-dd .dropdown-toggle::after {
+  position: absolute;
+  left: 10px;
+  /* caret position */
+  top: 50%;
+  transform: translateY(-50%);
+  /* vertical center */
+  margin-left: 0 !important;
+  /* remove default right-side spacing */
+  border-top-color: currentColor;
+  /* ensure caret color matches text */
+}
+
 /* Floating SSE reconnect badge (doesn't affect layout) */
 .sse-indicator {
   position: fixed;
