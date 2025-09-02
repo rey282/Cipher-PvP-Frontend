@@ -119,13 +119,22 @@ const games = [
   },
 ];
 
-const fmtRarity = (r: number) => {
-  if (r === 5) return "★★★★★";
-  if (r === 4) return "★★★★";
-  if (r === 3) return "★★★";
-  return "";
-};
-
+const fmtRarity = (r: number) => (
+  <span aria-label={`${r}-star`} style={{ letterSpacing: 2 }}>
+    {Array.from({ length: r }).map((_, i) => (
+      <span
+        key={i}
+        style={{
+          color: "#FFD54F", 
+          textShadow: "0 0 6px rgba(255,213,79,.35)",
+          marginRight: 2,
+        }}
+      >
+        ★
+      </span>
+    ))}
+  </span>
+);
 
 /* ───────────────── Cost Presets ───────────────── */
 type CostProfile = {
@@ -365,6 +374,30 @@ export default function Landing() {
       return { cMap: charMeta, wMap: wengMeta };
     }
   }
+
+  // characters: sort by rarity (desc) then name (A→Z)
+  const sortCharsByRarityThenName = (aCode: string, bCode: string) => {
+    const a = charMeta[aCode] ?? {};
+    const b = charMeta[bCode] ?? {};
+    const ra = Number(a.rarity) || 0;
+    const rb = Number(b.rarity) || 0;
+    if (ra !== rb) return rb - ra; // 5 before 4 before others
+    const an = (a.name ?? a.subname ?? aCode).toLowerCase();
+    const bn = (b.name ?? b.subname ?? bCode).toLowerCase();
+    return an.localeCompare(bn);
+  };
+
+  // w-engines: sort by rarity (desc) then name (A→Z)
+  const sortWengByRarityThenName = (aId: string, bId: string) => {
+    const a = wengMeta[aId] ?? {};
+    const b = wengMeta[bId] ?? {};
+    const ra = Number(a.rarity) || 0;
+    const rb = Number(b.rarity) || 0;
+    if (ra !== rb) return rb - ra;
+    const an = (a.name ?? a.subname ?? aId).toLowerCase();
+    const bn = (b.name ?? b.subname ?? bId).toLowerCase();
+    return an.localeCompare(bn);
+  };
 
   useEffect(() => {
     if (!showFeaturedModal) return;
@@ -2217,7 +2250,12 @@ export default function Landing() {
                         style={{
                           position: "sticky",
                           top: 0,
-                          background: "rgba(0,0,0,.4)",
+                          background: "rgba(0,0,0,0.5)", // darker overlay
+                          backdropFilter: "blur(6px)", // frosted glass effect
+                          WebkitBackdropFilter: "blur(6px)", // Safari support
+                          fontWeight: "700", // thicker font
+                          fontSize: "0.9rem", // slightly bigger
+                          zIndex: 2, // ensure stays above
                         }}
                       >
                         <tr>
@@ -2241,7 +2279,7 @@ export default function Landing() {
                               .toLowerCase();
                             return hay.includes(charSearch.toLowerCase());
                           })
-                          .sort()
+                          .sort(sortCharsByRarityThenName)
                           .map((code) => {
                             const meta = charMeta[code];
                             return (
@@ -2348,7 +2386,7 @@ export default function Landing() {
                               .toLowerCase();
                             return hay.includes(wengSearch.toLowerCase());
                           })
-                          .sort()
+                          .sort(sortWengByRarityThenName)
                           .map((id) => {
                             const meta = wengMeta[id];
                             return (
