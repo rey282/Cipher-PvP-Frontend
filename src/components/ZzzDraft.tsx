@@ -61,6 +61,18 @@ type FeaturedCfg = {
   customCost?: number | null;
 };
 
+// what we seed from landing/sessionStorage
+type DraftInit = {
+  team1?: string;
+  team2?: string;
+  mode?: "2v2" | "3v3";
+  featured?: FeaturedCfg[];
+  costProfileId?: string | null;
+  costLimit?: number;         
+  penaltyPerPoint?: number; 
+};
+
+
 function normalizeFeatured(list: any[]): FeaturedCfg[] {
   return (Array.isArray(list) ? list : []).map((f: any) => {
     const kind: "character" | "wengine" =
@@ -168,19 +180,10 @@ function calcWEngineCost(we: WEngine | undefined, phase: number): number {
 }
 
 
-/* ───────────── Penalty ───────────── */
-const PENALTY_PER_POINT = 2500;
-
 export default function ZzzDraftPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search);
-  type DraftInit = {
-    team1?: string;
-    team2?: string;
-    mode?: "2v2" | "3v3";
-    featured?: FeaturedCfg[];
-  };
 
   /* ───────── Player mode via token ─────────
    ?key=SESSION_KEY&pt=PLAYER_TOKEN
@@ -332,6 +335,17 @@ export default function ZzzDraftPage() {
     !!(navState as any)?.draftId ||
     (!!stored && (hasAnyName(stored.team1) || hasAnyName(stored.team2)));
 
+  const [costProfileId, setCostProfileId] = useState<string | null>(
+    (navState?.costProfileId ??
+      (stored as any)?.costProfileId ??
+      query.get("cp") ??
+      null) as string | null
+  );
+
+  const [costProfileName, setCostProfileName] = useState<string | null>(null);
+  const [costCharMs, setCostCharMs] = useState<Record<string, number[]>>({});
+  const [costWePhase, setCostWePhase] = useState<Record<string, number[]>>({});
+
   // HARD mobile/narrow-touch guard
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -384,6 +398,26 @@ export default function ZzzDraftPage() {
   const { user } = useAuth(); // truthy if logged in
   const [spectatorKey, setSpectatorKey] = useState<string | null>(null);
 
+  const hasSeededLimits =
+    typeof seed.costLimit === "number" ||
+    typeof seed.penaltyPerPoint === "number";
+
+  const [costLimit, setCostLimit] = useState<number>(
+    typeof seed.costLimit === "number" ? seed.costLimit : is3v3 ? 9 : 6
+  );
+  const [penaltyPerPoint, setPenaltyPerPoint] = useState<number>(
+    typeof seed.penaltyPerPoint === "number" ? seed.penaltyPerPoint : 2500
+  );
+
+
+  useEffect(() => {
+    if (!spectatorKey && !hasSeededLimits) {
+      setCostLimit(is3v3 ? 9 : 6);
+      setPenaltyPerPoint(2500);
+    }
+  }, [is3v3, spectatorKey, hasSeededLimits]);
+
+
   // If link has ?key=..., trust it immediately (player joins)
   useEffect(() => {
     const k = query.get("key");
@@ -400,7 +434,82 @@ export default function ZzzDraftPage() {
     if (k) setSpectatorKey(k);
   }, [spectatorKey]);
 
-  const COST_LIMIT = is3v3 ? 9 : 6;
+  useEffect(() => {
+    let abort = false;
+    (async () => {
+      if (!costProfileId) {
+        setCostProfileName(null);
+        setCostCharMs({});
+        setCostWePhase({});
+        return;
+      }
+
+      // 1) direct preset (works for owner)
+      try {
+        const r = await fetch(
+          `${
+            import.meta.env.VITE_API_BASE
+          }/api/zzz/cost-presets/${costProfileId}`,
+          { credentials: "include" }
+        );
+        if (!r.ok) throw new Error(String(r.status));
+        const j = await r.json();
+        if (abort) return;
+
+        const cm: Record<string, number[]> = {};
+        Object.entries(j.charMs || {}).forEach(([k, v]: [string, any]) => {
+          const arr = Array.isArray(v) ? v.map((n) => Number(n) || 0) : [];
+          cm[k] = (arr.length === 7 ? arr : Array(7).fill(0)) as number[];
+        });
+        const wp: Record<string, number[]> = {};
+        Object.entries(j.wePhase || {}).forEach(([k, v]: [string, any]) => {
+          const arr = Array.isArray(v) ? v.map((n) => Number(n) || 0) : [];
+          wp[String(k)] = (
+            arr.length === 5 ? arr : Array(5).fill(0)
+          ) as number[];
+        });
+
+        setCostProfileName(j.name || "Preset");
+        setCostCharMs(cm);
+        setCostWePhase(wp);
+        return;
+      } catch {
+        // 2) fallback: use embedded session data (works for players)
+        try {
+          if (!spectatorKey) throw new Error("no session");
+          const s = await fetch(
+            `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`
+          );
+          if (!s.ok) throw new Error("session fetch failed");
+          const d = await s.json();
+          if (abort) return;
+
+          if (
+            d?.costProfile &&
+            (d.costProfile.charMs || d.costProfile.wePhase)
+          ) {
+            const cp = d.costProfile;
+            setCostProfileName(cp.name || "Preset");
+            setCostCharMs(cp.charMs || {});
+            setCostWePhase(cp.wePhase || {});
+            return;
+          }
+
+          setCostProfileName("(failed to load)");
+          setCostCharMs({});
+          setCostWePhase({});
+        } catch {
+          if (abort) return;
+          setCostProfileName("(failed to load)");
+          setCostCharMs({});
+          setCostWePhase({});
+        }
+      }
+    })();
+    return () => {
+      abort = true;
+    };
+  }, [costProfileId, spectatorKey]);
 
   const draftSequence: string[] = is3v3
     ? [
@@ -552,7 +661,6 @@ export default function ZzzDraftPage() {
     }
   };
 
-  // ⬇️ replace the beginning of renderFeaturedPill with this
   const renderFeaturedPill = (f: FeaturedCfg) => {
     const ruleColor =
       f.rule === "globalBan"
@@ -654,7 +762,10 @@ export default function ZzzDraftPage() {
         team2: team2Name,
         mode,
         featured: featuredList,
+        costProfileId,
         state: collectSpectatorState(),
+        costLimit,
+        penaltyPerPoint,
       };
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE}/api/zzz/sessions`,
@@ -880,6 +991,30 @@ export default function ZzzDraftPage() {
       if (typeof payload?.team1 === "string") setTeam1Name(payload.team1);
       if (typeof payload?.team2 === "string") setTeam2Name(payload.team2);
 
+      // cost profile from server (preferred)
+      if (Object.prototype.hasOwnProperty.call(payload, "costProfileId")) {
+        setCostProfileId(payload.costProfileId ?? null);
+      }
+      // costLimit / penaltyPerPoint from server (preferred)
+      if (typeof payload?.costLimit === "number") {
+        setCostLimit(Number(payload.costLimit));
+      }
+      if (typeof payload?.penaltyPerPoint === "number") {
+        setPenaltyPerPoint(Number(payload.penaltyPerPoint));
+      }
+
+
+      // if server embeds the tables, use them directly (and set the name if present)
+      if (
+        payload?.costProfile &&
+        (payload.costProfile.charMs || payload.costProfile.wePhase)
+      ) {
+        const cp = payload.costProfile;
+        setCostProfileName(cp.name || "Preset");
+        setCostCharMs(cp.charMs || {});
+        setCostWePhase(cp.wePhase || {});
+      }
+
       // right after syncing mode/team names
       if (Array.isArray(payload?.featured)) {
         setFeaturedList(normalizeFeatured(payload.featured));
@@ -895,6 +1030,15 @@ export default function ZzzDraftPage() {
             featured: Array.isArray(payload?.featured)
               ? payload.featured
               : featuredList,
+            costProfileId: payload?.costProfileId ?? costProfileId,
+            costLimit:
+              typeof payload?.costLimit === "number"
+                ? payload.costLimit
+                : costLimit,
+            penaltyPerPoint:
+              typeof payload?.penaltyPerPoint === "number"
+                ? payload.penaltyPerPoint
+                : penaltyPerPoint,
           })
         );
       } catch {}
@@ -1006,6 +1150,29 @@ export default function ZzzDraftPage() {
         if (typeof data?.team1 === "string") setTeam1Name(data.team1);
         if (typeof data?.team2 === "string") setTeam2Name(data.team2);
 
+        if (
+          typeof data?.costProfileId === "string" ||
+          data?.costProfileId === null
+        ) {
+          setCostProfileId(data.costProfileId);
+        }
+        if (typeof data?.costLimit === "number") {
+          setCostLimit(Number(data.costLimit));
+        }
+        if (typeof data?.penaltyPerPoint === "number") {
+          setPenaltyPerPoint(Number(data.penaltyPerPoint));
+        }
+
+        if (
+          data?.costProfile &&
+          (data.costProfile.charMs || data.costProfile.wePhase)
+        ) {
+          const cp = data.costProfile;
+          setCostProfileName(cp.name || "Preset");
+          setCostCharMs(cp.charMs || {});
+          setCostWePhase(cp.wePhase || {});
+        }
+
         // hydrate featured even if SSE missed it
         if (Array.isArray(data?.featured)) {
           setFeaturedList(normalizeFeatured(data.featured));
@@ -1032,6 +1199,17 @@ export default function ZzzDraftPage() {
               featured: Array.isArray(data?.featured)
                 ? data.featured
                 : featuredList,
+              costProfileId: data?.costProfileId ?? costProfileId,
+
+              // NEW: persist limits (use server value if present, else keep current)
+              costLimit:
+                typeof data?.costLimit === "number"
+                  ? data.costLimit
+                  : costLimit,
+              penaltyPerPoint:
+                typeof data?.penaltyPerPoint === "number"
+                  ? data.penaltyPerPoint
+                  : penaltyPerPoint,
             })
           );
         } catch {}
@@ -1040,7 +1218,7 @@ export default function ZzzDraftPage() {
       } catch {}
     })();
     return () => ctrl.abort();
-  }, [spectatorKey, hydrated, featuredList.length]);
+  }, [spectatorKey, hydrated, featuredList.length, costLimit, penaltyPerPoint]);
 
   /* ───────────── Autosave PUTs (OWNER ONLY) ───────────── */
   useEffect(() => {
@@ -1049,6 +1227,7 @@ export default function ZzzDraftPage() {
 
     const payload = JSON.stringify({
       featured: featuredList,
+      costProfileId,
       state: collectSpectatorState(),
       isComplete: isComplete || undefined,
     });
@@ -1099,40 +1278,59 @@ export default function ZzzDraftPage() {
   function getSlotCost(pick: DraftPick | null | undefined) {
     if (!pick) return { agentCost: 0, weCost: 0, total: 0 };
 
-    // ——— Character cost: base at M0 (override if set) + delta(Mx - M0)
-    const normalAtM0 = calcAgentCost(pick.character, 0);
-    const normalAtMx = calcAgentCost(pick.character, pick.eidolon);
-    const mDelta = Number((normalAtMx - normalAtM0).toFixed(2));
+    // --- Character cost (featured base + preset delta) ---
+    let agentCost: number;
+    const cpRow = costCharMs[pick.character.code]; // preset row [M0..M6]
+    const featuredBase = featuredCostOverride.get(pick.character.code);
 
-    const featuredBaseChar =
-      typeof featuredCostOverride.get(pick.character.code) === "number"
-        ? (featuredCostOverride.get(pick.character.code) as number)
-        : normalAtM0;
+    if (Array.isArray(cpRow) && cpRow.length === 7) {
+      // base: featured customCost (if any) else preset M0
+      const baseAtM0 =
+        typeof featuredBase === "number"
+          ? featuredBase
+          : Number((cpRow[0] || 0).toFixed(2));
+      const atMx = Number(
+        (cpRow[Math.max(0, Math.min(6, pick.eidolon))] || 0).toFixed(2)
+      );
+      const delta = Number((atMx - (cpRow[0] || 0)).toFixed(2));
+      agentCost = Number((baseAtM0 + delta).toFixed(2));
+    } else {
+      // fallback: featured base over normal rule-based delta
+      const normalAtM0 = calcAgentCost(pick.character, 0);
+      const normalAtMx = calcAgentCost(pick.character, pick.eidolon);
+      const mDelta = Number((normalAtMx - normalAtM0).toFixed(2));
+      const base = typeof featuredBase === "number" ? featuredBase : normalAtM0;
+      agentCost = Number((base + mDelta).toFixed(2));
+    }
 
-    const agentCost = Number((featuredBaseChar + mDelta).toFixed(2));
-
-    // ——— W-Engine cost: base at P1 (override if set) + delta(Px - P1)
+    // --- W-Engine cost ---
     let weCost = 0;
     if (pick.wengine) {
-      const normalAtP1 = calcWEngineCost(pick.wengine, 1);
-      const normalAtPx = calcWEngineCost(pick.wengine, pick.superimpose);
-      const pDelta = Number((normalAtPx - normalAtP1).toFixed(2));
+      const row = costWePhase[String(pick.wengine.id)];
+      if (row && row.length === 5) {
+        weCost = Number(
+          (row[Math.max(1, Math.min(5, pick.superimpose)) - 1] || 0).toFixed(2)
+        );
+      } else {
+        // fall back to rule + featured base override
+        const normalAtP1 = calcWEngineCost(pick.wengine, 1);
+        const normalAtPx = calcWEngineCost(pick.wengine, pick.superimpose);
+        const pDelta = Number((normalAtPx - normalAtP1).toFixed(2));
 
-      const weOverride =
-        pick.wengine.id != null
-          ? featuredWeCostOverride.get(String(pick.wengine.id))
-          : undefined;
+        const weOverride =
+          pick.wengine.id != null
+            ? featuredWeCostOverride.get(String(pick.wengine.id))
+            : undefined;
 
-      const featuredBaseWE =
-        typeof weOverride === "number" ? weOverride : normalAtP1;
-
-      weCost = Number((featuredBaseWE + pDelta).toFixed(2));
+        const featuredBaseWE =
+          typeof weOverride === "number" ? weOverride : normalAtP1;
+        weCost = Number((featuredBaseWE + pDelta).toFixed(2));
+      }
     }
 
     const total = Number((agentCost + weCost).toFixed(2));
     return { agentCost, weCost, total };
   }
-
 
   /* ───────────── Data Fetch (characters & W-engines) ───────────── */
   useEffect(() => {
@@ -1516,7 +1714,6 @@ export default function ZzzDraftPage() {
       return;
     }
 
-
     if (isPlayer) {
       if (side !== playerSide) {
         setShowWengineModal(false);
@@ -1625,20 +1822,22 @@ export default function ZzzDraftPage() {
 
   /* ───────────── Team Cost using new rules ───────────── */
   const getTeamCost = (prefix: "B" | "R") => {
-    let total = 0;
-    for (let i = 0; i < draftSequence.length; i++) {
-      if (!draftSequence[i].startsWith(prefix)) continue;
-      if (slotIsBan(i)) continue;
-      const pick = draftPicks[i];
-      if (!pick) continue;
+  let total = 0;
+  for (let i = 0; i < draftSequence.length; i++) {
+    if (!draftSequence[i].startsWith(prefix)) continue;
+    if (slotIsBan(i)) continue;
+    const pick = draftPicks[i];
+    if (!pick) continue;
+    const { total: slotTotal } = getSlotCost(pick);
+    total += slotTotal;
+  }
 
-      const { total: slotTotal } = getSlotCost(pick);
-      total += slotTotal;
-    }
-    const penalty = Math.max(0, total - COST_LIMIT);
-    const penaltyPoints = Math.floor(penalty / 0.25) * PENALTY_PER_POINT;
-    return { total: Number(total.toFixed(2)), penaltyPoints };
-  };
+  const penalty = Math.max(0, total - costLimit);
+  const penaltyPoints = Math.floor(penalty / 0.25) * penaltyPerPoint;
+
+  return { total: Number(total.toFixed(2)), penaltyPoints };
+};
+
 
   /* ───────────── Share / Invite modal ───────────── */
   const [showShareModal, setShowShareModal] = useState(false);
@@ -1690,6 +1889,39 @@ export default function ZzzDraftPage() {
       />
       <div className="position-relative z-2 text-white px-4">
         <Navbar />
+
+        {/* Top-right stack: LIVE (pre-draft) + Cost Preset */}
+        <div
+          className="position-absolute"
+          style={{ top: 70, right: 20, zIndex: 10 }}
+        >
+          {isLive && !draftComplete && (
+            <div>
+              <span
+                className="badge bg-danger d-block"
+                style={{
+                  fontWeight: 800,
+                  letterSpacing: 1,
+                  padding: "8px 12px",
+                }}
+              >
+                LIVE
+              </span>
+            </div>
+          )}
+
+          {costProfileName && (
+            <div style={{ marginTop: 8 }}>
+              <span
+                className="badge bg-warning text-dark d-block"
+                style={{ fontWeight: 700, padding: "8px 12px" }}
+                title="Active cost preset"
+              >
+                Cost Preset: {costProfileName}
+              </span>
+            </div>
+          )}   
+        </div>
       </div>
 
       {/* Player banner */}
@@ -1804,13 +2036,12 @@ export default function ZzzDraftPage() {
                       </>
                     )}
                   </div>
-
                   <div
                     className={`team-cost ${
-                      cost.total > COST_LIMIT ? "over" : ""
+                      cost.total > costLimit ? "over" : ""
                     }`}
                   >
-                    Cost: {cost.total} / {COST_LIMIT}
+                    Cost: {cost.total} / {costLimit}
                   </div>
                 </div>
 
@@ -2416,10 +2647,10 @@ export default function ZzzDraftPage() {
                       <div className="score-title">{label}</div>
                       <div
                         className={`score-draft ${
-                          total > COST_LIMIT ? "over" : ""
+                          total > costLimit ? "over" : ""
                         }`}
                       >
-                        Cost: {total} / {COST_LIMIT}
+                        Cost: {total} / {costLimit}
                       </div>
                     </div>
 

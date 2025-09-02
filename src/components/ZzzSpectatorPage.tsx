@@ -65,7 +65,18 @@ type SessionRow = {
   is_complete?: boolean;
   last_activity_at?: string;
   completed_at?: string | null;
+
+  costLimit?: number | null;
+  penaltyPerPoint?: number | null;
+
+  costProfileId?: string | null;
+  costProfile?: {
+    name?: string | null;
+    charMs?: Record<string, number[]>;
+    wePhase?: Record<string, number[]>;
+  };
 };
+
 
 const MOBILE_QUERY = "(pointer:coarse), (max-width: 820px)";
 
@@ -169,8 +180,6 @@ function calcWEngineCostWithBase(
   return Number((base + delta).toFixed(2));
 }
 
-const PENALTY_PER_POINT = 2500;
-
 /* ───────────── Floating reconnect badge ───────────── */
 function ReconnectingBadge({ show }: { show: boolean }) {
   if (!show) return null;
@@ -232,7 +241,14 @@ export default function ZzzSpectatorPage() {
   const blueScores = state?.blueScores ?? (is3v3 ? [0, 0, 0] : [0, 0]);
   const redScores = state?.redScores ?? (is3v3 ? [0, 0, 0] : [0, 0]);
 
-  const COST_LIMIT = is3v3 ? 9 : 6;
+  // Dynamic cost settings coming from backend (fallback to mode defaults)
+  const COST_LIMIT =
+    typeof session?.costLimit === "number" ? session.costLimit : is3v3 ? 9 : 6;
+
+  const PENALTY_PER_POINT =
+    typeof session?.penaltyPerPoint === "number"
+      ? session.penaltyPerPoint
+      : 2500;
 
   const blueCount = draftSequence.filter((s) => s.startsWith("B")).length;
   const redCount = draftSequence.filter((s) => s.startsWith("R")).length;
@@ -252,6 +268,9 @@ export default function ZzzSpectatorPage() {
   };
   const nameLabelsBlue = buildNameLabels(team1Name, is3v3 ? 3 : 2);
   const nameLabelsRed = buildNameLabels(team2Name, is3v3 ? 3 : 2);
+
+  const costCharMs = session?.costProfile?.charMs ?? {};
+  const costWePhase = session?.costProfile?.wePhase ?? {};
 
   // Indexers
   const charByCode = useMemo(() => {
@@ -417,43 +436,56 @@ export default function ZzzSpectatorPage() {
     };
   }, [key]);
 
-  function getSlotCost(p: SpectatorState["picks"][number]): {
-    agentCost: number;
-    weCost: number;
-    total: number;
-  } {
+  function getSlotCost(p: SpectatorState["picks"][number]) {
     if (!p) return { agentCost: 0, weCost: 0, total: 0 };
+
     const char = charByCode.get(p.characterCode);
     const we = p.wengineId ? weById.get(String(p.wengineId)) : undefined;
 
-    // Character: base override at M0 + delta(Mx - M0)
+    // --- Character cost (featured base + preset delta) ---
     let agentCost = 0;
     if (char) {
-      const normalAtM0 = calcAgentCost(char, 0);
-      const normalAtMx = calcAgentCost(char, p.eidolon);
-      const delta = Number((normalAtMx - normalAtM0).toFixed(2));
-      const featuredBase =
-        typeof featuredCostOverride.get(char.code) === "number"
-          ? (featuredCostOverride.get(char.code) as number)
-          : normalAtM0;
-      agentCost = Number((featuredBase + delta).toFixed(2));
+      const row = costCharMs[char.code]; // preset row [M0..M6]
+      const featuredBase = featuredCostOverride.get(char.code);
+
+      if (Array.isArray(row) && row.length === 7) {
+        // base: featured customCost (if any) else preset M0
+        const baseAtM0 =
+          typeof featuredBase === "number"
+            ? featuredBase
+            : Number((row[0] || 0).toFixed(2));
+        const atMx = Number(
+          (row[Math.max(0, Math.min(6, p.eidolon))] || 0).toFixed(2)
+        );
+        const delta = Number((atMx - (row[0] || 0)).toFixed(2));
+        agentCost = Number((baseAtM0 + delta).toFixed(2));
+      } else {
+        // fallback: featured base over normal rule-based delta
+        const normalAtM0 = calcAgentCost(char, 0);
+        const normalAtMx = calcAgentCost(char, p.eidolon);
+        const delta = Number((normalAtMx - normalAtM0).toFixed(2));
+        const base =
+          typeof featuredBase === "number" ? featuredBase : normalAtM0;
+        agentCost = Number((base + delta).toFixed(2));
+      }
     }
 
-    // W-Engine: base override at P1 + delta(Px - P1)
-    const weBaseOverride =
-      we && featuredWeCostOverride.has(String(we.id))
-        ? featuredWeCostOverride.get(String(we.id))
-        : undefined;
+    // --- W-Engine cost ---
+    let weCost = 0;
+    if (we) {
+      const row = costWePhase[String(we.id)];
+      if (Array.isArray(row) && row.length === 5) {
+        weCost = Number(
+          (row[Math.max(1, Math.min(5, p.superimpose)) - 1] || 0).toFixed(2)
+        );
+      } else {
+        const baseOverride = featuredWeCostOverride.get(String(we.id));
+        weCost = calcWEngineCostWithBase(we, p.superimpose, baseOverride);
+      }
+    }
 
-    const weCost = we
-      ? calcWEngineCostWithBase(we, p.superimpose, weBaseOverride)
-      : 0;
-
-    return {
-      agentCost,
-      weCost,
-      total: Number((agentCost + weCost).toFixed(2)),
-    };
+    const total = Number((agentCost + weCost).toFixed(2));
+    return { agentCost, weCost, total };
   }
 
   const getTeamCost = (prefix: "B" | "R") => {
@@ -472,6 +504,7 @@ export default function ZzzSpectatorPage() {
     const penaltyPoints = Math.floor(penalty / 0.25) * PENALTY_PER_POINT;
     return { total: Number(total.toFixed(2)), penaltyPoints };
   };
+
 
   const team1Cost = getTeamCost("B");
   const team2Cost = getTeamCost("R");
@@ -531,24 +564,40 @@ export default function ZzzSpectatorPage() {
       />
       <div className="position-relative z-2 text-white px-4">
         <Navbar />
-        {/* Global LIVE badge (below navbar, top-right) */}
-        {isLive && !draftComplete && (
-          <div
-            className="position-absolute"
-            style={{
-              top: "70px",
-              right: "20px",
-              zIndex: 10,
-            }}
-          >
-            <span
-              className="badge bg-danger"
-              style={{ fontWeight: 800, letterSpacing: 1, padding: "8px 12px" }}
-            >
-              LIVE
-            </span>
-          </div>
-        )}
+
+        {/* Top-right stack: LIVE (if any) + Cost Preset */}
+        <div
+          className="position-absolute"
+          style={{ top: 70, right: 20, zIndex: 10 }}
+        >
+          {isLive && !draftComplete && (
+            <div>
+              <span
+                className="badge bg-danger d-block"
+                style={{
+                  fontWeight: 800,
+                  letterSpacing: 1,
+                  padding: "8px 12px",
+                }}
+              >
+                LIVE
+              </span>
+            </div>
+          )}
+
+          {/* Preset always sits below the LIVE (or alone if not live) */}
+          {session?.costProfile?.name && (
+            <div style={{ marginTop: 8 }}>
+              <span
+                className="badge bg-warning text-dark d-block"
+                style={{ fontWeight: 700, padding: "8px 12px" }}
+                title="Active cost preset"
+              >
+                Cost Preset: {session.costProfile.name}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div

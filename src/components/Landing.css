@@ -2185,6 +2185,222 @@ input[type="range"].big-slider {
   /* purely informational */
   backdrop-filter: blur(4px);
 }
+:root {
+  --zz-purple-500: #8b5cf6;
+  /* base purple */
+  --zz-purple-600: #7c3aed;
+  /* hover purple */
+  --zz-purple-400: #a78bfa;
+  /* outline purple */
+
+  --zz-amber-500: #f6c453;
+  /* warning amber */
+  --zz-amber-600: #ffd58f;
+  /* hover amber */
+
+  --zz-red-600: #dc3545;
+  /* danger red */
+  --zz-red-700: #c5303f;
+  /* hover red */
+
+  --zz-gray-bg: rgba(255, 255, 255, 0.06);
+  --zz-gray-bd: rgba(255, 255, 255, 0.20);
+}
+
+/* ───────── Base glass button ───────── */
+.btn-glass {
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .18);
+  color: #fff;
+  border-radius: 12px;
+  padding: .45rem .9rem;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+  transition: all .15s ease;
+}
+
+.btn-glass:hover {
+  background: rgba(255, 255, 255, .14);
+  border-color: rgba(255, 255, 255, .32);
+  transform: translateY(-1px);
+}
+
+.btn-glass:active {
+  transform: translateY(0);
+}
+
+.btn-glass:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* ───────── Neutral / secondary ───────── */
+.btn-glass-secondary,
+.btn-glass-outline {
+  background: var(--zz-gray-bg);
+  border-color: var(--zz-gray-bd);
+  color: #e5e7eb;
+}
+
+.btn-glass-secondary:hover,
+.btn-glass-outline:hover {
+  background: rgba(255, 255, 255, .12);
+  border-color: rgba(255, 255, 255, .32);
+}
+
+/* ───────── Purple (primary/info actions) ───────── */
+.btn-glass-purple,
+.btn-primary,
+.btn-info,
+.custom-dark-modal .btn-primary {
+  background: var(--zz-purple-500) !important;
+  border-color: var(--zz-purple-500) !important;
+  color: #fff !important;
+}
+
+.btn-glass-purple:hover,
+.btn-primary:hover,
+.btn-info:hover,
+.custom-dark-modal .btn-primary:hover {
+  background: var(--zz-purple-600) !important;
+  border-color: var(--zz-purple-400) !important;
+}
+
+/* ───────── Amber (warning: save, featured) ───────── */
+.btn-glass-warning {
+  background: rgba(246, 196, 83, .35);
+  border-color: var(--zz-amber-500);
+  color: #fff;
+}
+
+.btn-glass-warning:hover {
+  background: rgba(246, 196, 83, .48);
+  border-color: var(--zz-amber-600);
+}
+
+/* ───────── Red (danger: delete, close) ───────── */
+.btn-glass-danger,
+.btn-danger,
+.custom-dark-modal .btn-danger {
+  background: var(--zz-red-600) !important;
+  border-color: var(--zz-red-600) !important;
+  color: #fff !important;
+}
+
+.btn-glass-danger:hover,
+.btn-danger:hover,
+.custom-dark-modal .btn-danger:hover {
+  background: var(--zz-red-700) !important;
+  border-color: var(--zz-red-700) !important;
+}
+
+/* ───────── Modal styling (dark glass look) ───────── */
+.custom-dark-modal {
+  background-color: #121212;
+  color: #fff;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .1);
+}
+
+.custom-dark-modal .modal-header,
+.custom-dark-modal .modal-footer {
+  border-color: rgba(255, 255, 255, .1);
+}
+
+.custom-dark-modal .modal-body {
+  background-color: #121212;
+}
+
+/* Modal inputs */
+.custom-dark-modal select,
+.custom-dark-modal input,
+.custom-dark-modal .form-control {
+  background-color: #1e1e1e;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, .2);
+}
+
+.custom-dark-modal .form-control::placeholder {
+  color: rgba(255, 255, 255, .5);
+}
+
+/* Modal list groups */
+.custom-dark-modal .list-group-item {
+  background: rgba(255, 255, 255, .04);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.custom-dark-modal .list-group-item:hover {
+  background: rgba(255, 255, 255, .08);
+}
+
+/* Dropdown inside modal */
+.custom-dark-modal .featured-dd .dropdown-toggle.btn,
+.custom-dark-modal .featured-dd .dropdown-toggle.btn:focus {
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .18);
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: none !important;
+}
+
+.custom-dark-modal .featured-dd .dropdown-menu {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(22, 22, 27, .96);
+  backdrop-filter: blur(8px);
+}
+
+/* =======================================================================
+   Utility: keep Featured modal body height + picker grid
+   ======================================================================= */
+.keep-height .modal-body {
+  min-height: 560px;
+}
+
+/* Cost preset dropdown — solid black like Featured */
+.cost-preset-dd .dropdown-toggle {
+  background: #0b0b0b !important;
+  border: 1px solid rgba(255, 255, 255, .12) !important;
+  color: #fff !important;
+}
+
+.cost-preset-dd .dropdown-toggle:focus,
+.cost-preset-dd .dropdown-toggle:hover {
+  background: #111 !important;
+}
+
+.cost-preset-dd .dropdown-menu {
+  background: #0b0b0b;
+  /* already dark via featured-dd-menu; this enforces */
+  border: 1px solid rgba(255, 255, 255, .1);
+}
+
+.cost-preset-dd .dropdown-item {
+  color: #fff;
+}
+
+.cost-preset-dd .dropdown-item:hover,
+.cost-preset-dd .dropdown-item:focus {
+  background: rgba(255, 255, 255, .08);
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+  min-height: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.selected-fixed {
+  min-height: 140px;
+  max-height: 280px;
+  overflow-y: auto;
+}
 
 @media (max-width: 520px) {
   .sse-indicator {
