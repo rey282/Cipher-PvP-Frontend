@@ -136,6 +136,8 @@ const fmtRarity = (r: number) => (
   </span>
 );
 
+const ENABLE_ZZZ_SESSIONS_CHECK = false;
+
 /* ───────────────── Cost Presets ───────────────── */
 type CostProfile = {
   id: string;                // preset id from server
@@ -1367,31 +1369,55 @@ export default function Landing() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // ─────────── owner unfinished session handling (guarded) ───────────
   useEffect(() => {
+    // Only check when:
+    // - Feature is enabled
+    // - You are on the ZZZ tab
+    // - You’re logged in (otherwise the endpoint is irrelevant)
+    if (!ENABLE_ZZZ_SESSIONS_CHECK) {
+      setOwnerOpen(null);
+      return;
+    }
+    if (games[selected]?.id !== "zzz") {
+      setOwnerOpen(null);
+      return;
+    }
+    if (!user) {
+      setOwnerOpen(null);
+      return;
+    }
+
+    let cancelled = false;
     (async () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/open`,
-          {
-            credentials: "include",
-          }
+          { credentials: "include" }
         );
         if (!res.ok) {
-          setOwnerOpen(null);
+          if (!cancelled) setOwnerOpen(null);
           return;
         }
         const row = await res.json();
-        setOwnerOpen({
-          key: row.key,
-          mode: row.mode,
-          team1: row.team1,
-          team2: row.team2,
-        });
+        if (!cancelled) {
+          setOwnerOpen({
+            key: row.key,
+            mode: row.mode,
+            team1: row.team1,
+            team2: row.team2,
+          });
+        }
       } catch {
-        setOwnerOpen(null);
+        if (!cancelled) setOwnerOpen(null);
       }
     })();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+    // Re-evaluate when switching tabs or login status changes
+  }, [selected, user]);
 
   const clearLocalDraftKeys = () => {
     try {
