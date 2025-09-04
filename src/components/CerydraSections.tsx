@@ -35,6 +35,8 @@ type Props = {
 
 const ENABLE_HSR_SESSIONS_CHECK = true;
 
+const THREE_BAN_DISABLED = true;
+
 type CostProfile = {
   id: string;
   name: string;
@@ -176,7 +178,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
     const [pendingStart, setPendingStart] = useState<PendingStart | null>(null);
 
     // Timer
-    const [enableTimer, setEnableTimer] = useState<boolean>(false);
+    const [enableTimer, setEnableTimer] = useState<boolean>(true);
 
     // keep this as a string so users can backspace/clear while typing
     const [reserveMinutesStr, setReserveMinutesStr] = useState<string>("8");
@@ -358,6 +360,11 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         }
       })();
     }, [showFeaturedModal]);
+
+    // Always default timer ON when the Start Draft modal is opened
+    useEffect(() => {
+      if (showDraftModal) setEnableTimer(true);
+    }, [showDraftModal]);
 
     // ───── Cost Presets (Cerydra) ─────
     const [showCostModal, setShowCostModal] = useState(false);
@@ -1086,7 +1093,8 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
           return;
         }
         setShowDraftModal(true);
-        const m = (params.get("mode") as "2ban" | "3ban") || "2ban";
+        const raw = (params.get("mode") as "2ban" | "3ban") || "2ban";
+        const m = THREE_BAN_DISABLED && raw === "3ban" ? "2ban" : raw;
         setMode(m);
         modeRef.current = m;
         const len = nPlayers;
@@ -1268,7 +1276,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         costProfileId: core.costProfileId,
         featured: core.featured,
         penaltyPerPoint: core.penaltyPerPoint,
-        timerEnabled: core.timerEnabled ?? false,
+        timerEnabled: core.timerEnabled ?? true,
         reserveSeconds: core.reserveSeconds ?? 0,
       };
 
@@ -1334,9 +1342,15 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                   type="radio"
                   checked={mode === "3ban"}
                   onChange={() => {
-                    setMode("3ban");
-                    modeRef.current = "3ban";
+                    if (!THREE_BAN_DISABLED) {
+                      setMode("3ban");
+                      modeRef.current = "3ban";
+                    }
                   }}
+                  disabled={THREE_BAN_DISABLED}
+                  title={
+                    THREE_BAN_DISABLED ? "3 ban is temporarily disabled" : ""
+                  }
                 />
               </div>
 
