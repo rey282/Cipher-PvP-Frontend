@@ -1,4 +1,4 @@
-// components/ZzzDraft.tsx
+// components/CerydraDraft.tsx
 import { useEffect, useState, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import "../components/Landing.css";
@@ -7,37 +7,37 @@ import { Modal, Button } from "react-bootstrap";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 
-/* ───────────── Types ───────────── */
+/* ───────────── Types (HSR) ───────────── */
 type Character = {
   code: string;
   name: string;
   subname?: string;
-  rarity: number; // 5 = S, 4 = A
+  rarity: number; // 5★/4★
   image_url: string;
-  limited: boolean;
+  limited?: boolean;
 };
 
-type WEngine = {
-  id: string;
+type LightCone = {
+  id: string; // numeric-ish but treat as string
   name: string;
   subname?: string;
-  rarity: number; // 5 = S, 4/A/B below
+  rarity: number; // 5★ / 4★
   image_url: string;
   limited: boolean;
 };
 
 type DraftPick = {
   character: Character;
-  eidolon: number; // Mindscape M0..M6
-  wengine?: WEngine;
-  superimpose: number; // W1..W5 (1..5)
+  eidolon: number; // E0..E6
+  lightcone?: LightCone;
+  phase: number; // P1..P5 == 1..5
 };
 
 type ServerPick = {
   characterCode: string;
-  eidolon: number;
-  wengineId: string | null;
-  superimpose: number;
+  eidolon: number; // 0..6
+  lightconeId: string | null;
+  superimpose: number; // 1..5
 };
 
 type SpectatorState = {
@@ -46,41 +46,53 @@ type SpectatorState = {
   picks: Array<ServerPick | null>;
   blueScores: number[];
   redScores: number[];
-  // per-side draft locks after draft complete
   blueLocked?: boolean;
   redLocked?: boolean;
+
+  timerEnabled?: boolean;
+  paused?: { B: boolean; R: boolean };
+  reserveSeconds?: number;
+
+  reserveLeft?: { B: number; R: number };
+  graceLeft?: number; 
+  timerUpdatedAt?: number; 
+
+  extraCyclePenaltyB?: number;
+  extraCyclePenaltyR?: number;
 };
 
 type FeaturedCfg = {
-  kind: "character" | "wengine";
-  code?: string; // for characters
-  id?: string; // for W-Engines
+  kind: "character" | "lightcone";
+  code?: string;     // for characters
+  id?: string;       // for light cones
   name?: string;
   image_url?: string;
   rule: "none" | "globalBan" | "globalPick";
   customCost?: number | null;
 };
 
-// what we seed from landing/sessionStorage
+// Landing seeds this
 type DraftInit = {
   team1?: string;
   team2?: string;
-  mode?: "2v2" | "3v3";
+  mode?: "2ban" | "3ban";
   featured?: FeaturedCfg[];
   costProfileId?: string | null;
-  costLimit?: number;         
-  penaltyPerPoint?: number; 
+  costLimit?: number;
+  penaltyPerPoint?: number;
+  draftId?: string;
+  timerEnabled?: boolean;
+  reserveSeconds?: number;
 };
-
 
 function normalizeFeatured(list: any[]): FeaturedCfg[] {
   return (Array.isArray(list) ? list : []).map((f: any) => {
-    const kind: "character" | "wengine" =
-      f?.kind === "wengine" || f?.id ? "wengine" : "character";
+    const kind: "character" | "lightcone" =
+      f?.kind === "lightcone" || f?.id ? "lightcone" : "character";
     return {
       kind,
       code: f.code ?? undefined,
-      id: f.id ?? undefined,
+      id: f.id != null ? String(f.id) : undefined,
       name: f.name ?? undefined,
       image_url: f.image_url ?? undefined,
       rule: f.rule === "globalBan" || f.rule === "globalPick" ? f.rule : "none",
@@ -89,10 +101,9 @@ function normalizeFeatured(list: any[]): FeaturedCfg[] {
   });
 }
 
-
 const MOBILE_QUERY = "(pointer:coarse), (max-width: 820px)";
 const SCORE_MIN = 0;
-const SCORE_MAX = 65000;
+const SCORE_MAX = 15;
 
 /* ───────────── Responsive row sizing ───────────── */
 const CARD_W = 170;
@@ -100,8 +111,13 @@ const CARD_H = 240;
 const CARD_GAP = 12;
 const CARD_MIN_SCALE = 0.68;
 
-const CREATE_LOCK_KEY = "zzzSpectatorCreateLock";
-const SNAPSHOT_PREFIX = "zzzDraftLocal:";
+/* Storage keys aligned with CerydraSection */
+const CREATE_LOCK_KEY = "hsrSpectatorCreateLock";
+const SNAPSHOT_PREFIX = "hsrDraftLocal:";
+const SPECTATOR_KEY_SS = "hsrSpectatorKey";
+const DRAFT_INIT_SS = "hsrDraftInit";
+const BLUE_TOKEN_SS = "hsrBlueToken";
+const RED_TOKEN_SS = "hsrRedToken";
 
 function writeLocalSnapshot(key: string, state: SpectatorState) {
   try {
@@ -146,48 +162,92 @@ function useRowScale<T extends HTMLElement>(
   return scale;
 }
 
-/* ───────────── Cost Rules Helpers ───────────── */
-function calcAgentCost(agent: Character, mindscape: number): number {
-  const ms = Math.max(0, Math.min(6, mindscape));
-  if (agent.rarity === 4) return 0.5;
-  if (agent.rarity === 5) {
-    if (agent.limited) {
-      const bumpMilestones = [1, 2, 4, 6];
-      const bumps = bumpMilestones.filter((m) => ms >= m).length;
-      return 1 + 0.5 * bumps;
-    } else {
-      return ms >= 6 ? 1.5 : 1;
-    }
+/* ───────────── Cost Helpers (fallback rules if preset rows missing) ───────────── */
+function calcCharCostHSR(char: Character, eidolon: number): number {
+  const e = Math.max(0, Math.min(6, eidolon));
+  if (char.rarity <= 4) return 0.5; // cheap 4★ baseline if no preset
+  // 5★: limited more expensive — rough fallback, presets will usually override
+  if (char.limited) {
+    const bumps = [1, 2, 4, 6].filter((m) => e >= m).length;
+    return 1 + 0.5 * bumps; // 1.0 → up to 3.0
   }
-  return 0;
+  return e >= 6 ? 1.5 : 1.0;
 }
 
-function calcWEngineCost(we: WEngine | undefined, phase: number): number {
-  if (!we) return 0;
+function calcLcCostHSR(lc: LightCone | undefined, phase: number): number {
+  if (!lc) return 0;
   const p = Math.max(1, Math.min(5, phase));
-
-  // New: all 4★ (and lower) are free at every phase
-  if (we.rarity <= 4) return 0;
-
-  if (we.limited) {
-    // Limited 5★: P1–P2 0.25, P3–P4 0.5, P5 0.75
+  if (lc.rarity <= 4) return 0; // all 4★ free by fallback
+  if (lc.limited) {
     if (p <= 2) return 0.25;
     if (p <= 4) return 0.5;
-    return 0.75; // P5
+    return 0.75;
   }
-
   return p >= 3 ? 0.25 : 0;
 }
 
+/* ───────────── Build default local sequences (server may override via SSE) ───────────── */
+function buildSequenceForMode(mode: "2ban" | "3ban"): string[] {
+  // Token legend: "B" = Blue pick, "R" = Red pick, "BB"/"RR" = team ban slot
+  // These are sane defaults; the server snapshot will overwrite with exact flow.
+  if (mode === "3ban") {
+    return [
+      "BB",
+      "RR",
+      "B",
+      "R",
+      "R",
+      "B",
+      "BB",
+      "RR",
+      "R",
+      "B",
+      "B",
+      "R",
+      "BB",
+      "RR",
+      "B",
+      "R",
+      "R",
+      "B",
+      "B",
+      "R",
+      "R",
+      "B",
+    ];
+  }
+  // 2ban default
+  return [
+    "BB",
+    "RR",
+    "B",
+    "R",
+    "R",
+    "B",
+    "RR",
+    "BB",
+    "R",
+    "B",
+    "B",
+    "R",
+    "R",
+    "B",
+    "B",
+    "R",
+    "R",
+    "B",
+    "B",
+    "R",
+  ];
+}
 
-export default function ZzzDraftPage() {
+/* Draft page */
+export default function CerydraDraftPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search);
 
-  /* ───────── Player mode via token ─────────
-   ?key=SESSION_KEY&pt=PLAYER_TOKEN
-*/
+  /* Player linking */
   const keyFromUrl = query.get("key");
   const [playerToken, setPlayerToken] = useState<string | null>(null);
   const [playerSide, setPlayerSide] = useState<"B" | "R" | null>(null);
@@ -195,6 +255,14 @@ export default function ZzzDraftPage() {
 
   const [blueToken, setBlueToken] = useState<string | null>(null);
   const [redToken, setRedToken] = useState<string | null>(null);
+
+  function normName(s: string) {
+    return String(s || "")
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "") // strip accents
+      .replace(/[^a-z0-9]/g, ""); // keep a–z/0–9 only
+  }
 
   useEffect(() => {
     const k = query.get("key");
@@ -206,42 +274,42 @@ export default function ZzzDraftPage() {
         const res = await fetch(
           `${
             import.meta.env.VITE_API_BASE
-          }/api/zzz/sessions/${k}/resolve-token?pt=${encodeURIComponent(pt)}`,
+          }/api/hsr/sessions/${k}/resolve-token?pt=${encodeURIComponent(pt)}`,
           { credentials: "include" }
         );
-        if (!res.ok) return; // invalid token -> read-only
+        if (!res.ok) return;
         const data = await res.json(); // { side: "B" | "R" }
         setPlayerToken(pt);
         setPlayerSide(data.side);
         setSpectatorKey(k);
-        sessionStorage.setItem("zzzSpectatorKey", k);
+        sessionStorage.setItem(SPECTATOR_KEY_SS, k);
       } catch {}
     })();
   }, [location.search]);
 
-  // allow link joins + prior session keys
   const joiningViaLink = !!keyFromUrl;
   const hasKeyInSession = (() => {
     try {
-      return !!sessionStorage.getItem("zzzSpectatorKey");
+      return !!sessionStorage.getItem(SPECTATOR_KEY_SS);
     } catch {
       return false;
     }
   })();
 
-  const navState = (location.state as DraftInit) || null;
+  const round2 = (x: number) =>
+    Math.round((Number(x) + Number.EPSILON) * 100) / 100;
 
+  const navState = (location.state as DraftInit) || null;
   const stored: DraftInit | null = (() => {
     try {
-      return JSON.parse(sessionStorage.getItem("zzzDraftInit") || "null");
+      return JSON.parse(sessionStorage.getItem(DRAFT_INIT_SS) || "null");
     } catch {
       return null;
     }
   })();
-
   const seed = navState ?? stored ?? {};
 
-  // Featured config (owner sets it on Start, players receive via GET/SSE)
+  /* Featured from seed; will be overwritten by SSE/GET from server */
   const [featuredList, setFeaturedList] = useState<FeaturedCfg[]>(
     Array.isArray(seed.featured) ? normalizeFeatured(seed.featured) : []
   );
@@ -256,7 +324,6 @@ export default function ZzzDraftPage() {
       ),
     [featuredList]
   );
-
   const featuredGlobalPick = useMemo(
     () =>
       new Set(
@@ -267,8 +334,7 @@ export default function ZzzDraftPage() {
       ),
     [featuredList]
   );
-
-  const featuredCostOverride = useMemo(
+  const featuredCharCostOverride = useMemo(
     () =>
       new Map<string, number>(
         featuredList
@@ -282,39 +348,36 @@ export default function ZzzDraftPage() {
       ),
     [featuredList]
   );
-
-  const featuredWeCostOverride = useMemo(
+  const featuredLcCostOverride = useMemo(
     () =>
       new Map<string, number>(
         featuredList
           .filter(
             (f) =>
-              f.kind === "wengine" && typeof f.customCost === "number" && f.id
+              f.kind === "lightcone" && typeof f.customCost === "number" && f.id
           )
           .map((f) => [String(f.id), f.customCost as number])
       ),
     [featuredList]
   );
-
-  // W-Engine universal bans (server ignores "globalPick" for WEs)
-  const wengineGlobalBan = useMemo(
+  const lightconeGlobalBan = useMemo(
     () =>
       new Set(
         featuredList
-          .filter((f) => f.kind === "wengine" && f.rule === "globalBan")
+          .filter((f) => f.kind === "lightcone" && f.rule === "globalBan")
           .map((f) => String(f.id))
       ),
     [featuredList]
   );
 
-  /* ───────── Make mode & names stateful (will be overwritten by SSE/GET) ───────── */
-  const [mode, setMode] = useState<"2v2" | "3v3">(
-    ((seed.mode || (query.get("mode") as "2v2" | "3v3") || "2v2") as any) ===
-      "3v3"
-      ? "3v3"
-      : "2v2"
+  /* Mode & team names (owner seeds, server truth overrides via SSE/GET) */
+  const [mode, setMode] = useState<"2ban" | "3ban">(
+    ((seed.mode || (query.get("mode") as "2ban" | "3ban") || "2ban") as any) ===
+      "3ban"
+      ? "3ban"
+      : "2ban"
   );
-  const is3v3 = mode === "3v3";
+  const is3ban = mode === "3ban";
 
   const [team1Name, setTeam1Name] = useState<string>(
     seed.team1 || query.get("team1") || "Blue Team"
@@ -343,15 +406,13 @@ export default function ZzzDraftPage() {
   );
 
   const [costProfileName, setCostProfileName] = useState<string | null>(null);
-  const displayCostProfileName = useMemo(
-    () =>
-      costProfileName?.trim() ? costProfileName.trim() : "Vivian (Default)",
-    [costProfileName]
-  );
+  const displayCostProfileName = costProfileName?.trim() || "Cerydra (Default)";
   const [costCharMs, setCostCharMs] = useState<Record<string, number[]>>({});
-  const [costWePhase, setCostWePhase] = useState<Record<string, number[]>>({});
+  const [costLcPhase, setCostLcPhase] = useState<Record<string, number[]>>({});
 
-  // HARD mobile/narrow-touch guard
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // mobile guard
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia(MOBILE_QUERY);
@@ -364,28 +425,25 @@ export default function ZzzDraftPage() {
       else mq.removeListener(update);
     };
   }, []);
-
   useEffect(() => {
     if (!isMobile) return;
-    navigate("/", { replace: true, state: { blocked: "zzz-draft-mobile" } });
+    navigate("/", { replace: true, state: { blocked: "hsr-draft-mobile" } });
   }, [isMobile, navigate]);
 
-  // DON’T kick player links
+  // nudge owner back if no seed
   useEffect(() => {
     if (joiningViaLink) return;
     if (!cameFromStart && !isMobile) {
-      navigate("/", { replace: true, state: { blocked: "zzz-draft-no-team" } });
+      navigate("/", { replace: true, state: { blocked: "hsr-draft-no-team" } });
     }
   }, [cameFromStart, isMobile, navigate, joiningViaLink]);
 
-  // Only strip the querystring if it’s the owner flow (keep ?key or ?pt for players)
+  // Strip query for owner flow (keep ?key / ?pt for players)
   useEffect(() => {
     if (!cameFromStart) return;
     if (!location.search) return;
-
     const qs = new URLSearchParams(location.search);
     if (qs.get("key") || qs.get("pt")) return;
-
     navigate(location.pathname, {
       replace: true,
       state: { team1: team1Name, team2: team2Name, mode },
@@ -403,56 +461,85 @@ export default function ZzzDraftPage() {
   const { user } = useAuth();
   const [spectatorKey, setSpectatorKey] = useState<string | null>(null);
 
-  const hasSeededLimits =
-    typeof seed.costLimit === "number" ||
-    typeof seed.penaltyPerPoint === "number";
+  const [cycleBreakpoint, setCycleBreakpoint] = useState<number>(() => {
+    const fromSeed = Number(
+      (navState as any)?.penaltyPerPoint ?? (stored as any)?.penaltyPerPoint
+    );
+    return Number.isFinite(fromSeed) && fromSeed > 0
+      ? Math.max(1, Math.floor(fromSeed))
+      : 4;
+  });
 
-  const [costLimit, setCostLimit] = useState<number>(
-    typeof seed.costLimit === "number" ? seed.costLimit : is3v3 ? 9 : 6
-  );
-  const [penaltyPerPoint, setPenaltyPerPoint] = useState<number>(
-    typeof seed.penaltyPerPoint === "number" ? seed.penaltyPerPoint : 2500
-  );
 
+  const [cycleBpStr, setCycleBpStr] = useState<string>(String(cycleBreakpoint));
+  useEffect(() => setCycleBpStr(String(cycleBreakpoint)), [cycleBreakpoint]);
+
+  const lastLocalSettingsAtRef = useRef(0);
+  const cycleBreakpointRef = useRef(cycleBreakpoint);
   useEffect(() => {
-    if (!spectatorKey && !hasSeededLimits) {
-      setCostLimit(is3v3 ? 9 : 6);
-      setPenaltyPerPoint(2500);
-    }
-  }, [is3v3, spectatorKey, hasSeededLimits]);
+    cycleBreakpointRef.current = cycleBreakpoint;
+  }, [cycleBreakpoint]);
 
-  // If link has ?key=..., trust it immediately (player joins)
+  // NEW: ACK gating for breakpoint updates
+  const pendingCycleBpRef = useRef<number | null>(null);
+  const pendingBpExpiresAtRef = useRef<number>(0);
+
+  const applyCycleBreakpoint = (nextValue: number) => {
+    const v = Math.max(1, Math.floor(nextValue || 0));
+
+    lastLocalSettingsAtRef.current = Date.now();
+    pendingCycleBpRef.current = v;
+    pendingBpExpiresAtRef.current = Date.now() + 8000;
+
+    setCycleBreakpoint(v);
+    setCycleBpStr(String(v));
+
+    try {
+      const raw = sessionStorage.getItem("hsrDraftInit");
+      if (raw) {
+        const init = JSON.parse(raw);
+        init.penaltyPerPoint = v;
+        sessionStorage.setItem("hsrDraftInit", JSON.stringify(init));
+      }
+    } catch {}
+
+    if (isOwner) ownerOptimisticSave(300);
+  };
+
+
+
+  // If link has ?key, trust immediately (player joins)
   useEffect(() => {
     const k = query.get("key");
     if (k) {
       setSpectatorKey(k);
-      sessionStorage.setItem("zzzSpectatorKey", k);
+      sessionStorage.setItem(SPECTATOR_KEY_SS, k);
     }
   }, [location.search]);
 
-  // Otherwise hydrate from previous tab if any
+  // Otherwise hydrate session key
   useEffect(() => {
-    if (spectatorKey) return; // already set
-    const k = sessionStorage.getItem("zzzSpectatorKey");
+    if (spectatorKey) return;
+    const k = sessionStorage.getItem(SPECTATOR_KEY_SS);
     if (k) setSpectatorKey(k);
   }, [spectatorKey]);
 
+  // Load cost profile by id or from embedded session
   useEffect(() => {
     let abort = false;
     (async () => {
       if (!costProfileId) {
         setCostProfileName(null);
         setCostCharMs({});
-        setCostWePhase({});
+        setCostLcPhase({});
         return;
       }
-
-      // 1) direct preset (works for owner)
+      // 1) direct preset by id (owner)
       try {
         const r = await fetch(
           `${
             import.meta.env.VITE_API_BASE
-          }/api/zzz/cost-presets/${costProfileId}`,
+          }/api/hsr/cost-presets/${costProfileId}`,
           { credentials: "include" }
         );
         if (!r.ok) throw new Error(String(r.status));
@@ -464,24 +551,24 @@ export default function ZzzDraftPage() {
           const arr = Array.isArray(v) ? v.map((n) => Number(n) || 0) : [];
           cm[k] = (arr.length === 7 ? arr : Array(7).fill(0)) as number[];
         });
-        const wp: Record<string, number[]> = {};
-        Object.entries(j.wePhase || {}).forEach(([k, v]: [string, any]) => {
+        const lp: Record<string, number[]> = {};
+        Object.entries(j.lcPhase || {}).forEach(([k, v]: [string, any]) => {
           const arr = Array.isArray(v) ? v.map((n) => Number(n) || 0) : [];
-          wp[String(k)] = (
+          lp[String(k)] = (
             arr.length === 5 ? arr : Array(5).fill(0)
           ) as number[];
         });
 
         setCostProfileName(j.name || "Preset");
         setCostCharMs(cm);
-        setCostWePhase(wp);
+        setCostLcPhase(lp);
         return;
       } catch {
-        // 2) fallback: use embedded session data (works for players)
+        // 2) fallback from session (players)
         try {
           if (!spectatorKey) throw new Error("no session");
           const s = await fetch(
-            `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`
+            `${import.meta.env.VITE_API_BASE}/api/hsr/sessions/${spectatorKey}`
           );
           if (!s.ok) throw new Error("session fetch failed");
           const d = await s.json();
@@ -489,23 +576,23 @@ export default function ZzzDraftPage() {
 
           if (
             d?.costProfile &&
-            (d.costProfile.charMs || d.costProfile.wePhase)
+            (d.costProfile.charMs || d.costProfile.lcPhase)
           ) {
             const cp = d.costProfile;
             setCostProfileName(cp.name || "Preset");
             setCostCharMs(cp.charMs || {});
-            setCostWePhase(cp.wePhase || {});
+            setCostLcPhase(cp.lcPhase || {});
             return;
           }
 
           setCostProfileName("(failed to load)");
           setCostCharMs({});
-          setCostWePhase({});
+          setCostLcPhase({});
         } catch {
           if (abort) return;
           setCostProfileName("(failed to load)");
           setCostCharMs({});
-          setCostWePhase({});
+          setCostLcPhase({});
         }
       }
     })();
@@ -514,48 +601,20 @@ export default function ZzzDraftPage() {
     };
   }, [costProfileId, spectatorKey]);
 
-  const draftSequence: string[] = is3v3
-    ? [
-        "B",
-        "R",
-        "R",
-        "B",
-        "RR",
-        "BB",
-        "R",
-        "B",
-        "B(ACE)",
-        "R(ACE)",
-        "R",
-        "B",
-        "B",
-        "R",
-        "R",
-        "B",
-        "B(ACE)",
-        "R(ACE)",
-        "R",
-        "B",
-      ]
-    : [
-        "B",
-        "R",
-        "R",
-        "B",
-        "RR",
-        "BB",
-        "R",
-        "B",
-        "B",
-        "R",
-        "R(ACE)",
-        "B(ACE)",
-        "B",
-        "R",
-      ];
+  /* Draft sequence (local default; server snapshot can override) */
+  const [draftSequence, setDraftSequence] = useState<string[]>(
+    buildSequenceForMode(mode)
+  );
 
+  useEffect(() => {
+    // if we change mode locally (before server snapshot), adopt a new local sequence
+    setDraftSequence(buildSequenceForMode(mode));
+  }, [mode]);
+
+  /* Catalogs */
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [wengines, setWengines] = useState<WEngine[]>([]);
+
+  const [lightcones, setLightcones] = useState<LightCone[]>([]);
   const [draftPicks, setDraftPicks] = useState<(DraftPick | null)[]>(
     Array(draftSequence.length).fill(null)
   );
@@ -563,42 +622,88 @@ export default function ZzzDraftPage() {
   const [, setError] = useState<string | null>(null);
 
   const [eidolonOpenIndex, setEidolonOpenIndex] = useState<number | null>(null);
-  const [superOpenIndex, setSuperOpenIndex] = useState<number | null>(null);
+  const [phaseOpenIndex, setPhaseOpenIndex] = useState<number | null>(null);
 
-  const [showWengineModal, setShowWengineModal] = useState(false);
+  const [showLcModal, setShowLcModal] = useState(false);
   const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
-  const [selectedWengineId, setSelectedWengineId] = useState<string>("");
-  const [wengineSearch, setWengineSearch] = useState("");
+  const [selectedLcId, setSelectedLcId] = useState<string>("");
+  const [lcSearch, setLcSearch] = useState("");
   const [keyboardSearch, setKeyboardSearch] = useState("");
 
   const [blueScores, setBlueScores] = useState<number[]>(
-    is3v3 ? [0, 0, 0] : [0, 0]
+    is3ban ? [0, 0, 0] : [0, 0]
   );
   const [redScores, setRedScores] = useState<number[]>(
-    is3v3 ? [0, 0, 0] : [0, 0]
+    is3ban ? [0, 0, 0] : [0, 0]
   );
+  // keep fast string drafts while typing; commit to numbers on blur/enter
+  const [blueDraft, setBlueDraft] = useState<string[]>(
+    (is3ban ? [0, 1, 2] : [0, 1]).map((i) =>
+      blueScores[i] ? String(blueScores[i]) : ""
+    )
+  );
+  const [redDraft, setRedDraft] = useState<string[]>(
+    (is3ban ? [0, 1, 2] : [0, 1]).map((i) =>
+      redScores[i] ? String(redScores[i]) : ""
+    )
+  );
+  const [extraCyclePenaltyB, setExtraCyclePenaltyB] = useState<number>(0);
+  const [extraCyclePenaltyR, setExtraCyclePenaltyR] = useState<number>(0);
 
-  // per-side locks after draft complete
+
+  // keep drafts in sync if scores or mode change
+  useEffect(() => {
+    setBlueDraft(
+      (is3ban ? [0, 1, 2] : [0, 1]).map((i) =>
+        blueScores[i] ? String(blueScores[i]) : ""
+      )
+    );
+  }, [blueScores, is3ban]);
+  useEffect(() => {
+    setRedDraft(
+      (is3ban ? [0, 1, 2] : [0, 1]).map((i) =>
+        redScores[i] ? String(redScores[i]) : ""
+      )
+    );
+  }, [redScores, is3ban]);
+
+  const clampScore = (n: number) => Math.max(SCORE_MIN, Math.min(SCORE_MAX, n));
+
+  function commitScore(side: "B" | "R", i: number) {
+    const drafts = side === "B" ? blueDraft : redDraft;
+    const n = clampScore(parseInt(drafts[i] || "0", 10) || 0);
+
+    const src = side === "B" ? blueScores : redScores;
+    if (src[i] !== n) {
+      const next = [...src];
+      next[i] = n;
+      (side === "B" ? setBlueScores : setRedScores)(next);
+      requestSave(0); // save only when we commit
+    }
+
+    // normalize the draft display too
+    const dnext = side === "B" ? [...blueDraft] : [...redDraft];
+    dnext[i] = n ? String(n) : "";
+    (side === "B" ? setBlueDraft : setRedDraft)(dnext);
+  }
+
   const [blueLocked, setBlueLocked] = useState<boolean>(false);
   const [redLocked, setRedLocked] = useState<boolean>(false);
 
   const [hydrated, setHydrated] = useState(false);
   const pendingServerStateRef = useRef<SpectatorState | null>(null);
 
-  // DB timing for "LIVE" status (no keepalive)
+  // LIVE badge (no keepalive polling)
   const [createdAtMs, setCreatedAtMs] = useState<number | null>(null);
   const [finishedFromServer, setFinishedFromServer] = useState<boolean>(false);
-
-  // derived "live": created < 2h ago AND not finished
   const isLive =
     !!createdAtMs &&
     !finishedFromServer &&
-    Date.now() - createdAtMs < 2 * 60 * 60 * 1000; // 2 hours
+    Date.now() - createdAtMs < 2 * 60 * 60 * 1000;
 
   const draftComplete = currentTurn >= draftSequence.length;
 
-  // Player labels (derive from stateful names)
-  const nPlayers = is3v3 ? 3 : 2;
+  const nPlayers = is3ban ? 3 : 2;
   const rawTeam1List = (team1Name || "")
     .split("|")
     .map((s) => s.trim())
@@ -607,25 +712,24 @@ export default function ZzzDraftPage() {
     .split("|")
     .map((s) => s.trim())
     .filter(Boolean);
-
-  function buildNameLabels(rawList: string[], count: number): string[] {
+  const buildNameLabels = (rawList: string[], count: number): string[] => {
     const primary = rawList.find(Boolean) || "";
     return Array(count)
       .fill("")
       .map((_, i) => rawList[i] || primary);
-  }
-
+  };
   const blueLabels = buildNameLabels(rawTeam1List, nPlayers);
   const redLabels = buildNameLabels(rawTeam2List, nPlayers);
 
-  /* Completion + lock */
-  const allScoresFilled = (arr: number[]) => arr.every((v) => v > 0);
-  const [uiLocked, setUiLocked] = useState(false); // controls read-only UI for scoring/finalize
-  const canFinalize =
-    draftComplete && allScoresFilled(blueScores) && allScoresFilled(redScores);
+  const [uiLocked, setUiLocked] = useState(false);
+  const canFinalize = useMemo(() => {
+    const idxs = is3ban ? [0, 1, 2] : [0, 1];
+    const filled = (arr: string[]) =>
+      idxs.every((i) => (arr[i] ?? "").trim() !== "");
+    return draftComplete && filled(blueDraft) && filled(redDraft);
+  }, [draftComplete, is3ban, blueDraft, redDraft]);
   const isComplete = draftComplete && uiLocked;
 
-  // Build state payload (owner PUT)
   const collectSpectatorState = (): SpectatorState => ({
     draftSequence,
     currentTurn,
@@ -634,8 +738,8 @@ export default function ZzzDraftPage() {
         ? {
             characterCode: p.character.code,
             eidolon: p.eidolon,
-            wengineId: p.wengine?.id ?? null,
-            superimpose: p.superimpose,
+            lightconeId: p.lightcone?.id ?? null,
+            superimpose: p.phase,
           }
         : null
     ),
@@ -643,11 +747,23 @@ export default function ZzzDraftPage() {
     redScores,
     blueLocked,
     redLocked,
+
+    // timer snapshot (for sync)
+    timerEnabled,
+    paused,
+    reserveSeconds: Math.min(reserveLeft.B, reserveLeft.R), // legacy seed
+    reserveLeft: { ...reserveLeft },
+    graceLeft,
+    timerUpdatedAt: Date.now(),
+
+    // manual penalties
+    extraCyclePenaltyB,
+    extraCyclePenaltyR,
   });
+
 
   // Compact Featured preview / popup
   const [showFeaturedPopup, setShowFeaturedPopup] = useState(false);
-
   const resolveFeaturedMeta = (f: FeaturedCfg) => {
     if (f.kind === "character") {
       const c = characters.find((x) => x.code === f.code);
@@ -656,14 +772,13 @@ export default function ZzzDraftPage() {
         image_url: c?.image_url ?? f.image_url ?? "",
       };
     } else {
-      const w = wengines.find((x) => String(x.id) === String(f.id));
+      const w = lightcones.find((x) => String(x.id) === String(f.id));
       return {
         name: w?.name ?? f.name ?? (f.id ? String(f.id) : "Unknown"),
         image_url: w?.image_url ?? f.image_url ?? "",
       };
     }
   };
-
   const renderFeaturedPill = (f: FeaturedCfg) => {
     const ruleColor =
       f.rule === "globalBan"
@@ -677,14 +792,12 @@ export default function ZzzDraftPage() {
         : f.rule === "globalPick"
         ? "Uni Pick"
         : "No Rule";
-
-    const meta = resolveFeaturedMeta(f); // ✅ get name & image from catalogs
+    const meta = resolveFeaturedMeta(f);
     const title = meta.name;
     const img = meta.image_url;
-
     return (
       <div
-        key={f.kind === "character" ? f.code : `we-${f.id}`}
+        key={f.kind === "character" ? f.code : `lc-${f.id}`}
         className="d-inline-flex align-items-center"
         style={{
           gap: 10,
@@ -697,7 +810,7 @@ export default function ZzzDraftPage() {
           cursor: "pointer",
         }}
         title={ruleLabel}
-        onClick={() => setShowFeaturedPopup(true)} // whole pill opens modal
+        onClick={() => setShowFeaturedPopup(true)}
       >
         <div
           style={{
@@ -753,13 +866,85 @@ export default function ZzzDraftPage() {
     );
   };
 
-  /* ───────────── Session: auto-create on page load (Owner only) ───────────── */
+  useEffect(() => {
+    // Only hydrate if we DON'T already have a profile from server/preset
+    if (costProfileId) return; // a real preset is selected
+    if (Object.keys(costCharMs).length > 0) return; // already hydrated (server or earlier)
+    if (characters.length === 0) return; // need catalog to map names → codes
+
+    let aborted = false;
+    (async () => {
+      try {
+        const [resChars, resCones] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/balance`, {
+            credentials: "include",
+          }),
+          fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/cone-balance`, {
+            credentials: "include",
+          }),
+        ]);
+        if (!resChars.ok || !resCones.ok) return;
+
+        const [dataChars, dataCones] = await Promise.all([
+          resChars.json(), // { characters: [{ id, name, costs }] }
+          resCones.json(), // { cones: [{ id, name, costs, ... }] }
+        ]);
+
+        // Build name → code map from HSR catalog
+        const byName = new Map<string, string>();
+        for (const c of characters) byName.set(normName(c.name), c.code);
+
+        // code -> [E0..E6]
+        const cm: Record<string, number[]> = {};
+        for (const row of (dataChars.characters || []) as Array<{
+          id: string;
+          name: string;
+          costs: number[];
+        }>) {
+          const code = byName.get(normName(row.name));
+          if (!code) continue;
+          const arr = Array.isArray(row.costs)
+            ? row.costs.map((n) => Number(n) || 0)
+            : [];
+          cm[code] = (arr.length === 7 ? arr : Array(7).fill(0)) as number[];
+        }
+
+        // light cone id -> [P1..P5]
+        const lp: Record<string, number[]> = {};
+        for (const cone of (dataCones.cones || []) as Array<{
+          id: string;
+          costs: number[];
+        }>) {
+          const arr = Array.isArray(cone.costs)
+            ? cone.costs.map((n) => Number(n) || 0)
+            : [];
+          lp[String(cone.id)] = (
+            arr.length === 5 ? arr : Array(5).fill(0)
+          ) as number[];
+        }
+
+        if (aborted) return;
+        setCostProfileName("Cerydra Default");
+        setCostCharMs(cm);
+        setCostLcPhase(lp); // ✅ now sourced from cone-balance
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      aborted = true;
+    };
+  }, [costProfileId, costCharMs, characters]);
+
+  /* Auto-create session (OWNER ONLY) */
   const [creating, setCreating] = useState(false);
 
   const generateSpectatorSession = async () => {
     if (creating) return;
     setCreating(true);
     try {
+      // POST (generateSpectatorSession)
       const payload = {
         team1: team1Name,
         team2: team2Name,
@@ -767,11 +952,13 @@ export default function ZzzDraftPage() {
         featured: featuredList,
         costProfileId,
         state: collectSpectatorState(),
-        costLimit,
-        penaltyPerPoint,
+        penaltyPerPoint: cycleBreakpoint,
+        timerEnabled,
+        reserveSeconds: Math.min(reserveLeft.B, reserveLeft.R),
       };
+
       const res = await fetch(
-        `${import.meta.env.VITE_API_BASE}/api/zzz/sessions`,
+        `${import.meta.env.VITE_API_BASE}/api/hsr/sessions`,
         {
           method: "POST",
           credentials: "include",
@@ -782,17 +969,16 @@ export default function ZzzDraftPage() {
       if (!res.ok) throw new Error("Failed to create session");
       const data = await res.json(); // { key, url, blueToken?, redToken? }
       setSpectatorKey(data.key);
-      sessionStorage.setItem("zzzSpectatorKey", data.key);
+      sessionStorage.setItem(SPECTATOR_KEY_SS, data.key);
 
       if (data.blueToken) {
         setBlueToken(data.blueToken);
-        sessionStorage.setItem("zzzBlueToken", data.blueToken);
+        sessionStorage.setItem(BLUE_TOKEN_SS, data.blueToken);
       }
       if (data.redToken) {
         setRedToken(data.redToken);
-        sessionStorage.setItem("zzzRedToken", data.redToken);
+        sessionStorage.setItem(RED_TOKEN_SS, data.redToken);
       }
-
       setHydrated(true);
     } catch (e) {
       console.error(e);
@@ -803,72 +989,72 @@ export default function ZzzDraftPage() {
 
   useEffect(() => {
     if (blueToken && redToken) return;
-
-    const fromSSBlue = sessionStorage.getItem("zzzBlueToken");
-    const fromSSRed = sessionStorage.getItem("zzzRedToken");
+    const fromSSBlue = sessionStorage.getItem(BLUE_TOKEN_SS);
+    const fromSSRed = sessionStorage.getItem(RED_TOKEN_SS);
     if (fromSSBlue || fromSSRed) {
       if (fromSSBlue) setBlueToken(fromSSBlue);
       if (fromSSRed) setRedToken(fromSSRed);
       return;
     }
-
     (async () => {
       try {
         const r = await fetch(
-          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/open`,
-          { credentials: "include" }
+          `${import.meta.env.VITE_API_BASE}/api/hsr/sessions/open`,
+          {
+            credentials: "include",
+          }
         );
         if (!r.ok) return;
         const d = await r.json();
         if (d?.blueToken) {
           setBlueToken(d.blueToken);
-          sessionStorage.setItem("zzzBlueToken", d.blueToken);
+          sessionStorage.setItem(BLUE_TOKEN_SS, d.blueToken);
         }
         if (d?.redToken) {
           setRedToken(d.redToken);
-          sessionStorage.setItem("zzzRedToken", d.redToken);
+          sessionStorage.setItem(RED_TOKEN_SS, d.redToken);
         }
         if (d?.key && !spectatorKey) {
           setSpectatorKey(d.key);
-          sessionStorage.setItem("zzzSpectatorKey", d.key);
+          sessionStorage.setItem(SPECTATOR_KEY_SS, d.key);
         }
       } catch {}
     })();
   }, [blueToken, redToken, spectatorKey]);
 
-  // Owner auto-create (skip if we already have a key or URL carries a key)
+  // Owner auto-create
   useEffect(() => {
     if (!user) return;
-    if (spectatorKey) return; // have a key (maybe from URL)
-    if (keyFromUrl) return; // URL join, don't create
+    if (spectatorKey) return;
+    if (keyFromUrl) return;
 
-    const storedKey = sessionStorage.getItem("zzzSpectatorKey");
+    const storedKey = sessionStorage.getItem(SPECTATOR_KEY_SS);
     if (storedKey) {
       setSpectatorKey(storedKey);
       return;
     }
-
     if (sessionStorage.getItem(CREATE_LOCK_KEY)) return;
 
     sessionStorage.setItem(CREATE_LOCK_KEY, "1");
     (async () => {
       try {
-        await generateSpectatorSession(); // POST creates exactly one session
+        await generateSpectatorSession();
       } finally {
         sessionStorage.removeItem(CREATE_LOCK_KEY);
       }
     })();
-  }, [user, spectatorKey, keyFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, spectatorKey, keyFromUrl]);
 
   // If user logs out mid-session, clear local key
   useEffect(() => {
     if (!user && spectatorKey) {
-      sessionStorage.removeItem("zzzSpectatorKey");
+      sessionStorage.removeItem(SPECTATOR_KEY_SS);
       setSpectatorKey(null);
     }
-  }, [user]); // eslint-disable-next-line
+  }, [user]); // eslint-disable-line
 
-  /* ───────────── Derived helpers ───────────── */
+  /* Derived bans */
   const bannedCodes = draftPicks
     .map((pick, i) =>
       draftSequence[i] === "BB" || draftSequence[i] === "RR"
@@ -877,7 +1063,6 @@ export default function ZzzDraftPage() {
     )
     .filter((c): c is string => !!c);
 
-  // Add featured global bans (but never consider a globalPick as banned)
   const effectiveBanned = new Set([
     ...bannedCodes.filter((c) => !featuredGlobalPick.has(c)),
     ...Array.from(featuredGlobalBan).filter((c) => !featuredGlobalPick.has(c)),
@@ -885,10 +1070,8 @@ export default function ZzzDraftPage() {
 
   const lastPayloadRef = useRef<string>("");
 
-  // Save trigger: increments when we want to persist to DB
   const [saveSeq, setSaveSeq] = useState(0);
   const saveTimerRef = useRef<number | null>(null);
-
   function requestSave(delayMs = 0) {
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current);
@@ -904,24 +1087,19 @@ export default function ZzzDraftPage() {
     }
   }
 
-  /* ───────────── SSE: subscribe like spectator (owner + players) ───────────── */
-
+  /* SSE subscription (owner + players) */
   const esRef = useRef<EventSource | null>(null);
-
   const ignoreSseUntilRef = useRef<number>(0);
   const expectedTurnRef = useRef<number | null>(null);
   const expectedModeRef = useRef<"ge" | "le" | "eq" | null>(null);
-
   const bumpIgnoreSse = (
     expectedTurn?: number,
     mode: "ge" | "le" | "eq" = "ge"
   ) => {
-    ignoreSseUntilRef.current = Date.now() + 1200; // was 800
+    ignoreSseUntilRef.current = Date.now() + 1200;
     expectedTurnRef.current = expectedTurn ?? null;
     expectedModeRef.current = expectedTurn != null ? mode : null;
   };
-
-  // owner convenience
   function ownerOptimisticSave(
     delayMs = 0,
     expectedTurn?: number,
@@ -936,18 +1114,17 @@ export default function ZzzDraftPage() {
       if (!p) return null;
       const character = characters.find((c) => c.code === p.characterCode);
       if (!character) return null;
-      const wengine =
-        p.wengineId != null
-          ? wengines.find((w) => String(w.id) === String(p.wengineId))
+      const lightcone =
+        p.lightconeId != null
+          ? lightcones.find((w) => String(w.id) === String(p.lightconeId))
           : undefined;
       return {
         character,
         eidolon: p.eidolon,
-        wengine,
-        superimpose: p.superimpose,
+        lightcone,
+        phase: (p as any).superimpose ?? 1,
       };
     });
-
     return {
       picks: mapped,
       currentTurn: Math.max(
@@ -960,8 +1137,205 @@ export default function ZzzDraftPage() {
       redScores: Array.isArray(state.redScores) ? state.redScores : redScores,
       blueLocked: !!state.blueLocked,
       redLocked: !!state.redLocked,
+      draftSequence: state.draftSequence,
+      paused: state.paused ?? paused,
     };
   };
+
+  /* ───────────── Timers (reserve + per-move grace) ───────────── */
+  const MOVE_GRACE = 30; // seconds before reserve burns
+
+  const has = (o: any, k: string) =>
+    o && Object.prototype.hasOwnProperty.call(o, k);
+
+  const seedTimerEnabled = has(navState, "timerEnabled")
+    ? !!(navState as any).timerEnabled
+    : has(stored, "timerEnabled")
+    ? !!(stored as any).timerEnabled
+    : false;
+
+  const seedReserveSeconds = has(navState, "reserveSeconds")
+    ? Math.max(0, Number((navState as any).reserveSeconds) || 0)
+    : has(stored, "reserveSeconds")
+    ? Math.max(0, Number((stored as any).reserveSeconds) || 0)
+    : 0;
+
+  const [timerEnabled, setTimerEnabled] = useState<boolean>(seedTimerEnabled);
+  const [reserveLeft, setReserveLeft] = useState<{ B: number; R: number }>({
+    B: seedReserveSeconds,
+    R: seedReserveSeconds,
+  });
+
+  // per-pick grace (ticks down first on the active side)
+  const [graceLeft, setGraceLeft] = useState<number>(MOVE_GRACE);
+
+  // pause flags (owner can toggle by clicking timer)
+  const [paused, setPaused] = useState<{ B: boolean; R: boolean }>({
+    B: false,
+    R: false,
+  });
+
+  // Persist per-session so a reload doesn’t kill the clocks
+  const timersPersistKey = useMemo(
+    () => (spectatorKey ? `hsrDraftTimers:${spectatorKey}` : null),
+    [spectatorKey]
+  );
+  useEffect(() => {
+    if (!timersPersistKey) return;
+    try {
+      const raw = sessionStorage.getItem(timersPersistKey);
+      if (!raw) return;
+      const j = JSON.parse(raw);
+      if (
+        typeof j?.reserveLeft?.B === "number" &&
+        typeof j?.reserveLeft?.R === "number" &&
+        typeof j?.graceLeft === "number"
+      ) {
+        setReserveLeft({
+          B: Math.max(0, j.reserveLeft.B),
+          R: Math.max(0, j.reserveLeft.R),
+        });
+        setGraceLeft(Math.max(0, j.graceLeft));
+        if (typeof j?.timerEnabled === "boolean")
+          setTimerEnabled(j.timerEnabled);
+        if (
+          j?.paused &&
+          typeof j.paused.B === "boolean" &&
+          typeof j.paused.R === "boolean"
+        ) {
+          setPaused({ B: j.paused.B, R: j.paused.R });
+        }
+      }
+    } catch {}
+  }, [timersPersistKey]);
+
+  useEffect(() => {
+    if (!timersPersistKey) return;
+    try {
+      sessionStorage.setItem(
+        timersPersistKey,
+        JSON.stringify({ reserveLeft, graceLeft, timerEnabled, paused })
+      );
+    } catch {}
+  }, [reserveLeft, graceLeft, timerEnabled, paused, timersPersistKey]);
+
+  // Helpers
+  const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
+  const fmtClock = (s: number) => {
+    const ss = Math.max(0, Math.floor(s));
+    const m = Math.floor(ss / 60);
+    const r = ss % 60;
+    return `${m}:${pad2(r)}`;
+  };
+
+  const activeSide: "B" | "R" | null = useMemo(() => {
+    if (draftComplete) return null;
+    const tok = draftSequence[currentTurn];
+    if (!tok) return null;
+    return tok.startsWith("B") ? "B" : "R";
+  }, [draftComplete, draftSequence, currentTurn]);
+
+  const isFirstTurnBan = useMemo(() => {
+    if (currentTurn !== 0) return false;
+    const first = draftSequence[0];
+    return first === "BB" || first === "RR";
+  }, [currentTurn, draftSequence]);
+
+  const togglePause = (side: "B" | "R") => {
+    if (!isOwner) return;
+    setPaused((prev) => {
+      const next = { ...prev, [side]: !prev[side] };
+      ownerOptimisticSave(0, currentTurn, "eq");
+      return next;
+    });
+  };
+
+  // High-precision ticking with rAF
+  const rafIdRef = useRef<number | null>(null);
+
+  const graceRef = useRef(graceLeft);
+  useEffect(() => {
+    graceRef.current = graceLeft;
+  }, [graceLeft]);
+
+  const reserveRef = useRef(reserveLeft);
+  useEffect(() => {
+    reserveRef.current = reserveLeft;
+  }, [reserveLeft]);
+
+  const pausedRef = useRef(paused);
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
+  const activeSideRef = useRef<"B" | "R" | null>(null);
+  useEffect(() => {
+    activeSideRef.current = activeSide;
+  }, [activeSide]);
+
+  useEffect(() => {
+    if (!timerEnabled || !hydrated || draftComplete || isFirstTurnBan) return;
+
+    let last: number | null = null;
+
+    const loop = (ts: number) => {
+      if (last == null) last = ts;
+      const dt = Math.max(0, (ts - last) / 1000); // seconds
+      last = ts;
+
+      const side = activeSideRef.current;
+      if (!side) {
+        // no active side — keep the loop alive but don’t tick anyone
+        rafIdRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
+      const isPaused = !!pausedRef.current[side];
+
+      if (!isPaused) {
+        if (graceRef.current > 0) {
+          const g = Math.max(0, graceRef.current - dt);
+          if (g !== graceRef.current) {
+            graceRef.current = g;
+            setGraceLeft(g);
+          }
+        } else {
+          const curr = reserveRef.current[side] ?? 0;
+          const next = Math.max(0, curr - dt);
+          if (next !== curr) {
+            const r = { ...reserveRef.current, [side]: next };
+            reserveRef.current = r;
+            setReserveLeft(r);
+          }
+        }
+      }
+
+      rafIdRef.current = requestAnimationFrame(loop);
+    };
+
+    // kill any stray loop first (StrictMode / hot reload safety)
+    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+    rafIdRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    };
+  }, [timerEnabled, hydrated, draftComplete, isFirstTurnBan]);
+
+  const resetGraceNow = () => {
+    // update ref first so the rAF loop sees it immediately
+    graceRef.current = MOVE_GRACE;
+    setGraceLeft(MOVE_GRACE);
+  };
+
+
+  useEffect(() => {
+    if (!timerEnabled) return;
+    if (isFirstTurnBan) return; // don't start grace on the very first ban slot
+    setGraceLeft(MOVE_GRACE); // always reset to 30s, no carry from previous pick
+  }, [currentTurn, timerEnabled, isFirstTurnBan]);
+
 
   useEffect(() => {
     if (!spectatorKey) return;
@@ -969,110 +1343,186 @@ export default function ZzzDraftPage() {
     esRef.current?.close();
     const url = `${
       import.meta.env.VITE_API_BASE
-    }/api/zzz/sessions/${spectatorKey}/stream`;
+    }/api/hsr/sessions/${spectatorKey}/stream`;
     const es = new EventSource(url);
 
     const handleSnapshotOrUpdate = (payload: any) => {
-      // Pick up DB timestamps / completion for "live" without polling
       if (payload?.createdAt || payload?.created_at) {
         const ts = new Date(payload.createdAt || payload.created_at).getTime();
         if (!Number.isNaN(ts)) setCreatedAtMs(ts);
       }
-
-      // Prefer explicit isComplete; otherwise infer from completedAt if present
-      if (typeof payload?.isComplete === "boolean") {
-        setFinishedFromServer(payload.isComplete);
-      } else if (payload?.completedAt || payload?.completed_at) {
+      if (typeof payload?.is_complete === "boolean") {
+        setFinishedFromServer(!!payload.is_complete);
+      } else if (payload?.completed_at) {
         setFinishedFromServer(true);
       }
 
-      // sync mode/team names from server truth
-      if (payload?.mode === "2v2" || payload?.mode === "3v3") {
+      if (payload?.mode === "2ban" || payload?.mode === "3ban")
         setMode(payload.mode);
-      }
-
       if (typeof payload?.team1 === "string") setTeam1Name(payload.team1);
       if (typeof payload?.team2 === "string") setTeam2Name(payload.team2);
 
-      // cost profile from server (preferred)
       if (Object.prototype.hasOwnProperty.call(payload, "costProfileId")) {
         setCostProfileId(payload.costProfileId ?? null);
       }
-      // costLimit / penaltyPerPoint from server (preferred)
-      // NEW: gated costLimit
-      if (typeof payload?.costLimit === "number") {
-        const incoming = Number(payload.costLimit);
-        const current = costLimitRef.current;
-        const p = pendingCostLimitRef.current;
-        const stillPending = Date.now() < pendingSettingsExpiresAtRef.current;
-        const recentLocalEdit =
-          Date.now() - lastLocalSettingsAtRef.current < 5000;
-
-        if (p != null) {
-          if (incoming === p) {
-            pendingCostLimitRef.current = null; // ACK
-            if (incoming !== current) setCostLimit(incoming);
-          } else if (stillPending) {
-            // drop stale echo
-          } else {
-            pendingCostLimitRef.current = null; // timeout: accept server
-            if (incoming !== current) setCostLimit(incoming);
-          }
-        } else if (recentLocalEdit && incoming !== current) {
-          // drop brief stale echo
-        } else if (incoming !== current) {
-          setCostLimit(incoming);
-        }
-      }
-
-      // NEW: gated penaltyPerPoint
       if (typeof payload?.penaltyPerPoint === "number") {
-        const incoming = Math.max(
-          0,
-          Math.round(Number(payload.penaltyPerPoint))
-        );
-        const current = penaltyRef.current;
-        const p = pendingPenaltyRef.current;
-        const stillPending = Date.now() < pendingSettingsExpiresAtRef.current;
+        const incoming = Math.max(1, Math.floor(payload.penaltyPerPoint));
+        const current = cycleBreakpointRef.current;
+        const pending = pendingCycleBpRef.current;
+        const stillPending = Date.now() < pendingBpExpiresAtRef.current;
         const recentLocalEdit =
           Date.now() - lastLocalSettingsAtRef.current < 5000;
 
-        if (p != null) {
-          if (incoming === p) {
-            pendingPenaltyRef.current = null; // ACK
-            if (incoming !== current) setPenaltyPerPoint(incoming);
+        if (pending != null) {
+          if (incoming === pending) {
+            pendingCycleBpRef.current = null; // ACK
+            if (incoming !== current) setCycleBreakpoint(incoming);
           } else if (stillPending) {
-            // drop stale echo
+            // ignore older echo while pending
           } else {
-            pendingPenaltyRef.current = null; // timeout: accept server
-            if (incoming !== current) setPenaltyPerPoint(incoming);
+            pendingCycleBpRef.current = null; // timed out; accept server
+            if (incoming !== current) setCycleBreakpoint(incoming);
           }
         } else if (recentLocalEdit && incoming !== current) {
-          // drop brief stale echo
+          // likely stale; ignore
         } else if (incoming !== current) {
-          setPenaltyPerPoint(incoming);
+          setCycleBreakpoint(incoming);
         }
       }
 
-      // if server embeds the tables, use them directly (and set the name if present)
+
+      // ── Timer + penalties from server/session ────────────────────────────────────
+      const st = payload?.state || {};
+
+      // timerEnabled (support both camel/snake, state > top-level)
+      const timerFrom =
+        typeof st.timerEnabled === "boolean"
+          ? st.timerEnabled
+          : typeof st.timer_enabled === "boolean"
+          ? st.timer_enabled
+          : typeof payload?.timerEnabled === "boolean"
+          ? payload.timerEnabled
+          : typeof payload?.timer_enabled === "boolean"
+          ? payload.timer_enabled
+          : undefined;
+      if (typeof timerFrom === "boolean") setTimerEnabled(timerFrom);
+
+      // paused flags
+      if (
+        st.paused &&
+        typeof st.paused.B === "boolean" &&
+        typeof st.paused.R === "boolean"
+      ) {
+        setPaused({ B: !!st.paused.B, R: !!st.paused.R });
+      }
+
+      // Prefer precise timer fields (reserveLeft/graceLeft/timerUpdatedAt); fallback to legacy reserveSeconds
+      const incomingReserve =
+        st.reserveLeft &&
+        typeof st.reserveLeft.B === "number" &&
+        typeof st.reserveLeft.R === "number"
+          ? {
+              B: Math.max(0, Number(st.reserveLeft.B)),
+              R: Math.max(0, Number(st.reserveLeft.R)),
+            }
+          : Number.isFinite(Number(st.reserveSeconds)) ||
+            Number.isFinite(Number(st.reserve_seconds))
+          ? (() => {
+              const seed = Number.isFinite(Number(st.reserveSeconds))
+                ? Number(st.reserveSeconds)
+                : Number(st.reserve_seconds);
+              const v = Math.max(0, Number(seed) || 0);
+              return { B: v, R: v };
+            })()
+          : null;
+
+      const incomingGrace = Number.isFinite(Number(st.graceLeft))
+        ? Math.max(0, Number(st.graceLeft))
+        : null;
+
+      const ts = Number.isFinite(Number(st.timerUpdatedAt))
+        ? Number(st.timerUpdatedAt)
+        : null;
+
+      // Apply + catch up locally using server timestamp so spectator/owner stay in sync
+      if (incomingReserve) {
+        let nextReserve = incomingReserve;
+        let nextGrace =
+          typeof incomingGrace === "number" ? incomingGrace : graceLeft;
+
+        if (ts && timerFrom) {
+          const elapsed = Math.max(0, (Date.now() - ts) / 1000);
+
+          // Determine active side from server's view (prefer st fields)
+          const srvSeq =
+            Array.isArray(st.draftSequence) && st.draftSequence.length
+              ? st.draftSequence
+              : draftSequence;
+          const srvTurn = Number.isFinite(Number(st.currentTurn))
+            ? Number(st.currentTurn)
+            : currentTurn;
+          const tok = srvSeq[srvTurn] || "";
+          const activeSide = tok.startsWith("B")
+            ? "B"
+            : tok.startsWith("R")
+            ? "R"
+            : null;
+
+          // First slot is a BAN? Then don't burn grace on "turn 0 + ban"
+          const firstIsBan =
+            (srvSeq[0] === "BB" || srvSeq[0] === "RR") && srvTurn === 0;
+
+          if (activeSide && !st.paused?.[activeSide] && !firstIsBan) {
+            const burnFromGrace = Math.min(nextGrace, elapsed);
+            nextGrace = Math.max(0, nextGrace - burnFromGrace);
+            const over = Math.max(0, elapsed - burnFromGrace);
+            if (over > 0) {
+              nextReserve = {
+                ...nextReserve,
+                [activeSide]: Math.max(0, nextReserve[activeSide] - over),
+              };
+            }
+          }
+        }
+
+        setReserveLeft(nextReserve);
+        if (incomingGrace != null) setGraceLeft(nextGrace);
+      }
+
+      // ── Extra per-team manual cycle penalties ───────────────────────────────────
+      if (Number.isFinite(Number(st.extraCyclePenaltyB))) {
+        setExtraCyclePenaltyB(
+          round2(Math.max(0, Number(st.extraCyclePenaltyB)))
+        );
+      }
+      if (Number.isFinite(Number(st.extraCyclePenaltyR))) {
+        setExtraCyclePenaltyR(
+          round2(Math.max(0, Number(st.extraCyclePenaltyR)))
+        );
+      }
+
+
       if (
         payload?.costProfile &&
-        (payload.costProfile.charMs || payload.costProfile.wePhase)
+        (payload.costProfile.charMs || payload.costProfile.lcPhase)
       ) {
         const cp = payload.costProfile;
         setCostProfileName(cp.name || "Preset");
         setCostCharMs(cp.charMs || {});
-        setCostWePhase(cp.wePhase || {});
+        setCostLcPhase(cp.lcPhase || {});
       }
 
-      // right after syncing mode/team names
       if (Array.isArray(payload?.featured)) {
         setFeaturedList(normalizeFeatured(payload.featured));
       }
 
+      const rsFrom: number | undefined = incomingReserve
+        ? Math.floor(Math.min(incomingReserve.B, incomingReserve.R))
+        : undefined;
+
       try {
         sessionStorage.setItem(
-          "zzzDraftInit",
+          DRAFT_INIT_SS,
           JSON.stringify({
             team1: payload.team1,
             team2: payload.team2,
@@ -1080,15 +1530,22 @@ export default function ZzzDraftPage() {
             featured: Array.isArray(payload?.featured)
               ? payload.featured
               : featuredList,
-            costProfileId: payload?.costProfileId ?? costProfileId,
-            costLimit:
-              typeof payload?.costLimit === "number"
-                ? payload.costLimit
-                : costLimit,
+            costProfileId: Object.prototype.hasOwnProperty.call(
+              payload,
+              "costProfileId"
+            )
+              ? payload.costProfileId
+              : costProfileId,
             penaltyPerPoint:
               typeof payload?.penaltyPerPoint === "number"
-                ? payload.penaltyPerPoint
-                : penaltyPerPoint,
+                ? Math.max(1, Math.floor(payload.penaltyPerPoint))
+                : cycleBreakpoint,
+
+            // ✅ normalized & re-used
+            timerEnabled:
+              typeof timerFrom === "boolean" ? timerFrom : seedTimerEnabled,
+            reserveSeconds:
+              typeof rsFrom === "number" ? rsFrom : seedReserveSeconds,
           })
         );
       } catch {}
@@ -1106,42 +1563,54 @@ export default function ZzzDraftPage() {
             (mode === "le" && srv > exp) ||
             (mode === "eq" && srv !== exp);
           if (drop) return;
-          // accept & clear expectation
           expectedTurnRef.current = null;
           expectedModeRef.current = null;
         } else {
-          // fallback: drop echoes that don't move the turn
           if (serverState.currentTurn === currentTurn) return;
         }
       }
 
-      // If characters/wengines not loaded yet, store and wait
-      if (characters.length === 0 || wengines.length === 0) {
+      // if catalogs aren’t ready yet, queue the state
+      if (characters.length === 0 || lightcones.length === 0) {
         pendingServerStateRef.current = serverState;
         return;
       }
 
-      // map + set (LIVE lock visibility stays in sync here)
       const mapped = mapServerStateToLocal(serverState);
+      if (mapped.currentTurn !== currentTurn) {
+        resetGraceNow();
+      }
       setDraftPicks(mapped.picks);
       setCurrentTurn(mapped.currentTurn);
       setBlueScores(mapped.blueScores);
       setRedScores(mapped.redScores);
       setBlueLocked(mapped.blueLocked);
       setRedLocked(mapped.redLocked);
+      if (Array.isArray(mapped.draftSequence) && mapped.draftSequence.length) {
+        setDraftSequence(mapped.draftSequence);
+      }
+      if (
+        mapped.paused &&
+        typeof mapped.paused.B === "boolean" &&
+        typeof mapped.paused.R === "boolean"
+      ) {
+        setPaused(mapped.paused);
+      }
       setHydrated(true);
 
+      // late-load featured (in case SSE joined midstream)
       if (
         !Array.isArray(payload?.featured) &&
         featuredList.length === 0 &&
         spectatorKey
       ) {
         fetch(
-          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`
+          `${import.meta.env.VITE_API_BASE}/api/hsr/sessions/${spectatorKey}`
         )
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => {
-            if (d && Array.isArray(d.featured)) setFeaturedList(d.featured);
+            if (d && Array.isArray(d.featured))
+              setFeaturedList(normalizeFeatured(d.featured));
           })
           .catch(() => {});
       }
@@ -1153,38 +1622,34 @@ export default function ZzzDraftPage() {
         handleSnapshotOrUpdate(data);
       } catch {}
     });
-
     es.addEventListener("update", (ev: MessageEvent) => {
       try {
         const data = JSON.parse(ev.data);
         handleSnapshotOrUpdate(data);
       } catch {}
     });
-
     es.addEventListener("not_found", () => {
       console.warn("Session not found");
       es.close();
     });
-
     es.onerror = () => {
-      // let browser handle reconnects
+      // let browser’s EventSource auto-reconnect
     };
 
     esRef.current = es;
     return () => es.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spectatorKey, characters, wengines, currentTurn]);
+  }, [spectatorKey, characters, lightcones, currentTurn]);
 
-  /* ───────────── Fallback initial GET (in case SSE races) ───────────── */
+  /* ───────────── Fallback initial GET (race with SSE) ───────────── */
   useEffect(() => {
     if (!spectatorKey) return;
-    // run GET if we aren't hydrated OR we don't have featured yet
     if (hydrated && featuredList.length > 0) return;
     const ctrl = new AbortController();
     (async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`,
+          `${import.meta.env.VITE_API_BASE}/api/hsr/sessions/${spectatorKey}`,
           {
             signal: ctrl.signal,
           }
@@ -1196,7 +1661,7 @@ export default function ZzzDraftPage() {
         }
         const data = await res.json();
 
-        if (data?.mode === "2v2" || data?.mode === "3v3") setMode(data.mode);
+        if (data?.mode === "2ban" || data?.mode === "3ban") setMode(data.mode);
         if (typeof data?.team1 === "string") setTeam1Name(data.team1);
         if (typeof data?.team2 === "string") setTeam2Name(data.team2);
 
@@ -1206,43 +1671,147 @@ export default function ZzzDraftPage() {
         ) {
           setCostProfileId(data.costProfileId);
         }
-        if (typeof data?.costLimit === "number") {
-          const incoming = Number(data.costLimit);
-          const p = pendingCostLimitRef.current;
-          const stillPending = Date.now() < pendingSettingsExpiresAtRef.current;
-          if (!(p != null && stillPending && incoming !== p)) {
-            if (incoming !== costLimitRef.current) setCostLimit(incoming);
+        if (typeof data?.penaltyPerPoint === "number") {
+          const incoming = Math.max(1, Math.floor(data.penaltyPerPoint));
+          const current = cycleBreakpointRef.current;
+          const pending = pendingCycleBpRef.current;
+          const stillPending = Date.now() < pendingBpExpiresAtRef.current;
+
+          if (pending != null && stillPending && incoming !== pending) {
+            // ignore snapshot while a local save is pending
+          } else if (incoming !== current) {
+            setCycleBreakpoint(incoming);
           }
         }
-        if (typeof data?.penaltyPerPoint === "number") {
-          const incoming = Math.max(
-            0,
-            Math.round(Number(data.penaltyPerPoint))
-          );
-          const p = pendingPenaltyRef.current;
-          const stillPending = Date.now() < pendingSettingsExpiresAtRef.current;
-          if (!(p != null && stillPending && incoming !== p)) {
-            if (incoming !== penaltyRef.current) setPenaltyPerPoint(incoming);
+
+
+        // ── Timer + penalties from server/session (GET fallback) ─────────────────────
+        const st = data?.state || {};
+
+        // timerEnabled
+        const timerFrom =
+          typeof st.timerEnabled === "boolean"
+            ? st.timerEnabled
+            : typeof st.timer_enabled === "boolean"
+            ? st.timer_enabled
+            : typeof data?.timerEnabled === "boolean"
+            ? data.timerEnabled
+            : typeof data?.timer_enabled === "boolean"
+            ? data.timer_enabled
+            : undefined;
+        if (typeof timerFrom === "boolean") setTimerEnabled(timerFrom);
+
+        // paused flags
+        if (
+          st.paused &&
+          typeof st.paused.B === "boolean" &&
+          typeof st.paused.R === "boolean"
+        ) {
+          setPaused({ B: !!st.paused.B, R: !!st.paused.R });
+        }
+
+        // Prefer precise timer fields; fallback to legacy reserveSeconds
+        const incomingReserve =
+          st.reserveLeft &&
+          typeof st.reserveLeft.B === "number" &&
+          typeof st.reserveLeft.R === "number"
+            ? {
+                B: Math.max(0, Number(st.reserveLeft.B)),
+                R: Math.max(0, Number(st.reserveLeft.R)),
+              }
+            : Number.isFinite(Number(st.reserveSeconds)) ||
+              Number.isFinite(Number(st.reserve_seconds))
+            ? (() => {
+                const seed = Number.isFinite(Number(st.reserveSeconds))
+                  ? Number(st.reserveSeconds)
+                  : Number(st.reserve_seconds);
+                const v = Math.max(0, Number(seed) || 0);
+                return { B: v, R: v };
+              })()
+            : null;
+
+        const incomingGrace = Number.isFinite(Number(st.graceLeft))
+          ? Math.max(0, Number(st.graceLeft))
+          : null;
+
+        const ts = Number.isFinite(Number(st.timerUpdatedAt))
+          ? Number(st.timerUpdatedAt)
+          : null;
+
+        if (incomingReserve) {
+          let nextReserve = incomingReserve;
+          let nextGrace =
+            typeof incomingGrace === "number" ? incomingGrace : graceLeft;
+
+          if (ts && timerFrom) {
+            const elapsed = Math.max(0, (Date.now() - ts) / 1000);
+
+            const srvSeq =
+              Array.isArray(st.draftSequence) && st.draftSequence.length
+                ? st.draftSequence
+                : draftSequence;
+            const srvTurn = Number.isFinite(Number(st.currentTurn))
+              ? Number(st.currentTurn)
+              : currentTurn;
+            const tok = srvSeq[srvTurn] || "";
+            const activeSide = tok.startsWith("B")
+              ? "B"
+              : tok.startsWith("R")
+              ? "R"
+              : null;
+
+            const firstIsBan =
+              (srvSeq[0] === "BB" || srvSeq[0] === "RR") && srvTurn === 0;
+
+            if (activeSide && !st.paused?.[activeSide] && !firstIsBan) {
+              const burnFromGrace = Math.min(nextGrace, elapsed);
+              nextGrace = Math.max(0, nextGrace - burnFromGrace);
+              const over = Math.max(0, elapsed - burnFromGrace);
+              if (over > 0) {
+                nextReserve = {
+                  ...nextReserve,
+                  [activeSide]: Math.max(0, nextReserve[activeSide] - over),
+                };
+              }
+            }
           }
+
+          setReserveLeft(nextReserve);
+          if (incomingGrace != null) setGraceLeft(nextGrace);
+        }
+
+        if (Number.isFinite(Number(st.extraCyclePenaltyB))) {
+          setExtraCyclePenaltyB(
+            round2(Math.max(0, Number(st.extraCyclePenaltyB)))
+          );
+        }
+        if (Number.isFinite(Number(st.extraCyclePenaltyR))) {
+          setExtraCyclePenaltyR(
+            round2(Math.max(0, Number(st.extraCyclePenaltyR)))
+          );
         }
 
 
         if (
           data?.costProfile &&
-          (data.costProfile.charMs || data.costProfile.wePhase)
+          (data.costProfile.charMs || data.costProfile.lcPhase)
         ) {
           const cp = data.costProfile;
           setCostProfileName(cp.name || "Preset");
           setCostCharMs(cp.charMs || {});
-          setCostWePhase(cp.wePhase || {});
+          setCostLcPhase(cp.lcPhase || {});
         }
 
-        // hydrate featured even if SSE missed it
-        if (Array.isArray(data?.featured)) {
+        if (Array.isArray(data?.featured))
           setFeaturedList(normalizeFeatured(data.featured));
+
+        if (
+          Array.isArray(data?.state?.draftSequence) &&
+          data.state.draftSequence.length
+        ) {
+          setDraftSequence(data.state.draftSequence);
         }
 
-        // Capture DB timing/completion for "live"
         if (data?.createdAt || data?.created_at) {
           const ts = new Date(data.createdAt || data.created_at).getTime();
           if (!Number.isNaN(ts)) setCreatedAtMs(ts);
@@ -1255,7 +1824,7 @@ export default function ZzzDraftPage() {
 
         try {
           sessionStorage.setItem(
-            "zzzDraftInit",
+            DRAFT_INIT_SS,
             JSON.stringify({
               team1: data.team1,
               team2: data.team2,
@@ -1264,16 +1833,32 @@ export default function ZzzDraftPage() {
                 ? data.featured
                 : featuredList,
               costProfileId: data?.costProfileId ?? costProfileId,
-
-              // NEW: persist limits (use server value if present, else keep current)
-              costLimit:
-                typeof data?.costLimit === "number"
-                  ? data.costLimit
-                  : costLimit,
               penaltyPerPoint:
                 typeof data?.penaltyPerPoint === "number"
-                  ? data.penaltyPerPoint
-                  : penaltyPerPoint,
+                  ? Math.max(1, Math.floor(data.penaltyPerPoint))
+                  : cycleBreakpoint,
+
+              // normalized timer fields
+              timerEnabled:
+                typeof st.timerEnabled === "boolean"
+                  ? st.timerEnabled
+                  : typeof st.timer_enabled === "boolean"
+                  ? st.timer_enabled
+                  : typeof data?.timerEnabled === "boolean"
+                  ? data.timerEnabled
+                  : typeof data?.timer_enabled === "boolean"
+                  ? data.timer_enabled
+                  : seedTimerEnabled,
+
+              reserveSeconds: Number.isFinite(Number(st.reserveSeconds))
+                ? Number(st.reserveSeconds)
+                : Number.isFinite(Number(st.reserve_seconds))
+                ? Number(st.reserve_seconds)
+                : Number.isFinite(Number(data?.reserveSeconds))
+                ? Number(data.reserveSeconds)
+                : Number.isFinite(Number(data?.reserve_seconds))
+                ? Number(data.reserve_seconds)
+                : seedReserveSeconds,
             })
           );
         } catch {}
@@ -1282,30 +1867,38 @@ export default function ZzzDraftPage() {
       } catch {}
     })();
     return () => ctrl.abort();
-  }, [spectatorKey, hydrated, featuredList.length, costLimit, penaltyPerPoint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    spectatorKey,
+    hydrated,
+    featuredList.length,
+    costProfileId,
+    cycleBreakpoint,
+  ]);
 
-  /* ───────────── Autosave PUTs (OWNER ONLY) ───────────── */
+  /* ───────────── Autosave (OWNER ONLY) ───────────── */
   useEffect(() => {
     if (!user || !spectatorKey || isPlayerClient) return;
-    if (!hydrated) return; // don't overwrite server with empty local state
+    if (!hydrated) return;
 
     const payload = JSON.stringify({
       featured: featuredList,
       costProfileId,
       state: collectSpectatorState(),
       isComplete: isComplete || undefined,
-      costLimit,
-      penaltyPerPoint,
+      penaltyPerPoint: cycleBreakpoint,
+      timerEnabled,
+      reserveSeconds: Math.max(0, seedReserveSeconds || reserveLeft.B),
     });
 
-    if (payload === lastPayloadRef.current) return; // nothing changed
+    if (payload === lastPayloadRef.current) return;
     lastPayloadRef.current = payload;
 
     const ctrl = new AbortController();
     (async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_BASE}/api/zzz/sessions/${spectatorKey}`,
+          `${import.meta.env.VITE_API_BASE}/api/hsr/sessions/${spectatorKey}`,
           {
             method: "PUT",
             credentials: "include",
@@ -1314,13 +1907,9 @@ export default function ZzzDraftPage() {
             signal: ctrl.signal,
           }
         );
-
-        if (res.ok) {
-          writeLocalSnapshot(spectatorKey, collectSpectatorState());
-        }
-
+        if (res.ok) writeLocalSnapshot(spectatorKey, collectSpectatorState());
         if (res.status === 401 || res.status === 403 || res.status === 404) {
-          sessionStorage.removeItem("zzzSpectatorKey");
+          sessionStorage.removeItem(SPECTATOR_KEY_SS);
           setSpectatorKey(null);
         }
       } catch (e) {
@@ -1329,7 +1918,6 @@ export default function ZzzDraftPage() {
     })();
 
     return () => ctrl.abort();
-    // ✅ only run when saveSeq increments
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveSeq]);
 
@@ -1341,79 +1929,93 @@ export default function ZzzDraftPage() {
   const blueScale = useRowScale(blueRowRef, blueCount);
   const redScale = useRowScale(redRowRef, redCount);
 
+  /* ───────────── Slot Cost (preset + featured overrides; fallback rules) ───────────── */
   function getSlotCost(pick: DraftPick | null | undefined) {
-    if (!pick) return { agentCost: 0, weCost: 0, total: 0 };
+    if (!pick) return { charCost: 0, lcCost: 0, total: 0 };
 
-    // --- Character cost (featured base + preset delta) ---
-    let agentCost: number;
-    const cpRow = costCharMs[pick.character.code]; // preset row [M0..M6]
-    const featuredBase = featuredCostOverride.get(pick.character.code);
+    // Character cost
+    let charCost: number;
+    const cpRow = costCharMs[pick.character.code]; // [E0..E6]
+    const featuredBase = featuredCharCostOverride.get(pick.character.code);
 
     if (Array.isArray(cpRow) && cpRow.length === 7) {
-      // base: featured customCost (if any) else preset M0
-      const baseAtM0 =
+      const baseAtE0 =
         typeof featuredBase === "number"
           ? featuredBase
           : Number((cpRow[0] || 0).toFixed(2));
-      const atMx = Number(
+      const atEx = Number(
         (cpRow[Math.max(0, Math.min(6, pick.eidolon))] || 0).toFixed(2)
       );
-      const delta = Number((atMx - (cpRow[0] || 0)).toFixed(2));
-      agentCost = Number((baseAtM0 + delta).toFixed(2));
+      const delta = Number((atEx - (cpRow[0] || 0)).toFixed(2));
+      charCost = Number((baseAtE0 + delta).toFixed(2));
     } else {
-      // fallback: featured base over normal rule-based delta
-      const normalAtM0 = calcAgentCost(pick.character, 0);
-      const normalAtMx = calcAgentCost(pick.character, pick.eidolon);
-      const mDelta = Number((normalAtMx - normalAtM0).toFixed(2));
-      const base = typeof featuredBase === "number" ? featuredBase : normalAtM0;
-      agentCost = Number((base + mDelta).toFixed(2));
+      const normalAtE0 = calcCharCostHSR(pick.character, 0);
+      const normalAtEx = calcCharCostHSR(pick.character, pick.eidolon);
+      const eDelta = Number((normalAtEx - normalAtE0).toFixed(2));
+      const base = typeof featuredBase === "number" ? featuredBase : normalAtE0;
+      charCost = Number((base + eDelta).toFixed(2));
     }
 
-    // --- W-Engine cost ---
-    let weCost = 0;
-    if (pick.wengine) {
-      const row = costWePhase[String(pick.wengine.id)];
+    // Light Cone cost
+    let lcCost = 0;
+    if (pick.lightcone) {
+      const row = costLcPhase[String(pick.lightcone.id)];
+      const lcBaseOverride = featuredLcCostOverride.get(
+        String(pick.lightcone.id)
+      ); // treated as P1 base if using fallback rule
       if (row && row.length === 5) {
-        weCost = Number(
-          (row[Math.max(1, Math.min(5, pick.superimpose)) - 1] || 0).toFixed(2)
+        lcCost = Number(
+          (row[Math.max(1, Math.min(5, pick.phase)) - 1] || 0).toFixed(2)
         );
       } else {
-        // fall back to rule + featured base override
-        const normalAtP1 = calcWEngineCost(pick.wengine, 1);
-        const normalAtPx = calcWEngineCost(pick.wengine, pick.superimpose);
+        const normalAtP1 = calcLcCostHSR(pick.lightcone, 1);
+        const normalAtPx = calcLcCostHSR(pick.lightcone, pick.phase);
         const pDelta = Number((normalAtPx - normalAtP1).toFixed(2));
-
-        const weOverride =
-          pick.wengine.id != null
-            ? featuredWeCostOverride.get(String(pick.wengine.id))
-            : undefined;
-
-        const featuredBaseWE =
-          typeof weOverride === "number" ? weOverride : normalAtP1;
-        weCost = Number((featuredBaseWE + pDelta).toFixed(2));
+        const base =
+          typeof lcBaseOverride === "number" ? lcBaseOverride : normalAtP1;
+        lcCost = Number((base + pDelta).toFixed(2));
       }
     }
 
-    const total = Number((agentCost + weCost).toFixed(2));
-    return { agentCost, weCost, total };
+    const total = Number((charCost + lcCost).toFixed(2));
+    return { charCost, lcCost, total };
   }
 
-  /* ───────────── Data Fetch (characters & W-engines) ───────────── */
+  /* ───────────── Catalog fetch ───────────── */
   useEffect(() => {
     Promise.all([
-      fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/characters`, {
+      fetch(`${import.meta.env.VITE_API_BASE}/api/characters?cycle=0`, {
         credentials: "include",
       }),
-      fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/wengines`, {
+      fetch(`${import.meta.env.VITE_API_BASE}/api/cerydra/cone-balance`, {
         credentials: "include",
       }),
     ])
-      .then(async ([charRes, wengRes]) => {
-        const charData = await charRes.json();
-        const wengData = await wengRes.json();
-        if (!charRes.ok || !wengRes.ok) throw new Error("Failed to fetch data");
-        setCharacters((charData.data || []) as Character[]);
-        setWengines((wengData.data || []) as WEngine[]);
+      .then(async ([cRes, lcRes]) => {
+        const cJson = await cRes.json();
+        const lcJson = await lcRes.json();
+        if (!cRes.ok || !lcRes.ok)
+          throw new Error("Failed to fetch HSR catalogs");
+
+        const chars: Character[] = (cJson?.data || []).map((c: any) => ({
+          code: c.code,
+          name: c.name,
+          subname: c.subname,
+          image_url: c.image_url,
+          rarity: Number(c.rarity) || 5,
+          limited: !!c.limited,
+        }));
+        const lcs: LightCone[] = (lcJson?.cones || []).map((w: any) => ({
+          id: String(w.id),
+          name: w.name,
+          subname: w.subname,
+          rarity: Number(w.rarity) || 5,
+          limited: !!w.limited,
+          image_url: w.imageUrl,
+        }));
+
+        setCharacters(chars);
+        setLightcones(lcs);
       })
       .catch((err) => {
         console.error(err);
@@ -1421,27 +2023,26 @@ export default function ZzzDraftPage() {
       });
   }, []);
 
-  // Apply any pending server state once data is loaded
+  // Apply pending server state once catalogs are available
   useEffect(() => {
     if (hydrated) return;
     const pending = pendingServerStateRef.current;
     if (!pending) return;
-    if (characters.length === 0 || wengines.length === 0) return;
+    if (characters.length === 0 || lightcones.length === 0) return;
 
     const mappedPicks: (DraftPick | null)[] = pending.picks.map((p) => {
       if (!p) return null;
       const character = characters.find((c) => c.code === p.characterCode);
       if (!character) return null;
-      const wengine =
-        p.wengineId != null
-          ? wengines.find((w) => String(w.id) === String(p.wengineId))
+      const lightcone =
+        p.lightconeId != null
+          ? lightcones.find((w) => String(w.id) === String(p.lightconeId))
           : undefined;
-
       return {
         character,
         eidolon: p.eidolon,
-        wengine,
-        superimpose: p.superimpose,
+        lightcone,
+        phase: (p as any).superimpose ?? 1, // <-- here too
       };
     });
 
@@ -1449,6 +2050,10 @@ export default function ZzzDraftPage() {
     setCurrentTurn(
       Math.max(0, Math.min(pending.draftSequence.length, pending.currentTurn))
     );
+
+    if (Array.isArray(pending.draftSequence) && pending.draftSequence.length) {
+      setDraftSequence(pending.draftSequence);
+    }
 
     if (Array.isArray(pending.blueScores) && pending.blueScores.length)
       setBlueScores(pending.blueScores);
@@ -1458,27 +2063,45 @@ export default function ZzzDraftPage() {
     setBlueLocked(!!pending.blueLocked);
     setRedLocked(!!pending.redLocked);
 
+    if (
+      pending.paused &&
+      typeof pending.paused.B === "boolean" &&
+      typeof pending.paused.R === "boolean"
+    ) {
+      setPaused({ B: !!pending.paused.B, R: !!pending.paused.R });
+    }
+
+    // ⬇️ NEW: hydrate timer from pending.state for players too
+    if (typeof pending.timerEnabled === "boolean") {
+      setTimerEnabled(!!pending.timerEnabled);
+    }
+    if (Number.isFinite(Number(pending.reserveSeconds))) {
+      const sv = Math.max(0, Number(pending.reserveSeconds));
+      setReserveLeft((prev) => {
+        const untouched =
+          prev.B === prev.R && (prev.B === 0 || prev.B === seedReserveSeconds);
+        return untouched ? { B: sv, R: sv } : prev;
+      });
+    }
+
     pendingServerStateRef.current = null;
     setHydrated(true);
-  }, [characters, wengines, hydrated]);
-
-  /* ───────────── Click-outside sliders ───────────── */
+  }, [characters, lightcones, hydrated]);
+  /* ───────────── Outside click for sliders ───────────── */
   const eidolonRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const superimposeRefs = useRef<(HTMLDivElement | null)[]>([]);
-
+  const phaseRefs = useRef<(HTMLDivElement | null)[]>([]);
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-
       const bootstrapModal = document.querySelector(".modal-content");
       if (bootstrapModal && bootstrapModal.contains(target)) return;
 
       if (
-        superOpenIndex !== null &&
-        superimposeRefs.current[superOpenIndex] &&
-        !superimposeRefs.current[superOpenIndex]!.contains(target)
+        phaseOpenIndex !== null &&
+        phaseRefs.current[phaseOpenIndex] &&
+        !phaseRefs.current[phaseOpenIndex]!.contains(target)
       ) {
-        setSuperOpenIndex(null);
+        setPhaseOpenIndex(null);
       }
       if (
         eidolonOpenIndex !== null &&
@@ -1490,10 +2113,11 @@ export default function ZzzDraftPage() {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [superOpenIndex, eidolonOpenIndex]);
+  }, [phaseOpenIndex, eidolonOpenIndex]);
 
-  /* ───────────── Player gating helpers ───────────── */
+  /* ───────────── Player gating ───────────── */
   const isPlayer = isPlayerClient && (playerSide === "B" || playerSide === "R");
+  const isOwner = !!user && !isPlayerClient;
   const isMyTurn = (() => {
     if (!isPlayer) return false;
     const step = draftSequence[currentTurn] || "";
@@ -1501,78 +2125,13 @@ export default function ZzzDraftPage() {
     return side === playerSide;
   })();
 
-  const isOwner = !!user && !isPlayer;
-
-  // Settings modal
-  const [showSettings, setShowSettings] = useState(false);
-  const [costLimitStr, setCostLimitStr] = useState(String(costLimit));
-  const [penaltyStr, setPenaltyStr] = useState(String(penaltyPerPoint));
-  useEffect(() => setCostLimitStr(String(costLimit)), [costLimit]);
-  useEffect(() => setPenaltyStr(String(penaltyPerPoint)), [penaltyPerPoint]);
-
-  // ACK-gating for settings (prevents flicker from stale SSE/GET)
-  const lastLocalSettingsAtRef = useRef(0);
-  const pendingCostLimitRef = useRef<number | null>(null);
-  const pendingPenaltyRef = useRef<number | null>(null);
-  const pendingSettingsExpiresAtRef = useRef<number>(0);
-
-  // live refs for current values (avoid stale closures)
-  const costLimitRef = useRef(costLimit);
-  useEffect(() => {
-    costLimitRef.current = costLimit;
-  }, [costLimit]);
-
-  const penaltyRef = useRef(penaltyPerPoint);
-  useEffect(() => {
-    penaltyRef.current = penaltyPerPoint;
-  }, [penaltyPerPoint]);
-
-  // helpers
-  const roundToQuarter = (n: number) => Math.round(Math.max(0, n) * 4) / 4;
-
-  function applyCostLimit(nextValue: number) {
-    nextValue = roundToQuarter(nextValue);
-    lastLocalSettingsAtRef.current = Date.now();
-    pendingCostLimitRef.current = nextValue;
-    pendingSettingsExpiresAtRef.current = Date.now() + 8000;
-    setCostLimit(nextValue);
-    setCostLimitStr(String(nextValue));
-    try {
-      const raw = sessionStorage.getItem("zzzDraftInit");
-      if (raw) {
-        const init = JSON.parse(raw);
-        init.costLimit = nextValue;
-        sessionStorage.setItem("zzzDraftInit", JSON.stringify(init));
-      }
-    } catch {}
-    if (isOwner) ownerOptimisticSave(0);
-  }
-
-  function applyPenalty(nextValue: number) {
-    nextValue = Math.max(0, Math.round(nextValue)); // integer points
-    lastLocalSettingsAtRef.current = Date.now();
-    pendingPenaltyRef.current = nextValue;
-    pendingSettingsExpiresAtRef.current = Date.now() + 8000;
-    setPenaltyPerPoint(nextValue);
-    setPenaltyStr(String(nextValue));
-    try {
-      const raw = sessionStorage.getItem("zzzDraftInit");
-      if (raw) {
-        const init = JSON.parse(raw);
-        init.penaltyPerPoint = nextValue;
-        sessionStorage.setItem("zzzDraftInit", JSON.stringify(init));
-      }
-    } catch {}
-    if (isOwner) ownerOptimisticSave(0);
-  }
-
   async function postPlayerAction(action: any) {
     if (!spectatorKey || !playerToken) return;
     try {
       const res = await fetch(
         `${
           import.meta.env.VITE_API_BASE
-        }/api/zzz/sessions/${spectatorKey}/actions`,
+        }/api/hsr/sessions/${spectatorKey}/actions`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1590,32 +2149,41 @@ export default function ZzzDraftPage() {
   }
 
   useEffect(() => {
-    // only warn for owner-ish flow (not player link joins)
     if (!user && !isPlayer && cameFromStart) {
       toast.warning("You are not logged in — this match will NOT be recorded.");
     }
   }, [user, isPlayer, cameFromStart]);
 
-  /* ───────────── Draft Side Lock helpers ───────────── */
-  const sideOfIndex = (index: number) =>
-    draftSequence[index]?.startsWith("B") ? "B" : "R";
+  /* ───────────── Helpers & handlers ───────────── */
+  const slotIsBan = (i: number) =>
+    draftSequence[i] === "BB" || draftSequence[i] === "RR";
+  type Side = "B" | "R";
 
-  const isSideLocked = (side: "B" | "R") =>
+  const sideOfToken = (tok?: string): Side =>
+    tok && tok.startsWith("B") ? "B" : "R";
+
+  const sideOfIndex = (index: number): Side =>
+    draftSequence[index]?.startsWith("B") ? "B" : "R";
+  const sideLocked = (side: "B" | "R") =>
     side === "B" ? blueLocked : redLocked;
 
+  const isSignatureLC = (lc: LightCone, char: Character | undefined) => {
+    if (!char) return false;
+    const lcSub = lc.subname?.toLowerCase() || "";
+    const charName = char.name.toLowerCase();
+    return lcSub === charName;
+  };
+
   const toggleSideLock = (side: "B" | "R", nextLocked: boolean) => {
-    // Player: can LOCK only; cannot UNLOCK (owner only)
     if (isPlayer) {
       if (playerSide !== side) return;
-      if (!nextLocked) return; // block unlock on player client
-      // 🟦 OPTIMISTIC: update immediately
+      if (!nextLocked) return; // players can only lock, not unlock
       if (side === "B") setBlueLocked(true);
       else setRedLocked(true);
       bumpIgnoreSse();
       postPlayerAction({ op: "setLock", side, locked: true });
       return;
     }
-    // Owner: toggle locally; autosave will persist
     if (side === "B") setBlueLocked(nextLocked);
     else setRedLocked(nextLocked);
     requestSave(0);
@@ -1627,30 +2195,55 @@ export default function ZzzDraftPage() {
     const currentStep = draftSequence[currentTurn];
     if (!currentStep) return;
 
-    const mySideNow = currentStep.startsWith("B") ? "B" : "R";
+    const mySideNow: "B" | "R" = currentStep.startsWith("B") ? "B" : "R";
     const isBanSlot = currentStep === "BB" || currentStep === "RR";
 
-    // Cannot ban a global-pick
+    // Cannot ban a global-pick character
     if (isBanSlot && featuredGlobalPick.has(char.code)) return;
 
-    // Common validations (respect featured rules)
+    // Common bans
     if (effectiveBanned.has(char.code)) return;
 
-    // ───── Player flow ─────
-    if (isPlayer) {
-      if (mySideNow !== playerSide) return;
+    // Player gating
+    if (isPlayer && mySideNow !== playerSide) return;
 
-      // 🟦 OPTIMISTIC local apply
+    const myTeamPicks = draftPicks.filter((_, i) =>
+      draftSequence[i].startsWith(mySideNow)
+    );
+    const oppSide = mySideNow === "B" ? "R" : "B";
+    const opponentPicks = draftPicks.filter((_, i) =>
+      draftSequence[i].startsWith(oppSide)
+    );
+
+    const alreadyPickedByMe = myTeamPicks.some(
+      (p) => p?.character.code === char.code
+    );
+    const alreadyPickedByOpp = opponentPicks.some(
+      (p) => p?.character.code === char.code
+    );
+
+    if (!isBanSlot) {
+      if (featuredGlobalPick.has(char.code)) {
+        // Global pick: each team can pick at most once
+        if (alreadyPickedByMe) return;
+      } else {
+        // Normal pick: unique across both teams
+        if (alreadyPickedByMe || alreadyPickedByOpp) return;
+      }
+    }
+
+    // Apply pick/ban
+    const nextPick: DraftPick = { character: char, eidolon: 0, phase: 1 };
+    if (isPlayer) {
       setDraftPicks((prev) => {
         const updated = [...prev];
-        updated[currentTurn] = { character: char, eidolon: 0, superimpose: 1 };
+        updated[currentTurn] = nextPick;
         return updated;
       });
       setCurrentTurn((t) => t + 1);
+      resetGraceNow();
       setKeyboardSearch("");
       bumpIgnoreSse(currentTurn + 1, "ge");
-
-      // Persist to server (ban vs pick)
       postPlayerAction({
         op: isBanSlot ? "ban" : "pick",
         side: playerSide,
@@ -1660,299 +2253,229 @@ export default function ZzzDraftPage() {
       return;
     }
 
-    // ───── Owner flow ─────
-    const mySide = mySideNow;
-
-    // prevent duplicate per team
-    const myTeamPicks = draftPicks.filter((_, i) =>
-      draftSequence[i].startsWith(mySide)
-    );
-    const alreadyPickedByMyTeam = myTeamPicks.some(
-      (p) => p?.character.code === char.code
-    );
-
-    if (!isBanSlot) {
-      if (alreadyPickedByMyTeam) return; // one per team
-
-      if (!featuredGlobalPick.has(char.code)) {
-        // Normal rule: can’t take opponent’s pick unless ACE
-        const opponentSide = mySide === "B" ? "R" : "B";
-        const opponentHas = draftPicks
-          .filter((_, i) => draftSequence[i].startsWith(opponentSide))
-          .some((p) => p?.character.code === char.code);
-        const isAce = currentStep.includes("ACE");
-        if (opponentHas && !isAce) return;
-      }
-    }
-
-    // ✅ Actually write the pick/ban locally and advance turn
+    // Owner
     setDraftPicks((prev) => {
       const updated = [...prev];
-      updated[currentTurn] = { character: char, eidolon: 0, superimpose: 1 };
+      updated[currentTurn] = nextPick;
       return updated;
     });
     setCurrentTurn((prev) => prev + 1);
+    resetGraceNow();
     setKeyboardSearch("");
-
-    // persist via owner autosave
     ownerOptimisticSave(0, currentTurn + 1, "ge");
   };
 
   const handleUndo = () => {
     if (currentTurn === 0) return;
-
     const lastIdx = currentTurn - 1;
     const lastTok = draftSequence[lastIdx];
     const lastSide = sideOfToken(lastTok);
 
-    // OWNER flow
     if (!isPlayer) {
-      // prevent undo if any side is locked or UI is locked
       if (uiLocked || blueLocked || redLocked) return;
-
-      // optimistic revert
       setDraftPicks((prev) => {
         const next = [...prev];
         next[lastIdx] = null;
         return next;
       });
       setCurrentTurn(lastIdx);
-
-      // stop SSE echo flicker, then persist
+      resetGraceNow();
       ownerOptimisticSave(0, lastIdx, "le");
       return;
     }
 
-    // PLAYER flow
-    // must be my side’s last pick, not locked, and draft not complete
     if (draftComplete) return;
     if (playerSide !== lastSide) return;
     if (sideLocked(playerSide)) return;
 
-    // optimistic revert
     setDraftPicks((prev) => {
       const next = [...prev];
       next[lastIdx] = null;
       return next;
     });
     setCurrentTurn(lastIdx);
+    resetGraceNow();
     bumpIgnoreSse(currentTurn - 1, "le");
-
-    // send undo to server (include index for compatibility)
-    postPlayerAction({
-      op: "undoLast",
-      side: playerSide,
-      index: lastIdx, // safe both for old (requires index) and new (ignores it)
-    });
+    postPlayerAction({ op: "undoLast", side: playerSide, index: lastIdx });
   };
-
-  const slotIsBan = (i: number) =>
-    draftSequence[i] === "BB" || draftSequence[i] === "RR";
-  const sideOfToken = (tok: string) =>
-    tok?.startsWith("B") ? "B" : tok?.startsWith("R") ? "R" : "";
-  const sideLocked = (side: "B" | "R") =>
-    side === "B" ? blueLocked : redLocked;
 
   const updateEidolon = (index: number, eidolon: number) => {
     if (uiLocked) return;
     if (!draftPicks[index] || slotIsBan(index)) return;
 
     const side = sideOfIndex(index);
-    // allow after draft only if that side is not locked
-    if (draftComplete && isSideLocked(side)) return;
+    if (draftComplete && sideLocked(side)) return;
 
     if (isPlayer) {
       if (side !== playerSide) return;
-
-      // 🟦 OPTIMISTIC
       setDraftPicks((prev) => {
         const updated = [...prev];
         if (updated[index]) updated[index] = { ...updated[index]!, eidolon };
         return updated;
       });
       bumpIgnoreSse();
-
-      postPlayerAction({
-        op: "setMindscape",
-        side: playerSide,
-        index,
-        eidolon,
-      });
+      postPlayerAction({ op: "setEidolon", side: playerSide, index, eidolon });
       return;
     }
 
-    // owner local change
     const updated = [...draftPicks];
     updated[index] = { ...updated[index]!, eidolon };
     setDraftPicks(updated);
-    requestSave(250);
-
     ownerOptimisticSave(150);
   };
 
-  const isSignatureWengine = (weng: WEngine, char: Character | undefined) => {
-    if (!char) return false;
-    const wengSub = weng.subname?.toLowerCase() || "";
-    const charName = char.name.toLowerCase();
-    return wengSub === charName;
-  };
-
-  const openWengineModal = (index: number) => {
+  const openLcModal = (index: number) => {
     if (uiLocked) return;
     if (slotIsBan(index)) return;
-    if (!draftPicks[index]) return; // need a character first
+    if (!draftPicks[index]) return;
 
     const side = sideOfIndex(index);
-    if (draftComplete && isSideLocked(side)) return; // locked post-draft
-
-    // players may open modal on any of their own team’s picked slots
+    if (draftComplete && sideLocked(side)) return;
     if (isPlayer && side !== playerSide) return;
 
-    const currentConeId = draftPicks[index]?.wengine?.id || "";
-    setSelectedWengineId(currentConeId);
+    const currentLcId = draftPicks[index]?.lightcone?.id || "";
+    setSelectedLcId(currentLcId);
     setActiveSlotIndex(index);
-    setShowWengineModal(true);
+    setShowLcModal(true);
   };
 
-  const confirmWengine = (index: number) => {
+  const confirmLightCone = (index: number) => {
     const side = sideOfIndex(index);
     if (uiLocked) {
-      setShowWengineModal(false);
+      setShowLcModal(false);
       return;
     }
     if (slotIsBan(index) || !draftPicks[index]) {
-      setShowWengineModal(false);
+      setShowLcModal(false);
       return;
     }
-    if (draftComplete && isSideLocked(side)) {
-      setShowWengineModal(false);
+    if (draftComplete && sideLocked(side)) {
+      setShowLcModal(false);
       return;
     }
 
     const selected =
-      selectedWengineId === ""
+      selectedLcId === ""
         ? null
-        : wengines.find((w) => String(w.id) === String(selectedWengineId))
-            ?.id ?? null;
+        : lightcones.find((w) => String(w.id) === String(selectedLcId))?.id ??
+          null;
 
-    // ❌ If globally banned, block immediately (no optimistic update, no POST)
-    if (selected !== null && wengineGlobalBan.has(String(selected))) {
-      toast.error("That W-Engine is universally banned.");
-      setShowWengineModal(false);
+    // reject universally banned LC
+    if (selected !== null && lightconeGlobalBan.has(String(selected))) {
+      toast.error("That Light Cone is universally banned.");
+      setShowLcModal(false);
       setTimeout(() => setActiveSlotIndex(null), 100);
-      setSelectedWengineId("");
-      setWengineSearch("");
+      setSelectedLcId("");
+      setLcSearch("");
       return;
     }
 
     if (isPlayer) {
       if (side !== playerSide) {
-        setShowWengineModal(false);
+        setShowLcModal(false);
         return;
       }
-
-      // 🟦 OPTIMISTIC
       setDraftPicks((prev) => {
         const updated = [...prev];
         if (updated[index]) {
           if (selected === null) {
-            const { wengine, ...rest } = updated[index]!;
-            updated[index] = { ...rest, wengine: undefined };
+            const { lightcone, ...rest } = updated[index]!;
+            updated[index] = { ...rest, lightcone: undefined };
           } else {
-            const weObj = wengines.find(
+            const lcObj = lightcones.find(
               (w) => String(w.id) === String(selected)
             );
             updated[index] = {
               ...updated[index]!,
-              wengine: weObj ?? undefined,
+              lightcone: lcObj ?? undefined,
             };
           }
         }
         return updated;
       });
       bumpIgnoreSse();
-
       postPlayerAction({
-        op: "setWengine",
+        op: "setLightcone",
         side: playerSide,
         index,
-        wengineId: selected,
+        lightconeId: selected,
       });
 
-      setShowWengineModal(false);
+      setShowLcModal(false);
       setTimeout(() => setActiveSlotIndex(null), 100);
-      setSelectedWengineId("");
-      setWengineSearch("");
+      setSelectedLcId("");
+      setLcSearch("");
       return;
     }
 
-    // owner local change
+    // owner
     setDraftPicks((prev) => {
       const updated = [...prev];
       if (updated[index]) {
         if (selected === null) {
-          const { wengine, ...rest } = updated[index]!;
-          updated[index] = { ...rest, wengine: undefined };
+          const { lightcone, ...rest } = updated[index]!;
+          updated[index] = { ...rest, lightcone: undefined };
         } else {
-          const weObj = wengines.find((w) => String(w.id) === String(selected));
-          updated[index] = { ...updated[index]!, wengine: weObj ?? undefined };
+          const lcObj = lightcones.find(
+            (w) => String(w.id) === String(selected)
+          );
+          updated[index] = {
+            ...updated[index]!,
+            lightcone: lcObj ?? undefined,
+          };
         }
       }
       return updated;
     });
-
-    setShowWengineModal(false);
+    setShowLcModal(false);
     setTimeout(() => setActiveSlotIndex(null), 100);
-    setSelectedWengineId("");
-    setWengineSearch("");
+    setSelectedLcId("");
+    setLcSearch("");
     ownerOptimisticSave(150);
   };
 
-  const updateSuperimpose = (index: number, superimpose: number) => {
+  const updatePhase = (index: number, phase: number) => {
     if (uiLocked) return;
     if (!draftPicks[index] || slotIsBan(index)) return;
 
     const side = sideOfIndex(index);
-    if (draftComplete && isSideLocked(side)) return;
+    if (draftComplete && sideLocked(side)) return;
 
     if (isPlayer) {
       if (side !== playerSide) return;
-
-      // 🟦 OPTIMISTIC
       setDraftPicks((prev) => {
         const updated = [...prev];
-        if (updated[index])
-          updated[index] = { ...updated[index]!, superimpose };
+        if (updated[index]) updated[index] = { ...updated[index]!, phase };
         return updated;
       });
       bumpIgnoreSse();
-
       postPlayerAction({
         op: "setSuperimpose",
         side: playerSide,
         index,
-        superimpose,
+        superimpose: phase,
       });
+
       return;
     }
 
     const updated = [...draftPicks];
-    updated[index] = { ...updated[index]!, superimpose };
+    updated[index] = { ...updated[index]!, phase };
     setDraftPicks(updated);
-
     ownerOptimisticSave(150);
   };
 
-  /* For signature sort hinting */
-  const subnameToCharacterName = new Map<string, string>();
-  characters.forEach((char) => {
-    if (char.subname) {
-      subnameToCharacterName.set(char.subname.toLowerCase(), char.name);
-    }
-  });
+  // Signature hint support for LC search ordering
+  const subnameToCharacterName = useMemo(() => {
+    const m = new Map<string, string>();
+    characters.forEach((c) => {
+      if (c.subname) m.set(c.subname.toLowerCase(), c.name);
+    });
+    return m;
+  }, [characters]);
 
-  /* ───────────── Team Cost using new rules ───────────── */
-  const getTeamCost = (prefix: "B" | "R") => {
+  /* ───────────── Team Cost & penalties ───────────── */
+  function getTeamCost(prefix: "B" | "R") {
     let total = 0;
     for (let i = 0; i < draftSequence.length; i++) {
       if (!draftSequence[i].startsWith(prefix)) continue;
@@ -1962,42 +2485,64 @@ export default function ZzzDraftPage() {
       const { total: slotTotal } = getSlotCost(pick);
       total += slotTotal;
     }
+    return { total: Number(total.toFixed(2)) };
+  }
 
-    const penalty = Math.max(0, total - costLimit);
-    const penaltyPoints = Math.floor(penalty / 0.25) * penaltyPerPoint;
-
-    return { total: Number(total.toFixed(2)), penaltyPoints };
-  };
-
-  /* ───────────── Share / Invite modal ───────────── */
+  /* ───────────── Share links ───────────── */
   const [showShareModal, setShowShareModal] = useState(false);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const spectatorUrl = spectatorKey ? `${origin}/zzz/s/${spectatorKey}` : "";
-
+  const spectatorUrl = spectatorKey ? `${origin}/hsr/s/${spectatorKey}` : "";
   const bluePlayerUrl =
     spectatorKey && blueToken
-      ? `${origin}/zzz/draft?key=${encodeURIComponent(
+      ? `${origin}/hsr/draft?key=${encodeURIComponent(
           spectatorKey
         )}&pt=${encodeURIComponent(blueToken)}`
       : "";
-
   const redPlayerUrl =
     spectatorKey && redToken
-      ? `${origin}/zzz/draft?key=${encodeURIComponent(
+      ? `${origin}/hsr/draft?key=${encodeURIComponent(
           spectatorKey
         )}&pt=${encodeURIComponent(redToken)}`
       : "";
 
   if (isMobile || !cameFromStart) return null;
 
+  // memoize team costs once per relevant change
+  const teamCostMemo = useMemo(
+    () => ({
+      B: getTeamCost("B"),
+      R: getTeamCost("R"),
+    }),
+    [
+      draftPicks,
+      draftSequence,
+      costCharMs,
+      costLcPhase,
+      featuredCharCostOverride,
+      featuredLcCostOverride,
+    ]
+  );
+
+  const blueCyclePenalty = useMemo(
+    () =>
+      Number((teamCostMemo.B.total / Math.max(1, cycleBreakpoint)).toFixed(2)),
+    [teamCostMemo, cycleBreakpoint]
+  );
+  const redCyclePenalty = useMemo(
+    () =>
+      Number((teamCostMemo.R.total / Math.max(1, cycleBreakpoint)).toFixed(2)),
+    [teamCostMemo, cycleBreakpoint]
+  );
+
   /* ───────────── Render ───────────── */
-  const scoresLocked = uiLocked || isPlayer; // players can't edit scores
+  const scoresLocked = uiLocked || isPlayer;
+  const canEditSettings = isOwner;
 
   return (
     <div
       className="page-fade-in"
       style={{
-        backgroundImage: "url('/zzzdraft.webp')",
+        backgroundImage: "url('/hsr-bg.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed",
@@ -2020,7 +2565,7 @@ export default function ZzzDraftPage() {
       <div className="position-relative z-2 text-white px-4">
         <Navbar />
 
-        {/* Top-right stack: LIVE (pre-draft) + Cost Preset */}
+        {/* Top-right: LIVE + Cost Preset */}
         <div
           className="position-absolute"
           style={{ top: 70, right: 20, zIndex: 10 }}
@@ -2064,12 +2609,11 @@ export default function ZzzDraftPage() {
         className="position-relative z-2 text-white px-2 px-md-4"
         style={{ maxWidth: "1600px", margin: "0 auto" }}
       >
-        {/* Draft Box */}
+        {/* Draft rows */}
         <div className="d-flex flex-column align-items-center gap-3 mb-4">
           {(() => {
-            const team1Cost = getTeamCost("B");
-            const team2Cost = getTeamCost("R");
-
+            const team1Cost = teamCostMemo.B;
+            const team2Cost = teamCostMemo.R;
             return [
               {
                 prefix: "B" as const,
@@ -2098,7 +2642,6 @@ export default function ZzzDraftPage() {
                       style={{ backgroundColor: color }}
                     />
                     {name}
-                    {/* inline lock controls once draft is complete */}
                     {draftComplete && (
                       <>
                         {locked ? (
@@ -2109,7 +2652,6 @@ export default function ZzzDraftPage() {
                             >
                               🔒 Locked
                             </span>
-                            {/* Owner only unlocks */}
                             {!isPlayer && (
                               <button
                                 className="btn back-button-glass ms-2"
@@ -2122,7 +2664,6 @@ export default function ZzzDraftPage() {
                           </>
                         ) : (
                           <>
-                            {/* Owner sees all lock buttons */}
                             {!isPlayer && (
                               <button
                                 className="btn back-button-glass ms-2"
@@ -2132,8 +2673,6 @@ export default function ZzzDraftPage() {
                                 🔒 Lock
                               </button>
                             )}
-
-                            {/* Player sees only their own team button */}
                             {isPlayer && playerSide === prefix && (
                               <button
                                 className="btn back-button-glass ms-2"
@@ -2148,18 +2687,75 @@ export default function ZzzDraftPage() {
                       </>
                     )}
                   </div>
+
+                  {/* RIGHT SIDE: cost + timer */}
                   <div
-                    className={`team-cost ${
-                      cost.total > costLimit ? "over" : ""
-                    }`}
+                    className="d-flex align-items-center"
+                    style={{ gap: 10 }}
                   >
-                    Cost: {cost.total} / {costLimit}
+                    {timerEnabled &&
+                      (isOwner ? (
+                        // Owner: clickable pause/resume
+                        <button
+                          type="button"
+                          className="btn btn-sm back-button-glass"
+                          onClick={() => togglePause(prefix)}
+                          title={
+                            paused[prefix] ? "Resume timer" : "Pause timer"
+                          }
+                          style={{
+                            opacity:
+                              activeSide === prefix &&
+                              !paused[prefix] &&
+                              !draftComplete
+                                ? 1
+                                : 0.8,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {paused[prefix] ? "⏸" : "⏱"}{" "}
+                          {fmtClock(reserveLeft[prefix])}
+                          {paused[prefix] && (
+                            <span className="badge bg-warning ms-2">
+                              Paused
+                            </span>
+                          )}
+                          {activeSide === prefix &&
+                            !draftComplete &&
+                            !isFirstTurnBan && (
+                              <span className="ms-2 text-white-50">
+                                (+{fmtClock(graceLeft)})
+                              </span>
+                            )}
+                        </button>
+                      ) : (
+                        // Player: read-only when enabled
+                        <div
+                          className="btn btn-sm back-button-glass disabled"
+                          style={{ pointerEvents: "none" }}
+                        >
+                          {paused[prefix] ? "⏸" : "⏱"}{" "}
+                          {fmtClock(reserveLeft[prefix])}
+                          {paused[prefix] && (
+                            <span className="badge bg-warning ms-2">
+                              Paused
+                            </span>
+                          )}
+                          {activeSide === prefix &&
+                            !draftComplete &&
+                            !isFirstTurnBan && (
+                              <span className="ms-2 text-white-50">
+                                (+{fmtClock(graceLeft)})
+                              </span>
+                            )}
+                        </div>
+                      ))}
+
+                    <div className="team-cost">Cost: {cost.total}</div>
                   </div>
                 </div>
 
-                {/* measured wrapper */}
                 <div ref={ref} className="draft-row-wrap">
-                  {/* scaled row */}
                   <div
                     className="draft-row"
                     style={
@@ -2173,20 +2769,18 @@ export default function ZzzDraftPage() {
                       } as React.CSSProperties
                     }
                   >
-                    {draftSequence.map((side, i) =>
-                      side.startsWith(prefix) ? (
+                    {draftSequence.map((tok, i) =>
+                      tok.startsWith(prefix) ? (
                         <div
                           key={i}
                           className={[
                             "draft-card",
-                            side.includes("ACE") ? "ace" : "",
-                            side === "BB" || side === "RR" ? "ban" : "",
+                            tok === "BB" || tok === "RR" ? "ban" : "",
                             prefix === "B" ? "blue" : "red",
                             i === currentTurn && !draftComplete ? "active" : "",
                           ].join(" ")}
                           style={{
                             zIndex: 10,
-                            // If draft is complete and this side is locked, freeze this slot
                             pointerEvents:
                               draftComplete && locked ? "none" : "auto",
                             opacity: draftComplete && locked ? 0.8 : 1,
@@ -2194,26 +2788,22 @@ export default function ZzzDraftPage() {
                           }}
                           onClick={(e) => {
                             if (uiLocked) return;
-                            const isBanSlot = side === "BB" || side === "RR";
-                            if (isBanSlot) return;
-
-                            // If post-draft and side is locked, no edits
+                            const isBan = tok === "BB" || tok === "RR";
+                            if (isBan) return;
                             if (draftComplete && locked) return;
-
-                            // Players can open W-Engine modal on ANY of their own team’s picked slots
                             if (isPlayer && prefix !== playerSide) return;
 
                             if (
                               eidolonOpenIndex === i ||
-                              superOpenIndex === i
+                              phaseOpenIndex === i
                             ) {
                               e.stopPropagation();
                               return;
                             }
-                            if (draftPicks[i]?.character) openWengineModal(i);
+                            if (draftPicks[i]?.character) openLcModal(i);
                           }}
                         >
-                          {/* Lock badge after draft */}
+                          {/* Lock badge */}
                           {draftComplete && locked && (
                             <div
                               title="Draft locked"
@@ -2229,22 +2819,12 @@ export default function ZzzDraftPage() {
                             </div>
                           )}
 
-                          {/* Ribbon (only when empty) */}
+                          {/* Ribbon (only when empty & ban slot) */}
                           {(() => {
-                            const isBanSlot = side === "BB" || side === "RR";
-                            const isAceSlot = side.includes("ACE");
-                            const showRibbon =
-                              !draftPicks[i] && (isBanSlot || isAceSlot);
+                            const isBan = tok === "BB" || tok === "RR";
+                            const showRibbon = !draftPicks[i] && isBan;
                             if (!showRibbon) return null;
-                            return (
-                              <div
-                                className={`ribbon ${
-                                  isAceSlot ? "ace" : "ban"
-                                }`}
-                              >
-                                {isAceSlot ? "ACE" : "BAN"}
-                              </div>
-                            );
+                            return <div className="ribbon ban">BAN</div>;
                           })()}
 
                           {draftPicks[i] ? (
@@ -2256,18 +2836,18 @@ export default function ZzzDraftPage() {
                                 className="draft-img"
                                 style={{
                                   filter:
-                                    side === "BB" || side === "RR"
+                                    tok === "BB" || tok === "RR"
                                       ? "grayscale(100%) brightness(0.5)"
                                       : "none",
                                 }}
                               />
 
-                              {/* Engine badge */}
-                              {draftPicks[i]?.wengine && (
+                              {/* Light Cone badge */}
+                              {draftPicks[i]?.lightcone && (
                                 <img
-                                  src={draftPicks[i]!.wengine!.image_url}
-                                  alt={draftPicks[i]!.wengine!.name}
-                                  title={draftPicks[i]!.wengine!.name}
+                                  src={draftPicks[i]!.lightcone!.image_url}
+                                  alt={draftPicks[i]!.lightcone!.name}
+                                  title={draftPicks[i]!.lightcone!.name}
                                   className="engine-badge"
                                   onClick={(e) => {
                                     if (uiLocked) return;
@@ -2275,12 +2855,12 @@ export default function ZzzDraftPage() {
                                     if (isPlayer && prefix !== playerSide)
                                       return;
                                     e.stopPropagation();
-                                    openWengineModal(i);
+                                    openLcModal(i);
                                   }}
                                 />
                               )}
 
-                              {/* Mindscape slider */}
+                              {/* Eidolon slider */}
                               {eidolonOpenIndex === i &&
                                 !uiLocked &&
                                 !(draftComplete && locked) && (
@@ -2292,9 +2872,7 @@ export default function ZzzDraftPage() {
                                     onClick={(e) => e.stopPropagation()}
                                     onMouseDown={(e) => e.stopPropagation()}
                                   >
-                                    <div className="slider-label">
-                                      Mindscape
-                                    </div>
+                                    <div className="slider-label">Eidolon</div>
                                     <input
                                       type="range"
                                       min={0}
@@ -2327,28 +2905,30 @@ export default function ZzzDraftPage() {
                                   </div>
                                 )}
 
-                              {/* Superimpose slider */}
-                              {superOpenIndex === i &&
+                              {/* Phase slider */}
+                              {phaseOpenIndex === i &&
                                 !uiLocked &&
                                 !(draftComplete && locked) && (
                                   <div
                                     className="slider-panel"
                                     ref={(el) => {
-                                      superimposeRefs.current[i] = el;
+                                      phaseRefs.current[i] = el;
                                     }}
                                     style={{ bottom: 70 }}
                                     onClick={(e) => e.stopPropagation()}
                                     onMouseDown={(e) => e.stopPropagation()}
                                   >
-                                    <div className="slider-label">Phase</div>
+                                    <div className="slider-label">
+                                      Superimposition
+                                    </div>
                                     <input
                                       type="range"
                                       min={1}
                                       max={5}
                                       className="big-slider"
-                                      value={draftPicks[i]!.superimpose}
+                                      value={draftPicks[i]!.phase}
                                       onChange={(e) =>
-                                        updateSuperimpose(
+                                        updatePhase(
                                           i,
                                           parseInt(
                                             (e.target as HTMLInputElement).value
@@ -2361,7 +2941,7 @@ export default function ZzzDraftPage() {
                                         <span
                                           key={v}
                                           className={
-                                            draftPicks[i]!.superimpose === v
+                                            draftPicks[i]!.phase === v
                                               ? "active"
                                               : ""
                                           }
@@ -2373,14 +2953,12 @@ export default function ZzzDraftPage() {
                                   </div>
                                 )}
 
-                              {/* Bottom info */}
+                              {/* Bottom info bar */}
                               {(() => {
                                 const c = getSlotCost(draftPicks[i]);
                                 const name = draftPicks[i]!.character.name;
-                                const bannedSlot =
-                                  side === "BB" || side === "RR";
-                                const hasWengine = !!draftPicks[i]?.wengine;
-
+                                const banSlot = tok === "BB" || tok === "RR";
+                                const hasLc = !!draftPicks[i]?.lightcone;
                                 return (
                                   <div
                                     className="info-bar"
@@ -2389,8 +2967,7 @@ export default function ZzzDraftPage() {
                                     <div className="char-name" title={name}>
                                       {name}
                                     </div>
-
-                                    {!bannedSlot && (
+                                    {!banSlot && (
                                       <div className="chip-row">
                                         <span
                                           className={`chip clickable chip-left ${
@@ -2403,7 +2980,7 @@ export default function ZzzDraftPage() {
                                             uiLocked ||
                                             (draftComplete && locked)
                                               ? "Locked"
-                                              : "Set Mindscape"
+                                              : "Set Eidolon"
                                           }
                                           onClick={(e) => {
                                             if (uiLocked) return;
@@ -2414,23 +2991,23 @@ export default function ZzzDraftPage() {
                                             )
                                               return;
                                             e.stopPropagation();
-                                            setSuperOpenIndex(null);
+                                            setPhaseOpenIndex(null);
                                             setEidolonOpenIndex(
                                               eidolonOpenIndex === i ? null : i
                                             );
                                           }}
                                         >
-                                          M{draftPicks[i]!.eidolon}
+                                          E{draftPicks[i]!.eidolon}
                                         </span>
 
                                         <span
                                           className="chip cost chip-center"
-                                          title={`Agent ${c.agentCost} + W-Eng ${c.weCost}`}
+                                          title={`Char ${c.charCost} + LC ${c.lcCost}`}
                                         >
                                           {c.total}
                                         </span>
 
-                                        {hasWengine ? (
+                                        {hasLc ? (
                                           <span
                                             className={`chip clickable chip-right ${
                                               uiLocked ||
@@ -2442,7 +3019,7 @@ export default function ZzzDraftPage() {
                                               uiLocked ||
                                               (draftComplete && locked)
                                                 ? "Locked"
-                                                : "Set Phase"
+                                                : "Set Superimposition"
                                             }
                                             onClick={(e) => {
                                               if (uiLocked) return;
@@ -2455,12 +3032,12 @@ export default function ZzzDraftPage() {
                                                 return;
                                               e.stopPropagation();
                                               setEidolonOpenIndex(null);
-                                              setSuperOpenIndex(
-                                                superOpenIndex === i ? null : i
+                                              setPhaseOpenIndex(
+                                                phaseOpenIndex === i ? null : i
                                               );
                                             }}
                                           >
-                                            P{draftPicks[i]!.superimpose}
+                                            S{draftPicks[i]!.phase}
                                           </span>
                                         ) : (
                                           <span
@@ -2489,7 +3066,7 @@ export default function ZzzDraftPage() {
           })()}
         </div>
 
-        {/* ───────────── Featured (clickable section opens modal) ───────────── */}
+        {/* Featured preview bar */}
         {featuredList.length > 0 && (
           <div
             className="featured-wrap"
@@ -2500,11 +3077,10 @@ export default function ZzzDraftPage() {
               borderRadius: 12,
               background: "rgba(255,255,255,0.06)",
               border: "1px solid rgba(255,255,255,0.1)",
-              cursor: "pointer", // clickable area
+              cursor: "pointer",
             }}
-            onClick={() => setShowFeaturedPopup(true)} // ✅ whole bar opens modal
+            onClick={() => setShowFeaturedPopup(true)}
           >
-            {/* header */}
             <div
               className="d-flex align-items-center justify-content-between flex-wrap gap-2"
               style={{ marginBottom: 8 }}
@@ -2517,11 +3093,10 @@ export default function ZzzDraftPage() {
                 </span>
               </div>
               <div className="text-white-50 small">
-                Cost shown is the M0 (or WE) override if set. Rules still apply.
+                Cost shown is the E0 / LC override base if set. Rules still
+                apply.
               </div>
             </div>
-
-            {/* row */}
             <div
               className="d-flex align-items-center gap-2 flex-wrap"
               style={{ overflow: "hidden", whiteSpace: "nowrap" }}
@@ -2531,7 +3106,7 @@ export default function ZzzDraftPage() {
           </div>
         )}
 
-        {/* Search Bar + Undo + Share */}
+        {/* Search + Undo + Share */}
         <div className="mb-3 w-100 d-flex justify-content-center align-items-center gap-2 flex-wrap">
           {/* Settings */}
           <button
@@ -2540,7 +3115,7 @@ export default function ZzzDraftPage() {
             title={
               isOwner ? "Draft Settings" : "View settings (owner can edit)"
             }
-            onClick={() => setShowSettings(true)}
+            onClick={() => setShowSettingsModal(true)}
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
             <span aria-hidden="true">⚙️</span>
@@ -2566,21 +3141,13 @@ export default function ZzzDraftPage() {
             onClick={handleUndo}
             disabled={(() => {
               if (currentTurn === 0) return true;
-
               const lastIdx = currentTurn - 1;
               const lastTok = draftSequence[lastIdx];
               const lastSide = sideOfToken(lastTok);
-
-              if (!isPlayer) {
-                // owner: only blocked by UI lock or any side lock
-                return uiLocked || blueLocked || redLocked;
-              }
-
-              // player: only undo last move of *their* side, not locked, not complete
+              if (!isPlayer) return uiLocked || blueLocked || redLocked;
               if (draftComplete) return true;
               if (playerSide !== lastSide) return true;
               if (sideLocked(playerSide)) return true;
-
               return false;
             })()}
             title={(() => {
@@ -2595,7 +3162,6 @@ export default function ZzzDraftPage() {
             ⟲ Undo
           </button>
 
-          {/* OWNER ONLY */}
           {user && !isPlayer && (
             <button
               className="btn back-button-glass"
@@ -2610,7 +3176,7 @@ export default function ZzzDraftPage() {
           )}
         </div>
 
-        {/* Character Grid (hidden when draft complete) */}
+        {/* Character Grid */}
         {!draftComplete && (
           <div
             className="mb-5 px-2"
@@ -2641,54 +3207,41 @@ export default function ZzzDraftPage() {
                     if (!currentStep) return null;
 
                     const mySide = currentStep.startsWith("B") ? "B" : "R";
-                    const opponentSide = mySide === "B" ? "R" : "B";
+                    const oppSide = mySide === "B" ? "R" : "B";
 
                     const myPicks = draftPicks.filter((_, i) =>
                       draftSequence[i]?.startsWith(mySide)
                     );
-                    const opponentPicks = draftPicks.filter((_, i) =>
-                      draftSequence[i]?.startsWith(opponentSide)
+                    const oppPicks = draftPicks.filter((_, i) =>
+                      draftSequence[i]?.startsWith(oppSide)
                     );
 
-                    const alreadyPickedByMe = myPicks.some(
+                    const pickedByMe = myPicks.some(
                       (p) => p?.character.code === char.code
                     );
-                    const alreadyPickedByOpponent = opponentPicks.some(
+                    const pickedByOpp = oppPicks.some(
                       (p) => p?.character.code === char.code
                     );
 
                     const isBanned = effectiveBanned.has(char.code);
-                    const isAcePickStep = currentStep.includes("ACE");
-                    const isOpponentPicked = alreadyPickedByOpponent;
-
                     const isBanSlot =
                       currentStep === "BB" || currentStep === "RR";
 
                     let isDisabled =
                       uiLocked ||
-                      (isBanSlot && featuredGlobalPick.has(char.code)) || // cannot ban global-pick
+                      (isBanSlot && featuredGlobalPick.has(char.code)) || // cannot ban a global-pick char
                       isBanned;
 
-                    // Picking rules
                     if (!isDisabled) {
                       if (featuredGlobalPick.has(char.code)) {
-                        // Both teams can pick once per team, anytime (like ACE), still unique per team
-                        if (alreadyPickedByMe) isDisabled = true;
+                        // each team can take once
+                        if (pickedByMe) isDisabled = true;
                       } else {
-                        // Normal rules: needs ACE to steal opponent’s pick
-                        if (
-                          !isAcePickStep &&
-                          (alreadyPickedByMe || alreadyPickedByOpponent)
-                        ) {
-                          isDisabled = true;
-                        }
-                        if (isAcePickStep && alreadyPickedByMe) {
-                          isDisabled = true; // still one copy per team
-                        }
+                        // unique globally
+                        if (pickedByMe || pickedByOpp) isDisabled = true;
                       }
                     }
 
-                    // Player turn gating (unchanged)
                     if (isPlayer && mySide !== playerSide) isDisabled = true;
 
                     return (
@@ -2700,14 +3253,11 @@ export default function ZzzDraftPage() {
                           width: "70px",
                           height: "70px",
                           borderRadius: "8px",
-                          border:
-                            isAcePickStep && isOpponentPicked
-                              ? "2px solid gold"
-                              : isBanned
-                              ? "2px dashed #888"
-                              : alreadyPickedByMe || alreadyPickedByOpponent
-                              ? "2px solid #aaa"
-                              : "2px solid #555",
+                          border: isBanned
+                            ? "2px dashed #888"
+                            : pickedByMe || pickedByOpp
+                            ? "2px solid #aaa"
+                            : "2px solid #555",
                           backgroundImage: `url(${char.image_url})`,
                           backgroundSize: "cover",
                           backgroundPosition: "center",
@@ -2736,6 +3286,7 @@ export default function ZzzDraftPage() {
             </div>
           </div>
         )}
+
         {/* Post-draft scoring */}
         {draftComplete && (
           <>
@@ -2746,7 +3297,6 @@ export default function ZzzDraftPage() {
               {(["B", "R"] as const).map((side) => {
                 const isBlue = side === "B";
                 const scores = isBlue ? blueScores : redScores;
-                const setScores = isBlue ? setBlueScores : setRedScores;
                 const label = isBlue ? (
                   <span style={{ color: "#3388ff", fontWeight: 700 }}>
                     Blue Team
@@ -2758,9 +3308,18 @@ export default function ZzzDraftPage() {
                 );
                 const nameLabels = isBlue ? blueLabels : redLabels;
 
-                const { total, penaltyPoints } = getTeamCost(side);
-                const adjustedTotal =
-                  scores.reduce((a, b) => a + b, 0) - penaltyPoints;
+                const penaltyCycles =
+                  side === "B" ? blueCyclePenalty : redCyclePenalty;
+                const extraCycles = round2(
+                  side === "B" ? extraCyclePenaltyB : extraCyclePenaltyR
+                );
+                const adjustedTotal = Number(
+                  (
+                    scores.reduce((a, b) => a + b, 0) +
+                    penaltyCycles +
+                    extraCycles
+                  ).toFixed(2)
+                );
 
                 return (
                   <div
@@ -2770,17 +3329,13 @@ export default function ZzzDraftPage() {
                   >
                     <div className="score-header">
                       <div className="score-title">{label}</div>
-                      <div
-                        className={`score-draft ${
-                          total > costLimit ? "over" : ""
-                        }`}
-                      >
-                        Cost: {total} / {costLimit}
+                      <div className="score-draft">
+                        Cycle penalty: {penaltyCycles} (÷ {cycleBreakpoint})
                       </div>
                     </div>
 
                     <div className="score-inputs">
-                      {(is3v3 ? [0, 1, 2] : [0, 1]).map((i) => (
+                      {(is3ban ? [0, 1, 2] : [0, 1]).map((i) => (
                         <div className="score-input-group" key={i}>
                           <label>{nameLabels[i] || `Player ${i + 1}`}</label>
                           <input
@@ -2791,49 +3346,83 @@ export default function ZzzDraftPage() {
                             min={SCORE_MIN}
                             max={SCORE_MAX}
                             disabled={scoresLocked}
-                            value={scores[i] === 0 ? "" : String(scores[i])}
+                            value={isBlue ? blueDraft[i] : redDraft[i]}
                             onChange={(e) => {
                               if (scoresLocked) return;
-                              const v = e.target.value;
-                              const updated = [...scores];
-                              if (v === "") {
-                                updated[i] = 0;
+                              const raw = e.target.value.replace(/[^\d]/g, "");
+                              if (isBlue) {
+                                setBlueDraft((d) => {
+                                  const a = [...d];
+                                  a[i] = raw;
+                                  return a;
+                                });
                               } else {
-                                const n = parseInt(v, 10) || 0;
-                                updated[i] = Math.max(
-                                  SCORE_MIN,
-                                  Math.min(SCORE_MAX, n)
-                                );
+                                setRedDraft((d) => {
+                                  const a = [...d];
+                                  a[i] = raw;
+                                  return a;
+                                });
                               }
-                              setScores(updated);
                             }}
                             onBlur={() => {
                               if (scoresLocked) return;
-                              const updated = [...scores];
-                              updated[i] = Math.max(
-                                SCORE_MIN,
-                                Math.min(SCORE_MAX, updated[i] || 0)
-                              );
-                              setScores(updated);
-                              requestSave(0);
+                              commitScore(isBlue ? "B" : "R", i);
+                              // commitScore() also normalizes the draft text and calls requestSave(0)
                             }}
                           />
                         </div>
                       ))}
+                      <div className="score-input-group" key="extra">
+                        <label>Extra Cycle Penalty</label>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min={0}
+                          className="form-control score-input"
+                          placeholder="0"
+                          disabled={scoresLocked}
+                          value={
+                            (side === "B"
+                              ? extraCyclePenaltyB
+                              : extraCyclePenaltyR) ?? 0
+                          }
+                          onChange={(e) => {
+                            const v = Math.max(
+                              0,
+                              parseFloat(e.target.value || "0") || 0
+                            );
+                            if (side === "B") setExtraCyclePenaltyB(v);
+                            else setExtraCyclePenaltyR(v);
+                          }}
+                          onBlur={() => {
+                            if (side === "B")
+                              setExtraCyclePenaltyB((v) =>
+                                round2(Math.max(0, v))
+                              );
+                            else
+                              setExtraCyclePenaltyR((v) =>
+                                round2(Math.max(0, v))
+                              );
+                            requestSave(0);
+                          }}
+                        />
+                      </div>
                     </div>
 
                     <div className="score-total">
                       <div className="score-total-label">Team Total</div>
                       <div className="score-total-value">
                         {scores.reduce((a, b) => a + b, 0)}
-                        {penaltyPoints > 0 && (
+                        {penaltyCycles > 0 || extraCycles > 0 ? (
                           <span className="score-penalty">
-                            −{penaltyPoints} ={" "}
+                            +{penaltyCycles}
+                            {extraCycles ? ` +${extraCycles}` : ""} ={" "}
                             <span className="score-adjusted">
                               {adjustedTotal}
                             </span>
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -2841,27 +3430,45 @@ export default function ZzzDraftPage() {
               })}
             </div>
 
-            {/* Finalize / Complete control (owner only) */}
+            {/* Finalize / Complete (owner only) */}
             {!isPlayer && (
               <div className="text-center mt-3">
                 <button
                   className="btn back-button-glass"
                   onClick={() => {
                     if (uiLocked) {
-                      setUiLocked(false); // unlock to edit scores/draft (DB remains completed)
-                    } else if (canFinalize) {
-                      setUiLocked(true); // lock UI and flag as complete
-                      requestSave(0);
+                      setUiLocked(false);
+                      return;
                     }
+                    if (!canFinalize) return;
+
+                    const idxs = is3ban ? [0, 1, 2] : [0, 1];
+                    const coerce = (
+                      drafts: string[],
+                      prev: number[],
+                      set: React.Dispatch<React.SetStateAction<number[]>>
+                    ) => {
+                      const next = [...prev];
+                      for (const i of idxs) {
+                        const n = Math.max(
+                          SCORE_MIN,
+                          Math.min(
+                            SCORE_MAX,
+                            parseInt(drafts[i] || "0", 10) || 0
+                          )
+                        );
+                        next[i] = n;
+                      }
+                      set(next);
+                    };
+
+                    coerce(blueDraft, blueScores, setBlueScores);
+                    coerce(redDraft, redScores, setRedScores);
+
+                    setUiLocked(true);
+                    requestSave(0);
                   }}
                   disabled={!uiLocked && !canFinalize}
-                  title={
-                    uiLocked
-                      ? "Unlock to edit scores/draft"
-                      : canFinalize
-                      ? "Marks this match as complete and locks editing"
-                      : "Enter all player scores to complete the match"
-                  }
                 >
                   {uiLocked ? "Unlock to Edit" : "Mark Match Complete"}
                 </button>
@@ -2871,17 +3478,20 @@ export default function ZzzDraftPage() {
             {/* Winner banner */}
             <div className="text-center mt-4 text-white">
               {(() => {
-                const blueTotal =
-                  blueScores.reduce((a, b) => a + b, 0) -
-                  getTeamCost("B").penaltyPoints;
-                const redTotal =
-                  redScores.reduce((a, b) => a + b, 0) -
-                  getTeamCost("R").penaltyPoints;
-                if (blueTotal > redTotal)
+                const blueAdjusted =
+                  blueScores.reduce((a, b) => a + b, 0) +
+                  blueCyclePenalty +
+                  extraCyclePenaltyB;
+                const redAdjusted =
+                  redScores.reduce((a, b) => a + b, 0) +
+                  redCyclePenalty +
+                  extraCyclePenaltyR;
+
+                if (blueAdjusted < redAdjusted)
                   return (
                     <h4 style={{ color: "#3388ff" }}>🏆 {team1Name} Wins!</h4>
                   );
-                if (redTotal > blueTotal)
+                if (redAdjusted < blueAdjusted)
                   return (
                     <h4 style={{ color: "#cc3333" }}>🏆 {team2Name} Wins!</h4>
                   );
@@ -2891,38 +3501,38 @@ export default function ZzzDraftPage() {
           </>
         )}
 
-        {/* W-Engine Modal */}
+        {/* Light Cone Modal */}
         <Modal
-          show={showWengineModal}
-          onHide={() => setShowWengineModal(false)}
+          show={showLcModal}
+          onHide={() => setShowLcModal(false)}
           centered
           contentClassName="custom-black-modal"
         >
           <Modal.Header closeButton>
-            <Modal.Title>Select W-Engine</Modal.Title>
+            <Modal.Title>Select Light Cone</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             <input
               type="text"
               className="form-control mb-2"
-              placeholder="Search W-Engine..."
-              value={wengineSearch}
-              onChange={(e) => setWengineSearch(e.target.value)}
+              placeholder="Search Light Cone..."
+              value={lcSearch}
+              onChange={(e) => setLcSearch(e.target.value)}
               disabled={uiLocked}
             />
             <div style={{ maxHeight: "300px", overflowY: "auto" }}>
               <ul className="list-group">
                 <li
                   className={`list-group-item list-group-item-action ${
-                    selectedWengineId === "" ? "active" : ""
+                    selectedLcId === "" ? "active" : ""
                   }`}
-                  onClick={() => !uiLocked && setSelectedWengineId("")}
+                  onClick={() => !uiLocked && setSelectedLcId("")}
                   style={{ cursor: uiLocked ? "not-allowed" : "pointer" }}
                 >
                   None
                 </li>
                 {(() => {
-                  const searchLower = wengineSearch.toLowerCase();
+                  const searchLower = lcSearch.toLowerCase();
                   const activeChar =
                     activeSlotIndex !== null
                       ? draftPicks[activeSlotIndex]?.character
@@ -2930,19 +3540,19 @@ export default function ZzzDraftPage() {
                   const activeCharName = activeChar?.name?.toLowerCase();
                   const activeCharSubname = activeChar?.subname?.toLowerCase();
 
-                  const filteredWengines = wengines.filter((w: WEngine) => {
+                  const filtered = lightcones.filter((w: LightCone) => {
                     const name = w.name?.toLowerCase() || "";
                     const sub = w.subname?.toLowerCase() || "";
                     if (name.includes(searchLower) || sub.includes(searchLower))
                       return true;
 
-                    // Signature search hint support
+                    // signature hint: match character-name subname
                     for (const [
-                      subname,
+                      subn,
                       charName,
                     ] of subnameToCharacterName.entries()) {
                       if (
-                        subname.includes(searchLower) &&
+                        subn.includes(searchLower) &&
                         (name.includes(charName.toLowerCase()) ||
                           sub.includes(charName.toLowerCase()))
                       ) {
@@ -2953,7 +3563,7 @@ export default function ZzzDraftPage() {
                   });
 
                   // signature first
-                  filteredWengines.sort((a: WEngine, b: WEngine) => {
+                  filtered.sort((a: LightCone, b: LightCone) => {
                     if (!activeCharName && !activeCharSubname) return 0;
                     const aSub = a.subname?.toLowerCase() || "";
                     const bSub = b.subname?.toLowerCase() || "";
@@ -2968,30 +3578,28 @@ export default function ZzzDraftPage() {
                     return 0;
                   });
 
-                  return filteredWengines.map((w: WEngine) => {
-                    const isSig =
-                      !!activeChar && isSignatureWengine(w, activeChar);
-                    const isBannedWE = wengineGlobalBan.has(String(w.id));
-
+                  return filtered.map((w: LightCone) => {
+                    const isSig = !!activeChar && isSignatureLC(w, activeChar);
+                    const isBanned = lightconeGlobalBan.has(String(w.id));
                     return (
                       <li
                         key={w.id}
                         className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center
-        ${selectedWengineId === String(w.id) ? "active" : ""} ${
-                          isBannedWE ? "disabled" : ""
+                          ${selectedLcId === String(w.id) ? "active" : ""} ${
+                          isBanned ? "disabled" : ""
                         }`}
                         onClick={() => {
-                          if (uiLocked || isBannedWE) return; // 🔒 no selection if banned
-                          setSelectedWengineId(String(w.id));
+                          if (uiLocked || isBanned) return;
+                          setSelectedLcId(String(w.id));
                         }}
                         style={{
                           cursor:
-                            uiLocked || isBannedWE ? "not-allowed" : "pointer",
+                            uiLocked || isBanned ? "not-allowed" : "pointer",
                           padding: "6px 10px",
                           gap: "10px",
-                          opacity: uiLocked || isBannedWE ? 0.5 : 1,
+                          opacity: uiLocked || isBanned ? 0.5 : 1,
                         }}
-                        title={isBannedWE ? "Universally banned" : w.name}
+                        title={isBanned ? "Universally banned" : w.name}
                       >
                         <div className="d-flex align-items-center gap-2">
                           <img
@@ -3014,7 +3622,7 @@ export default function ZzzDraftPage() {
                           </div>
                         </div>
 
-                        {isBannedWE ? (
+                        {isBanned ? (
                           <span className="badge bg-danger">Uni Ban</span>
                         ) : isSig ? (
                           <span className="badge bg-warning text-dark">
@@ -3028,31 +3636,28 @@ export default function ZzzDraftPage() {
               </ul>
             </div>
           </Modal.Body>
-
           <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowWengineModal(false)}
-            >
+            <Button variant="secondary" onClick={() => setShowLcModal(false)}>
               Cancel
             </Button>
             <Button
               variant="primary"
               onClick={() => {
                 if (uiLocked) return;
-                if (activeSlotIndex !== null) confirmWengine(activeSlotIndex);
+                if (activeSlotIndex !== null) confirmLightCone(activeSlotIndex);
               }}
               disabled={
                 uiLocked ||
-                (selectedWengineId !== "" &&
-                  wengineGlobalBan.has(String(selectedWengineId)))
+                (selectedLcId !== "" &&
+                  lightconeGlobalBan.has(String(selectedLcId)))
               }
             >
               Confirm
             </Button>
           </Modal.Footer>
         </Modal>
-        {/* Featured: full list popup (landing-style tiles) */}
+
+        {/* Featured full list popup */}
         <Modal
           show={showFeaturedPopup}
           onHide={() => setShowFeaturedPopup(false)}
@@ -3063,7 +3668,6 @@ export default function ZzzDraftPage() {
           <Modal.Header closeButton>
             <Modal.Title>All Featured</Modal.Title>
           </Modal.Header>
-
           <Modal.Body>
             <div
               style={{
@@ -3073,7 +3677,7 @@ export default function ZzzDraftPage() {
               }}
             >
               {featuredList.map((f) => {
-                const fk = f.kind === "character" ? f.code! : `we-${f.id!}`;
+                const fk = f.kind === "character" ? f.code! : `lc-${f.id!}`;
                 const ruleColor =
                   f.rule === "globalBan"
                     ? "#ef4444"
@@ -3086,9 +3690,7 @@ export default function ZzzDraftPage() {
                     : f.rule === "globalPick"
                     ? "Uni Pick"
                     : "No Rule";
-
-                const meta = resolveFeaturedMeta(f); // ✅ hydrate from catalogs
-
+                const meta = resolveFeaturedMeta(f);
                 return (
                   <div
                     key={`full-${fk}`}
@@ -3126,7 +3728,6 @@ export default function ZzzDraftPage() {
                         />
                       ) : null}
                     </div>
-
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div
                         title={meta.name}
@@ -3140,7 +3741,6 @@ export default function ZzzDraftPage() {
                       >
                         {meta.name}
                       </div>
-
                       <div
                         className="d-flex align-items-center flex-wrap"
                         style={{ gap: 8, marginTop: 6 }}
@@ -3158,7 +3758,6 @@ export default function ZzzDraftPage() {
                         >
                           {ruleLabel}
                         </span>
-
                         {typeof f.customCost === "number" && (
                           <span
                             className="text-white-50 small"
@@ -3177,7 +3776,6 @@ export default function ZzzDraftPage() {
               })}
             </div>
           </Modal.Body>
-
           <Modal.Footer>
             <Button
               variant="secondary"
@@ -3188,7 +3786,7 @@ export default function ZzzDraftPage() {
           </Modal.Footer>
         </Modal>
 
-        {/* Share / Invite Modal (OWNER ONLY) */}
+        {/* Share / Invite (OWNER ONLY) */}
         <Modal
           show={showShareModal}
           onHide={() => setShowShareModal(false)}
@@ -3264,13 +3862,21 @@ export default function ZzzDraftPage() {
           </Modal.Footer>
         </Modal>
         <Modal
-          show={showSettings}
-          onHide={() => setShowSettings(false)}
+          show={showSettingsModal}
+          onHide={() => {
+            setShowSettingsModal(false);
+            setCycleBpStr(String(cycleBreakpoint)); // reset any unsaved edits
+          }}
           centered
           contentClassName="custom-dark-modal"
         >
           <Modal.Header closeButton>
-            <Modal.Title>Match Settings</Modal.Title>
+            <Modal.Title>
+              Draft Settings{" "}
+              {!canEditSettings && (
+                <span className="badge bg-secondary ms-2"></span>
+              )}
+            </Modal.Title>
           </Modal.Header>
 
           <Modal.Body>
@@ -3284,62 +3890,67 @@ export default function ZzzDraftPage() {
                 {displayCostProfileName}
               </span>
             </div>
-            <div className="mb-3">
-              <label className="form-label fw-semibold">Cost limit</label>
+            <label className="form-label">Cycle breakpoint</label>
+            <div className="d-flex align-items-center gap-2 mb-1">
               <input
-                type="number"
-                step="0.25"
-                min={0}
+                type="text"
+                inputMode="numeric"
+                pattern="\d*"
                 className="form-control"
-                value={costLimitStr}
-                onChange={(e) => setCostLimitStr(e.target.value)}
-                disabled={!isOwner}
+                style={{ maxWidth: 160 }}
+                placeholder="4"
+                value={cycleBpStr}
+                onChange={(e) =>
+                  setCycleBpStr(e.target.value.replace(/[^\d]/g, ""))
+                }
+                onKeyDown={(e) => {
+                  if (!canEditSettings) return; // read-only
+                  if (e.key === "Enter") {
+                    const parsed = parseInt(cycleBpStr || "4", 10);
+                    const next =
+                      Number.isFinite(parsed) && parsed >= 1 ? parsed : 4;
+                    applyCycleBreakpoint(next);
+                    setShowSettingsModal(false);
+                  }
+                }}
+                disabled={!canEditSettings}
               />
-              <small className="text-white-50">
-                Team draft cost cap. Rounded to the nearest 0.25.
-              </small>
+              <span className="text-white-50 small">Default is 4</span>
             </div>
 
-            <div className="mb-2">
-              <label className="form-label fw-semibold">
-                Penalty per 0.25 over cap
-              </label>
-              <input
-                type="number"
-                step="50"
-                min={0}
-                className="form-control"
-                value={penaltyStr}
-                onChange={(e) => setPenaltyStr(e.target.value)}
-                disabled={!isOwner}
-              />
-              <small className="text-white-50">
-                Points deducted for each 0.25 over the cost limit.
-              </small>
-            </div>
+            <small className="text-white-50">
+              Each{" "}
+              <strong>
+                {(canEditSettings
+                  ? Number(cycleBpStr || cycleBreakpoint)
+                  : cycleBreakpoint
+                ).toFixed(2)}
+              </strong>{" "}
+              total cost adds <strong>1.00</strong> cycle penalty.
+            </small>
           </Modal.Body>
 
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowSettings(false)}>
-              {isOwner ? "Cancel" : "Close"}
+            <Button
+              className="btn-glass btn-glass-secondary"
+              onClick={() => {
+                setShowSettingsModal(false);
+                setCycleBpStr(String(cycleBreakpoint));
+              }}
+            >
+              Close
             </Button>
             <Button
-              variant="primary"
+              className="btn-glass btn-glass-warning"
               onClick={() => {
-                if (!isOwner) {
-                  setShowSettings(false);
-                  return;
-                }
-                const cl = roundToQuarter(parseFloat(costLimitStr || "0"));
-                const pp = Math.max(
-                  0,
-                  Math.round(parseFloat(penaltyStr || "0"))
-                );
-                applyCostLimit(cl);
-                applyPenalty(pp);
-                setShowSettings(false);
+                if (!canEditSettings) return; // read-only
+                const parsed = parseInt(cycleBpStr || "4", 10);
+                const next =
+                  Number.isFinite(parsed) && parsed >= 1 ? parsed : 4;
+                applyCycleBreakpoint(next);
+                setShowSettingsModal(false);
               }}
-              disabled={!isOwner}
+              disabled={!canEditSettings}
             >
               Save
             </Button>

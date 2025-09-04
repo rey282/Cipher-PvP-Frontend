@@ -18,7 +18,7 @@ const BalancePage = lazy(() => import("./components/BalancePage"));
 const BalancePreview = lazy(() => import("./components/BalancePreview"));
 const AdminMatchHistory = lazy(() => import("./components/AdminMatchHistory"));
 const HsrInsights = lazy(() => import("./components/HsrInsights"));
-const HsrHome2 = lazy(() => import("./components2/HsrHome2"));
+//const HsrHome2 = lazy(() => import("./components2/HsrHome2"));
 const BalancePage2 = lazy(() => import("./components2/BalancePage2"));
 const BalancePreview2 = lazy(() => import("./components2/BalancePreview2"));
 const CostTest = lazy(() => import("./components2/CostTest"));
@@ -26,6 +26,8 @@ const RosterLog = lazy(() => import("./components/RosterLog"));
 const ZzzDraftPage = lazy(() => import("./components/ZzzDraft"));
 const TeamPresets = lazy(() => import("./components/TeamPresets"));
 const ZzzSpectatorPage = lazy(() => import("./components/ZzzSpectatorPage"));
+const HsrDraftPage = lazy(() => import("./components/HsrDraft"));
+const HsrSpectatorPage = lazy(() => import("./components/HsrSpectatorPage"));
 
 /* ─────────── Layout wrapper ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
@@ -196,16 +198,6 @@ export default function App() {
       {/* Cerydra Format */}
       <Route path="/cerydra">
         <Route
-          index
-          element={
-            <Suspense fallback={<LoadingSplash />}>
-              <PageWithFooter>
-                <HsrHome2 />
-              </PageWithFooter>
-            </Suspense>
-          }
-        />
-        <Route
           path="balance-cost"
           element={
             <Suspense fallback={<LoadingSplash />}>
@@ -245,6 +237,30 @@ export default function App() {
             <Suspense fallback={<LoadingSplash />}>
               <PageWithFooter>
                 <ZzzSpectatorPage />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+      </Route>
+
+      {/* HSR Format */}
+      <Route path="/hsr">
+        <Route
+          path="draft"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <HsrDraftPage />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+        <Route
+          path="s/:key"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <HsrSpectatorPage />
               </PageWithFooter>
             </Suspense>
           }

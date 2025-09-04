@@ -29,11 +29,11 @@ export default function ZzzRules() {
           agents.
         </li>
         <li>
-          <strong>Ban (red boxes):</strong> elect an agent to ban (cannot ban
+          <strong>Ban (darker boxes):</strong> elect an agent to ban (cannot ban
           first 4 picks).
         </li>
         <li>
-          <strong>Ace pick (orange/yellow boxes):</strong> select any unbanned
+          <strong>Ace pick (glowing boxes):</strong> select any unbanned
           agent, including opponent's picks; only one copy per team allowed.
         </li>
       </ul>

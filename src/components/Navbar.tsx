@@ -11,16 +11,17 @@ export default function Navbar() {
   const isCipher = location.pathname.startsWith("/cipher");
   const isLanding = location.pathname === "/";
 
-  // Treat profile & presets as "landing-like" so we show the home (2 choices) navbar there
+  // Treat profile & presets as "landing-like" so we show the home navbar there
   const isProfile = location.pathname.startsWith("/profile");
   const isPresets = /\/presets(\/|$)/.test(location.pathname);
   const isLandingLike = isLanding || isProfile || isPresets;
 
   const goToTeamPresets = () => {
-    if (!user?.id) return; // not shown if logged out, but guard anyway
+    if (!user?.id) return;
     navigate(`/profile/${user.id}/presets`);
   };
 
+  // Cipher section navbar remains as-is
   const cipherNav = [
     { label: "Home", path: "/cipher" },
     { label: "Balance Cost", path: "/cipher/balance-cost" },
@@ -29,39 +30,29 @@ export default function Navbar() {
     { label: "Character Stats", path: "/cipher/characters" },
   ];
 
-  const cerydraNav = [
-    { label: "Home", path: "/cerydra" },
-    { label: "Balance Cost", path: "/cerydra/balance-cost" },
+  // Home/Landing navbar (shared by Landing pages AND Cerydra pages)
+  // NOTE: Cerydra link removed here per request; Cost Test stays.
+  const homeNav = [
+    { label: "Cipher Format", path: "/cipher" },
+    // { label: "Cerydra Format", path: "/cerydra" }, // removed
     { label: "Cost Test", path: "/cerydra/cost-test" },
   ];
 
-  const navLinks = isLandingLike
-    ? [
-        { label: "Cipher Format", path: "/cipher" },
-        { label: "Cerydra Format", path: "/cerydra" },
-        { label: "Cost Test", path: "/cerydra/cost-test" },
-      ]
-    : isCipher
-    ? cipherNav
-    : isCerydra
-    ? cerydraNav
-    : [];
+  // Use homeNav on landing-like pages AND on Cerydra pages
+  const navLinks =
+    isLandingLike || isCerydra ? homeNav : isCipher ? cipherNav : [];
 
-  const showTeamPresetsLink = !!user; // show everywhere when logged in
+  const showTeamPresetsLink = !!user;
 
   const handleCloseOffcanvas = () => {
     const offcanvasEl = document.getElementById("mobileNav");
     if (!offcanvasEl) return;
-
     try {
       const anyWin = window as any;
       const inst = anyWin?.bootstrap?.Offcanvas?.getInstance?.(offcanvasEl);
       inst?.hide?.();
-    } catch {
-      // ignore – we still want navigation to proceed
-    }
+    } catch {}
   };
-
 
   return (
     <nav className="w-100 px-2 py-3 d-flex justify-content-between align-items-center">

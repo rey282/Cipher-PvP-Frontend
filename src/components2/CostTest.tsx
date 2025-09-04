@@ -150,7 +150,6 @@ export default function CostTestPage() {
     }
   };
 
-
   // unlock when all modals are closed + on unmount
   useEffect(() => {
     if (!showModal && !showExportModal) {
@@ -214,7 +213,6 @@ export default function CostTestPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showModal, slotsRef]);
 
-
   /* ───────────── Base data fetch (Cerydra + Cipher) ───────────── */
   useEffect(() => {
     const ac = new AbortController();
@@ -268,7 +266,6 @@ export default function CostTestPage() {
         setCipherChars(cipCharData.characters || cipCharData || []);
         setCipherCones(cipConeData.cones || cipConeData || []);
 
-
         setTeam(makeEmptyTeam());
         setLoad(false);
       } catch (err: any) {
@@ -321,7 +318,6 @@ export default function CostTestPage() {
     })();
     return () => ac.abort();
   }, [user?.id]);
-
 
   /* ───────────── Maps for fast lookups ───────────── */
   // Cerydra
@@ -535,7 +531,6 @@ export default function CostTestPage() {
     setShowExportModal(true);
   };
 
-
   const handleCreatePreset = async () => {
     if (!user?.id) return;
 
@@ -649,8 +644,6 @@ export default function CostTestPage() {
     }
   };
 
-
-
   const handleDeletePreset = async (presetId: string) => {
     if (!playerIdForPresets) return;
 
@@ -705,7 +698,6 @@ export default function CostTestPage() {
         throw new Error(msg);
       }
 
-
       if (r.status === 404) {
         // Server says it doesn't exist — reconcile the list.
         toast.info("Preset not found on server. Refreshing list…");
@@ -732,7 +724,6 @@ export default function CostTestPage() {
       toast.error(err.message || "Failed to delete preset");
     }
   };
-
 
   /* ───────────── Early error/loading return ───────────── */
   if (loading || error) {
@@ -775,7 +766,7 @@ export default function CostTestPage() {
         <Navbar />
 
         <div className="d-flex justify-content-end mb-3 pe-4">
-          <Link to="/cerydra" className="btn back-button-glass">
+          <Link to="/" className="btn back-button-glass">
             ← Back
           </Link>
         </div>
@@ -882,238 +873,333 @@ export default function CostTestPage() {
             </div>
 
             {/* Team slots */}
-            <div ref={slotsRef} className="ct-team-slots">
+            <div
+              ref={slotsRef}
+              className="d-flex justify-content-between gap-2"
+              style={{
+                flexWrap: "nowrap",
+                overflowX: "auto",
+                overflowY: "hidden",
+                width: "100%",
+                WebkitOverflowScrolling: "touch",
+              }}
+            >
               {team.map((member, index) => {
                 const char = member.characterInfo;
                 const cone = member.lightConeData;
 
-                const eCery = char ? cerydraCharCost(member) : 0; // E COST
-                const sCery = cone ? cerydraConeCost(member) : 0; // LC COST
+                const eCery = char ? cerydraCharCost(member) : 0;
+                const sCery = cone ? cerydraConeCost(member) : 0;
 
                 return (
-                  <div key={index} className="ct-slot">
-                    {/* Card */}
-                    <div
-                      className="draft-card ct ct-card"
-                      onClick={() => char && openConeModal(index)}
-                      style={{ cursor: char ? "pointer" : "default" }}
-                    >
-                      {char ? (
-                        <>
-                          {/* Full image area */}
-                          <img
-                            src={char.image_url}
-                            alt={char.name}
-                            className="draft-img"
-                            loading="lazy"
-                            onError={(e) => {
-                              (
-                                e.currentTarget as HTMLImageElement
-                              ).style.visibility = "hidden";
+                  <div
+                    key={index}
+                    onClick={() => char && openConeModal(index)}
+                    style={{
+                      flex: "0 0 auto",
+                      width: "22vw",
+                      maxWidth: "120px",
+                      minWidth: "80px",
+                      height: "220px",
+                      borderRadius: "12px",
+                      background: "rgba(0,0,0,0.7)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      cursor: char ? "pointer" : "default",
+                      overflow: "visible",
+                      padding: 0,
+                      margin: 0,
+                      display: "inline-block",
+                      position: "relative",
+                    }}
+                  >
+                    {char ? (
+                      <div style={{ position: "relative" }}>
+                        <img
+                          src={char.image_url}
+                          alt={char.name}
+                          loading="lazy"
+                          onError={(e) => {
+                            (
+                              e.currentTarget as HTMLImageElement
+                            ).style.visibility = "hidden";
+                          }}
+                          style={{
+                            width: "100%",
+                            height: cone ? "140px" : "220px",
+                            objectFit: "cover",
+                            transition: "height 0.3s ease",
+                          }}
+                        />
+
+                        {/* Eidolon badge with both systems */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: 4,
+                            left: 4,
+                            zIndex: 10,
+                          }}
+                        >
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEidolonOpenIndex(
+                                eidolonOpenIndex === index ? null : index
+                              );
                             }}
                             style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
+                              position: "relative",
+                              display: "inline-block",
+                              cursor: "pointer",
                             }}
-                          />
-
-                          {/* Light Cone overlay (doesn’t affect layout) */}
-                          {cone && (
-                            <img
-                              src={cone.imageUrl}
-                              alt={cone.name}
-                              title={cone.name}
-                              className="engine-badge ct-engine"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openConeModal(index);
-                              }}
-                            />
-                          )}
-
-                          {/* Eidolon slider */}
-                          {eidolonOpenIndex === index && (
-                            <div
-                              ref={eidolonRef}
-                              className="slider-panel ct-slider-panel"
-                              onClick={(e) => e.stopPropagation()}
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              <div className="slider-label">Eidolon</div>
-                              <input
-                                type="range"
-                                min={0}
-                                max={6}
-                                className="big-slider"
-                                value={member.eidolon}
-                                onChange={(e) => {
-                                  const updated = [...team];
-                                  updated[index].eidolon = Number(
-                                    (e.target as HTMLInputElement).value
-                                  );
-                                  setTeam(updated);
-                                }}
-                              />
-                              <div className="slider-ticks mt-1">
-                                {[0, 1, 2, 3, 4, 5, 6].map((v) => (
-                                  <span
-                                    key={v}
-                                    className={
-                                      member.eidolon === v ? "active" : ""
-                                    }
-                                  >
-                                    {v}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Superimpose slider */}
-                          {superOpenIndex === index && (
-                            <div
-                              ref={superRef}
-                              className="slider-panel ct-slider-panel"
-                              onClick={(e) => e.stopPropagation()}
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              <div className="slider-label">
-                                Superimposition
-                              </div>
-                              <input
-                                type="range"
-                                min={1}
-                                max={Math.max(
-                                  5,
-                                  member.lightConeData?.costs.length ?? 5
-                                )}
-                                className="big-slider"
-                                value={member.superimpose}
-                                onChange={(e) => {
-                                  const updated = [...team];
-                                  updated[index].superimpose = Number(
-                                    (e.target as HTMLInputElement).value
-                                  );
-                                  setTeam(updated);
-                                }}
-                              />
-                              <div className="slider-ticks mt-1">
-                                {[1, 2, 3, 4, 5].map((v) => (
-                                  <span
-                                    key={v}
-                                    className={
-                                      member.superimpose === v ? "active" : ""
-                                    }
-                                  >
-                                    S{v}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Bottom info bar */}
-                          <div
-                            className="info-bar ct-info"
-                            onClick={(e) => e.stopPropagation()}
                           >
                             <div
-                              className="char-name"
-                              title={char.name}
-                              style={{ textAlign: "center", fontWeight: 700 }}
+                              style={{
+                                background: "#000",
+                                color: "#fff",
+                                fontSize: "0.75rem",
+                                padding: "2px 6px",
+                                borderRadius: "6px",
+                              }}
                             >
-                              {char.name}
+                              E{member.eidolon} | {formatCost(eCery)}
                             </div>
 
-                            {/* Centered 4 pills: E | E COST | LC COST | S */}
-                            <div className="chip-row four">
-                              {/* E (open Eidolon) */}
-                              <span
-                                className="chip clickable"
-                                title="Set Eidolon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSuperOpenIndex(null);
-                                  setEidolonOpenIndex(
-                                    eidolonOpenIndex === index ? null : index
-                                  );
+                            {eidolonOpenIndex === index && (
+                              <div
+                                ref={eidolonRef}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  position: "absolute",
+                                  top: "calc(100% - 1px)",
+                                  left: index === team.length - 1 ? "auto" : 0,
+                                  right: index === team.length - 1 ? 0 : "auto",
+                                  width: "180px",
+                                  background: "rgba(0,0,0,0.85)",
+                                  padding: "8px",
+                                  borderRadius: "10px",
+                                  boxShadow: "0 0 6px rgba(0,0,0,0.6)",
+                                  backdropFilter: "blur(4px)",
+                                  zIndex: 999,
                                 }}
                               >
-                                E{member.eidolon}
-                              </span>
-
-                              {/* E COST */}
-                              <span
-                                className="chip cost"
-                                title="Character cost"
-                              >
-                                {formatCost(eCery)}
-                              </span>
-
-                              {/* LC COST (spacer if no cone) */}
-                              {cone ? (
-                                <span
-                                  className="chip cost"
-                                  title="Light Cone cost"
-                                >
-                                  {formatCost(sCery)}
-                                </span>
-                              ) : (
-                                <span
-                                  className="chip-spacer"
-                                  aria-hidden="true"
-                                />
-                              )}
-
-                              {/* S (open Superimpose; spacer if no cone) */}
-                              {cone ? (
-                                <span
-                                  className="chip clickable"
-                                  title="Set Superimpose"
-                                  onClick={(e) => {
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={6}
+                                  step={1}
+                                  value={member.eidolon}
+                                  onChange={(e) => {
                                     e.stopPropagation();
-                                    setEidolonOpenIndex(null);
-                                    setSuperOpenIndex(
-                                      superOpenIndex === index ? null : index
+                                    const updated = [...team];
+                                    updated[index].eidolon = Number(
+                                      e.target.value
                                     );
+                                    setTeam(updated);
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    accentColor: "#0af",
+                                    cursor: "pointer",
+                                  }}
+                                />
+                                <div
+                                  className="d-flex justify-content-between text-white mt-1"
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    fontWeight: 500,
+                                    color: "#ccc",
                                   }}
                                 >
-                                  S{member.superimpose}
-                                </span>
-                              ) : (
-                                <span
-                                  className="chip-spacer"
-                                  aria-hidden="true"
-                                />
-                              )}
-                            </div>
+                                  {[
+                                    "E0",
+                                    "E1",
+                                    "E2",
+                                    "E3",
+                                    "E4",
+                                    "E5",
+                                    "E6",
+                                  ].map((label, i) => (
+                                    <span
+                                      key={i}
+                                      style={{
+                                        color:
+                                          member.eidolon === i
+                                            ? "#0af"
+                                            : "#ccc",
+                                        fontWeight:
+                                          member.eidolon === i
+                                            ? "bold"
+                                            : "normal",
+                                      }}
+                                    >
+                                      {label}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </>
-                      ) : (
-                        <div className="d-flex w-100 h-100 align-items-center justify-content-center" />
-                      )}
-                    </div>
+                        </div>
 
-                    {/* Remove bar below the card */}
-                    <div
-                      style={{
-                        marginTop: 6,
-                        background: "rgba(0,0,0,0.55)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: 10,
-                        padding: 6,
-                      }}
-                    >
-                      <button
-                        className="btn btn-outline-danger btn-sm w-100"
-                        onClick={() => removeSlot(index)}
-                        disabled={!char}
-                        title={char ? "Remove this member" : "Empty slot"}
-                      >
-                        Remove
-                      </button>
-                    </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeSlot(index);
+                          }}
+                          className="btn btn-sm btn-danger position-absolute"
+                          style={{
+                            top: 4,
+                            right: 4,
+                            padding: "2px 6px",
+                            fontSize: "0.75rem",
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "140px",
+                          background: "rgba(255,255,255,0.05)",
+                        }}
+                      />
+                    )}
+
+                    {/* Cone area with both systems */}
+                    {cone ? (
+                      <div style={{ position: "relative" }}>
+                        <img
+                          src={cone.imageUrl}
+                          alt={cone.name}
+                          loading="lazy"
+                          onError={(e) => {
+                            (
+                              e.currentTarget as HTMLImageElement
+                            ).style.visibility = "hidden";
+                          }}
+                          style={{
+                            width: "100%",
+                            height: "80px",
+                            objectFit: "cover",
+                          }}
+                        />
+
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: 4,
+                            left: 4,
+                            zIndex: 10,
+                          }}
+                        >
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSuperOpenIndex(
+                                superOpenIndex === index ? null : index
+                              );
+                            }}
+                            style={{
+                              position: "relative",
+                              display: "inline-block",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div
+                              style={{
+                                background: "#000",
+                                color: "#fff",
+                                fontSize: "0.75rem",
+                                padding: "2px 6px",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              S{member.superimpose} | {formatCost(sCery)}
+                            </div>
+
+                            {superOpenIndex === index && (
+                              <div
+                                ref={superRef}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  position: "absolute",
+                                  bottom: "calc(100% - 1px)",
+                                  left: index === team.length - 1 ? "auto" : 0,
+                                  right: index === team.length - 1 ? 0 : "auto",
+                                  width: "180px",
+                                  background: "rgba(0,0,0,0.85)",
+                                  padding: "8px",
+                                  borderRadius: "10px",
+                                  boxShadow: "0 0 6px rgba(0,0,0,0.6)",
+                                  backdropFilter: "blur(4px)",
+                                  zIndex: 999,
+                                }}
+                              >
+                                <input
+                                  type="range"
+                                  min={1}
+                                  max={Math.max(5, cone?.costs.length ?? 5)}
+                                  step={1}
+                                  value={member.superimpose}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    const updated = [...team];
+                                    updated[index].superimpose = Number(
+                                      e.target.value
+                                    );
+                                    setTeam(updated);
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    accentColor: "#0af",
+                                    cursor: "pointer",
+                                  }}
+                                />
+                                <div
+                                  className="d-flex justify-content-between text-white mt-1"
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    fontWeight: 500,
+                                    color: "#ccc",
+                                  }}
+                                >
+                                  {["S1", "S2", "S3", "S4", "S5"].map(
+                                    (label, i) => (
+                                      <span
+                                        key={i}
+                                        style={{
+                                          color:
+                                            member.superimpose === i + 1
+                                              ? "#0af"
+                                              : "#ccc",
+                                          fontWeight:
+                                            member.superimpose === i + 1
+                                              ? "bold"
+                                              : "normal",
+                                        }}
+                                      >
+                                        {label}
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "80px",
+                          background: "rgba(255,255,255,0.05)",
+                        }}
+                      />
+                    )}
                   </div>
                 );
               })}
