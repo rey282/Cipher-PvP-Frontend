@@ -54,11 +54,19 @@ type SpectatorState = {
   reserveSeconds?: number;
 
   reserveLeft?: { B: number; R: number };
-  graceLeft?: number; 
-  timerUpdatedAt?: number; 
+  graceLeft?: number;
+  timerUpdatedAt?: number;
 
   extraCyclePenaltyB?: number;
   extraCyclePenaltyR?: number;
+
+  applyCyclePenaltyB?: boolean;
+  applyCyclePenaltyR?: boolean;
+
+  timerPenaltyCountB?: number;
+  timerPenaltyCountR?: number;
+  applyTimerPenaltyB?: boolean;
+  applyTimerPenaltyR?: boolean;
 };
 
 type FeaturedCfg = {
@@ -153,10 +161,8 @@ function useRowScale<T extends HTMLElement>(
     compute();
     const ro = new ResizeObserver(() => compute());
     ro.observe(el);
-    window.addEventListener("resize", compute);
     return () => {
       ro.disconnect();
-      window.removeEventListener("resize", compute);
     };
   }, [ref, cardCount]);
   return scale;
@@ -255,6 +261,23 @@ export default function CerydraDraftPage() {
 
   const [blueToken, setBlueToken] = useState<string | null>(null);
   const [redToken, setRedToken] = useState<string | null>(null);
+
+  function forceResetGraceOnTurnChange(srv: Partial<SpectatorState>) {
+    if (!timerEnabled) return;
+    const srvTurn = Number.isFinite(Number(srv.currentTurn))
+      ? Number(srv.currentTurn)
+      : null;
+    if (srvTurn == null) return;
+
+    const seq =
+      Array.isArray(srv.draftSequence) && srv.draftSequence.length
+        ? srv.draftSequence
+        : draftSequence;
+    if (!isFirstBanForSide(srvTurn, seq) && srvTurn !== currentTurn) {
+      graceRef.current = MOVE_GRACE;
+      setGraceLeft(MOVE_GRACE);
+    }
+  }
 
   function normName(s: string) {
     return String(s || "")
@@ -470,7 +493,6 @@ export default function CerydraDraftPage() {
       : 4;
   });
 
-
   const [cycleBpStr, setCycleBpStr] = useState<string>(String(cycleBreakpoint));
   useEffect(() => setCycleBpStr(String(cycleBreakpoint)), [cycleBreakpoint]);
 
@@ -505,8 +527,6 @@ export default function CerydraDraftPage() {
 
     if (isOwner) ownerOptimisticSave(300);
   };
-
-
 
   // If link has ?key, trust immediately (player joins)
   useEffect(() => {
@@ -638,32 +658,46 @@ export default function CerydraDraftPage() {
   );
   // keep fast string drafts while typing; commit to numbers on blur/enter
   const [blueDraft, setBlueDraft] = useState<string[]>(
-    (is3ban ? [0, 1, 2] : [0, 1]).map((i) =>
-      blueScores[i] ? String(blueScores[i]) : ""
-    )
+    (is3ban ? [0, 1, 2] : [0, 1]).map((i) => String(blueScores[i] ?? 0))
   );
   const [redDraft, setRedDraft] = useState<string[]>(
-    (is3ban ? [0, 1, 2] : [0, 1]).map((i) =>
-      redScores[i] ? String(redScores[i]) : ""
-    )
+    (is3ban ? [0, 1, 2] : [0, 1]).map((i) => String(redScores[i] ?? 0))
   );
   const [extraCyclePenaltyB, setExtraCyclePenaltyB] = useState<number>(0);
   const [extraCyclePenaltyR, setExtraCyclePenaltyR] = useState<number>(0);
 
+  // Draft strings so users can backspace to "" and type freely (with decimal)
+  const [extraCycleDraftB, setExtraCycleDraftB] = useState<string>("");
+  const [extraCycleDraftR, setExtraCycleDraftR] = useState<string>("");
+
+  // keep drafts in sync when numeric values change (e.g., from SSE)
+  useEffect(() => {
+    setExtraCycleDraftB(extraCyclePenaltyB ? String(extraCyclePenaltyB) : "");
+  }, [extraCyclePenaltyB]);
+  useEffect(() => {
+    setExtraCycleDraftR(extraCyclePenaltyR ? String(extraCyclePenaltyR) : "");
+  }, [extraCyclePenaltyR]);
+
+  // allow digits and a single dot; turn "." into "0."
+  const sanitizeDec = (s: string) => {
+    let x = s.replace(/[^\d.]/g, "");
+    const firstDot = x.indexOf(".");
+    if (firstDot !== -1) {
+      x = x.slice(0, firstDot + 1) + x.slice(firstDot + 1).replace(/\./g, "");
+    }
+    if (x === ".") x = "0.";
+    return x;
+  };
 
   // keep drafts in sync if scores or mode change
   useEffect(() => {
     setBlueDraft(
-      (is3ban ? [0, 1, 2] : [0, 1]).map((i) =>
-        blueScores[i] ? String(blueScores[i]) : ""
-      )
+      (is3ban ? [0, 1, 2] : [0, 1]).map((i) => String(blueScores[i] ?? 0))
     );
   }, [blueScores, is3ban]);
   useEffect(() => {
     setRedDraft(
-      (is3ban ? [0, 1, 2] : [0, 1]).map((i) =>
-        redScores[i] ? String(redScores[i]) : ""
-      )
+      (is3ban ? [0, 1, 2] : [0, 1]).map((i) => String(redScores[i] ?? 0))
     );
   }, [redScores, is3ban]);
 
@@ -683,7 +717,7 @@ export default function CerydraDraftPage() {
 
     // normalize the draft display too
     const dnext = side === "B" ? [...blueDraft] : [...redDraft];
-    dnext[i] = n ? String(n) : "";
+    dnext[i] = String(n);
     (side === "B" ? setBlueDraft : setRedDraft)(dnext);
   }
 
@@ -721,6 +755,12 @@ export default function CerydraDraftPage() {
   const blueLabels = buildNameLabels(rawTeam1List, nPlayers);
   const redLabels = buildNameLabels(rawTeam2List, nPlayers);
 
+  const [applyCyclePenaltyB, setApplyCyclePenaltyB] = useState<boolean>(true);
+  const [applyCyclePenaltyR, setApplyCyclePenaltyR] = useState<boolean>(true);
+
+  const [applyTimerPenaltyB, setApplyTimerPenaltyB] = useState(true);
+  const [applyTimerPenaltyR, setApplyTimerPenaltyR] = useState(true);
+
   const [uiLocked, setUiLocked] = useState(false);
   const canFinalize = useMemo(() => {
     const idxs = is3ban ? [0, 1, 2] : [0, 1];
@@ -748,19 +788,24 @@ export default function CerydraDraftPage() {
     blueLocked,
     redLocked,
 
-    // timer snapshot (for sync)
     timerEnabled,
     paused,
-    reserveSeconds: Math.min(reserveLeft.B, reserveLeft.R), // legacy seed
+    reserveSeconds: Math.min(reserveLeft.B, reserveLeft.R),
     reserveLeft: { ...reserveLeft },
     graceLeft,
     timerUpdatedAt: Date.now(),
 
-    // manual penalties
     extraCyclePenaltyB,
     extraCyclePenaltyR,
-  });
 
+    applyCyclePenaltyB,
+    applyCyclePenaltyR,
+
+    timerPenaltyCountB: timerPenCount.B,
+    timerPenaltyCountR: timerPenCount.R,
+    applyTimerPenaltyB,
+    applyTimerPenaltyR,
+  });
 
   // Compact Featured preview / popup
   const [showFeaturedPopup, setShowFeaturedPopup] = useState(false);
@@ -1180,6 +1225,24 @@ export default function CerydraDraftPage() {
     () => (spectatorKey ? `hsrDraftTimers:${spectatorKey}` : null),
     [spectatorKey]
   );
+
+  // Display-only clock baseline from the last server sync (or local action)
+  const [clockSyncedAt, setClockSyncedAt] = useState<number | null>(null);
+
+  // A lightweight tick just to refresh the UI (doesn't mutate clocks)
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    let id: number | null = null;
+    const tick = () => {
+      setNowMs(Date.now());
+      id = window.setTimeout(tick, 200) as unknown as number; // ~5 fps is plenty
+    };
+    id = window.setTimeout(tick, 200) as unknown as number;
+    return () => {
+      if (id) window.clearTimeout(id);
+    };
+  }, []);
+
   useEffect(() => {
     if (!timersPersistKey) return;
     try {
@@ -1228,6 +1291,52 @@ export default function CerydraDraftPage() {
     return `${m}:${pad2(r)}`;
   };
 
+  // GRACE-first model with repeating +30s cycles once both timers hit 0
+  function computeGraceReserveCycles(
+    grace0: number,
+    reserve0: number,
+    elapsed: number,
+    cycleLen = 30
+  ) {
+    let g = Math.max(0, grace0);
+    let r = Math.max(0, reserve0);
+    let e = Math.max(0, elapsed);
+    let cycles = 0;
+
+    if (e <= g) return { grace: g - e, reserve: r, cycles }; // still burning the initial grace
+
+    e -= g; // grace spent
+    g = 0;
+    if (e <= r) return { grace: 0, reserve: r - e, cycles }; // now burning reserve
+
+    // both initial grace and reserve are gone; we're into 30s penalty cycles
+    e -= r;
+    r = 0;
+    cycles = 1 + Math.floor(e / cycleLen); // +1 for the first “both=0” event
+    const within = e % cycleLen; // time into current 30s window
+    g = cycleLen - within; // new grace window is ticking
+    return { grace: g, reserve: r, cycles };
+  }
+
+  function materializeActiveBurn(now = Date.now()) {
+    if (!timerEnabled || draftComplete || clockSyncedAt == null) return false;
+    const side = activeSideRef.current;
+    if (!side || pausedRef.current[side] || isFirstTurnBan) return false;
+
+    const elapsed = Math.max(0, (now - clockSyncedAt) / 1000);
+    const res = computeGraceReserveCycles(
+      graceRef.current,
+      reserveRef.current[side],
+      elapsed,
+      MOVE_GRACE
+    );
+
+    setGraceLeft(res.grace);
+    setReserveLeft((prev) => ({ ...prev, [side]: res.reserve }));
+    setClockSyncedAt(now);
+    return true;
+  }
+
   const activeSide: "B" | "R" | null = useMemo(() => {
     if (draftComplete) return null;
     const tok = draftSequence[currentTurn];
@@ -1235,23 +1344,31 @@ export default function CerydraDraftPage() {
     return tok.startsWith("B") ? "B" : "R";
   }, [draftComplete, draftSequence, currentTurn]);
 
-  const isFirstTurnBan = useMemo(() => {
-    if (currentTurn !== 0) return false;
-    const first = draftSequence[0];
-    return first === "BB" || first === "RR";
-  }, [currentTurn, draftSequence]);
+  function isFirstBanForSide(idx: number, seq: string[]) {
+    const tok = seq[idx];
+    if (tok !== "BB" && tok !== "RR") return false;
+
+    for (let i = 0; i < idx; i++) {
+      if (seq[i] === tok) return false;
+    }
+    return true;
+  }
+
+  const isFirstTurnBan = useMemo(
+    () => isFirstBanForSide(currentTurn, draftSequence),
+    [currentTurn, draftSequence]
+  );
 
   const togglePause = (side: "B" | "R") => {
     if (!isOwner) return;
+    materializeActiveBurn();
     setPaused((prev) => {
       const next = { ...prev, [side]: !prev[side] };
       ownerOptimisticSave(0, currentTurn, "eq");
+      setClockSyncedAt(Date.now());
       return next;
     });
   };
-
-  // High-precision ticking with rAF
-  const rafIdRef = useRef<number | null>(null);
 
   const graceRef = useRef(graceLeft);
   useEffect(() => {
@@ -1273,69 +1390,119 @@ export default function CerydraDraftPage() {
     activeSideRef.current = activeSide;
   }, [activeSide]);
 
-  useEffect(() => {
-    if (!timerEnabled || !hydrated || draftComplete || isFirstTurnBan) return;
-
-    let last: number | null = null;
-
-    const loop = (ts: number) => {
-      if (last == null) last = ts;
-      const dt = Math.max(0, (ts - last) / 1000); // seconds
-      last = ts;
-
-      const side = activeSideRef.current;
-      if (!side) {
-        // no active side — keep the loop alive but don’t tick anyone
-        rafIdRef.current = requestAnimationFrame(loop);
-        return;
-      }
-
-      const isPaused = !!pausedRef.current[side];
-
-      if (!isPaused) {
-        if (graceRef.current > 0) {
-          const g = Math.max(0, graceRef.current - dt);
-          if (g !== graceRef.current) {
-            graceRef.current = g;
-            setGraceLeft(g);
-          }
-        } else {
-          const curr = reserveRef.current[side] ?? 0;
-          const next = Math.max(0, curr - dt);
-          if (next !== curr) {
-            const r = { ...reserveRef.current, [side]: next };
-            reserveRef.current = r;
-            setReserveLeft(r);
-          }
-        }
-      }
-
-      rafIdRef.current = requestAnimationFrame(loop);
-    };
-
-    // kill any stray loop first (StrictMode / hot reload safety)
-    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-    rafIdRef.current = requestAnimationFrame(loop);
-
-    return () => {
-      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
-    };
-  }, [timerEnabled, hydrated, draftComplete, isFirstTurnBan]);
-
   const resetGraceNow = () => {
     // update ref first so the rAF loop sees it immediately
     graceRef.current = MOVE_GRACE;
     setGraceLeft(MOVE_GRACE);
+    setClockSyncedAt(Date.now());
   };
 
+  type DisplayClocks = {
+    reserve: { B: number; R: number };
+    grace: number;
+    cycles: { B: number; R: number }; // NEW: how many +30 penalties so far this turn
+  };
+
+  const displayClocks: DisplayClocks = useMemo(() => {
+    let g = Math.max(0, Number(graceLeft) || 0);
+    let rB = Math.max(0, Number(reserveLeft.B) || 0);
+    let rR = Math.max(0, Number(reserveLeft.R) || 0);
+    let cB = 0,
+      cR = 0;
+
+    if (
+      timerEnabled &&
+      hydrated &&
+      !draftComplete &&
+      clockSyncedAt != null &&
+      activeSide &&
+      !paused[activeSide]
+    ) {
+      const elapsed = Math.max(0, (nowMs - clockSyncedAt) / 1000);
+
+      if (!isFirstTurnBan) {
+        if (activeSide === "B") {
+          const res = computeGraceReserveCycles(g, rB, elapsed, MOVE_GRACE);
+          g = res.grace;
+          rB = res.reserve;
+          cB = res.cycles;
+        } else {
+          const res = computeGraceReserveCycles(g, rR, elapsed, MOVE_GRACE);
+          g = res.grace;
+          rR = res.reserve;
+          cR = res.cycles;
+        }
+      }
+    }
+    return { reserve: { B: rB, R: rR }, grace: g, cycles: { B: cB, R: cR } };
+  }, [
+    timerEnabled,
+    hydrated,
+    draftComplete,
+    clockSyncedAt,
+    activeSide,
+    paused,
+    isFirstTurnBan,
+    graceLeft,
+    reserveLeft.B,
+    reserveLeft.R,
+    nowMs,
+  ]);
+
+  // NEW: global total penalties for the whole draft
+  const [timerPenCount, setTimerPenCount] = useState<{ B: number; R: number }>({
+    B: 0,
+    R: 0,
+  });
+
+  // Tracks how many penalties we already counted in the *current* turn per team
+  const creditedThisTurnRef = useRef<{ B: number; R: number }>({ B: 0, R: 0 });
+
+  // Reset per-turn credited *only* when the turn index changes
+  useEffect(() => {
+    creditedThisTurnRef.current = { B: 0, R: 0 };
+  }, [currentTurn]);
+
+  // When cycles grow for the active side, add the delta to the global total
+  useEffect(() => {
+    if (
+      !timerEnabled ||
+      draftComplete ||
+      !activeSide ||
+      isFirstTurnBan ||
+      paused[activeSide]
+    )
+      return;
+    const side = activeSide;
+    const nowCycles = displayClocks.cycles[side];
+    const credited = creditedThisTurnRef.current[side] || 0;
+    if (nowCycles > credited) {
+      setTimerPenCount((prev) => ({
+        ...prev,
+        [side]: prev[side] + (nowCycles - credited),
+      }));
+      creditedThisTurnRef.current[side] = nowCycles;
+    }
+  }, [
+    timerEnabled,
+    draftComplete,
+    activeSide,
+    isFirstTurnBan,
+    paused.B,
+    paused.R,
+    displayClocks.cycles.B,
+    displayClocks.cycles.R,
+  ]);
+
+  useEffect(() => {
+    if (timerEnabled && clockSyncedAt == null) setClockSyncedAt(Date.now());
+  }, [timerEnabled, clockSyncedAt]);
 
   useEffect(() => {
     if (!timerEnabled) return;
     if (isFirstTurnBan) return; // don't start grace on the very first ban slot
     setGraceLeft(MOVE_GRACE); // always reset to 30s, no carry from previous pick
   }, [currentTurn, timerEnabled, isFirstTurnBan]);
-
 
   useEffect(() => {
     if (!spectatorKey) return;
@@ -1390,9 +1557,31 @@ export default function CerydraDraftPage() {
         }
       }
 
-
       // ── Timer + penalties from server/session ────────────────────────────────────
       const st = payload?.state || {};
+
+      // include-cycle-penalty toggles
+      if (typeof st.applyCyclePenaltyB === "boolean")
+        setApplyCyclePenaltyB(st.applyCyclePenaltyB);
+      if (typeof st.applyCyclePenaltyR === "boolean")
+        setApplyCyclePenaltyR(st.applyCyclePenaltyR);
+
+      if (Number.isFinite(Number(st.timerPenaltyCountB))) {
+        setTimerPenCount((p) => ({
+          ...p,
+          B: Math.max(0, Number(st.timerPenaltyCountB)),
+        }));
+      }
+      if (Number.isFinite(Number(st.timerPenaltyCountR))) {
+        setTimerPenCount((p) => ({
+          ...p,
+          R: Math.max(0, Number(st.timerPenaltyCountR)),
+        }));
+      }
+      if (typeof st.applyTimerPenaltyB === "boolean")
+        setApplyTimerPenaltyB(st.applyTimerPenaltyB);
+      if (typeof st.applyTimerPenaltyR === "boolean")
+        setApplyTimerPenaltyR(st.applyTimerPenaltyR);
 
       // timerEnabled (support both camel/snake, state > top-level)
       const timerFrom =
@@ -1461,18 +1650,15 @@ export default function CerydraDraftPage() {
           const srvTurn = Number.isFinite(Number(st.currentTurn))
             ? Number(st.currentTurn)
             : currentTurn;
-          const tok = srvSeq[srvTurn] || "";
-          const activeSide = tok.startsWith("B")
+          const activeSide = srvSeq[srvTurn]?.startsWith("B")
             ? "B"
-            : tok.startsWith("R")
+            : srvSeq[srvTurn]?.startsWith("R")
             ? "R"
             : null;
+          const firstBanFreeze = isFirstBanForSide(srvTurn, srvSeq);
 
-          // First slot is a BAN? Then don't burn grace on "turn 0 + ban"
-          const firstIsBan =
-            (srvSeq[0] === "BB" || srvSeq[0] === "RR") && srvTurn === 0;
-
-          if (activeSide && !st.paused?.[activeSide] && !firstIsBan) {
+          if (activeSide && !st.paused?.[activeSide] && !firstBanFreeze) {
+            // burn grace/reserve using elapsed
             const burnFromGrace = Math.min(nextGrace, elapsed);
             nextGrace = Math.max(0, nextGrace - burnFromGrace);
             const over = Math.max(0, elapsed - burnFromGrace);
@@ -1488,6 +1674,8 @@ export default function CerydraDraftPage() {
         setReserveLeft(nextReserve);
         if (incomingGrace != null) setGraceLeft(nextGrace);
       }
+      setClockSyncedAt(Date.now());
+      creditedThisTurnRef.current = { B: 0, R: 0 };
 
       // ── Extra per-team manual cycle penalties ───────────────────────────────────
       if (Number.isFinite(Number(st.extraCyclePenaltyB))) {
@@ -1500,7 +1688,6 @@ export default function CerydraDraftPage() {
           round2(Math.max(0, Number(st.extraCyclePenaltyR)))
         );
       }
-
 
       if (
         payload?.costProfile &&
@@ -1552,6 +1739,9 @@ export default function CerydraDraftPage() {
 
       const serverState: SpectatorState | undefined = payload?.state;
       if (!serverState) return;
+
+      // NEW: make sure everyone resets grace when server turn changes
+      forceResetGraceOnTurnChange(serverState);
 
       if (Date.now() < ignoreSseUntilRef.current) {
         const exp = expectedTurnRef.current;
@@ -1684,9 +1874,35 @@ export default function CerydraDraftPage() {
           }
         }
 
-
         // ── Timer + penalties from server/session (GET fallback) ─────────────────────
         const st = data?.state || {};
+
+        // include-cycle-penalty toggles
+        if (typeof st.applyCyclePenaltyB === "boolean")
+          setApplyCyclePenaltyB(st.applyCyclePenaltyB);
+        if (typeof st.applyCyclePenaltyR === "boolean")
+          setApplyCyclePenaltyR(st.applyCyclePenaltyR);
+
+        if (Number.isFinite(Number(st.timerPenaltyCountB))) {
+          setTimerPenCount((p) => ({
+            ...p,
+            B: Math.max(0, Number(st.timerPenaltyCountB)),
+          }));
+        }
+        if (Number.isFinite(Number(st.timerPenaltyCountR))) {
+          setTimerPenCount((p) => ({
+            ...p,
+            R: Math.max(0, Number(st.timerPenaltyCountR)),
+          }));
+        }
+        if (typeof st.applyTimerPenaltyB === "boolean")
+          setApplyTimerPenaltyB(st.applyTimerPenaltyB);
+        if (typeof st.applyTimerPenaltyR === "boolean")
+          setApplyTimerPenaltyR(st.applyTimerPenaltyR);
+
+        if (data?.state) {
+          forceResetGraceOnTurnChange(data.state);
+        }
 
         // timerEnabled
         const timerFrom =
@@ -1753,17 +1969,14 @@ export default function CerydraDraftPage() {
             const srvTurn = Number.isFinite(Number(st.currentTurn))
               ? Number(st.currentTurn)
               : currentTurn;
-            const tok = srvSeq[srvTurn] || "";
-            const activeSide = tok.startsWith("B")
+            const activeSide = srvSeq[srvTurn]?.startsWith("B")
               ? "B"
-              : tok.startsWith("R")
+              : srvSeq[srvTurn]?.startsWith("R")
               ? "R"
               : null;
+            const firstBanFreeze = isFirstBanForSide(srvTurn, srvSeq);
 
-            const firstIsBan =
-              (srvSeq[0] === "BB" || srvSeq[0] === "RR") && srvTurn === 0;
-
-            if (activeSide && !st.paused?.[activeSide] && !firstIsBan) {
+            if (activeSide && !st.paused?.[activeSide] && !firstBanFreeze) {
               const burnFromGrace = Math.min(nextGrace, elapsed);
               nextGrace = Math.max(0, nextGrace - burnFromGrace);
               const over = Math.max(0, elapsed - burnFromGrace);
@@ -1779,6 +1992,8 @@ export default function CerydraDraftPage() {
           setReserveLeft(nextReserve);
           if (incomingGrace != null) setGraceLeft(nextGrace);
         }
+        setClockSyncedAt(Date.now());
+        creditedThisTurnRef.current = { B: 0, R: 0 };
 
         if (Number.isFinite(Number(st.extraCyclePenaltyB))) {
           setExtraCyclePenaltyB(
@@ -1790,7 +2005,6 @@ export default function CerydraDraftPage() {
             round2(Math.max(0, Number(st.extraCyclePenaltyR)))
           );
         }
-
 
         if (
           data?.costProfile &&
@@ -1888,7 +2102,9 @@ export default function CerydraDraftPage() {
       isComplete: isComplete || undefined,
       penaltyPerPoint: cycleBreakpoint,
       timerEnabled,
-      reserveSeconds: Math.max(0, seedReserveSeconds || reserveLeft.B),
+      reserveSeconds: Math.floor(
+        Math.max(0, Math.min(reserveLeft.B, reserveLeft.R))
+      ),
     });
 
     if (payload === lastPayloadRef.current) return;
@@ -2160,7 +2376,7 @@ export default function CerydraDraftPage() {
   type Side = "B" | "R";
 
   const sideOfToken = (tok?: string): Side =>
-    tok && tok.startsWith("B") ? "B" : "R";
+    tok?.startsWith("B") ? "B" : "R";
 
   const sideOfIndex = (index: number): Side =>
     draftSequence[index]?.startsWith("B") ? "B" : "R";
@@ -2234,6 +2450,7 @@ export default function CerydraDraftPage() {
 
     // Apply pick/ban
     const nextPick: DraftPick = { character: char, eidolon: 0, phase: 1 };
+    materializeActiveBurn();
     if (isPlayer) {
       setDraftPicks((prev) => {
         const updated = [...prev];
@@ -2270,6 +2487,7 @@ export default function CerydraDraftPage() {
     const lastIdx = currentTurn - 1;
     const lastTok = draftSequence[lastIdx];
     const lastSide = sideOfToken(lastTok);
+    materializeActiveBurn();
 
     if (!isPlayer) {
       if (uiLocked || blueLocked || redLocked) return;
@@ -2279,6 +2497,9 @@ export default function CerydraDraftPage() {
         return next;
       });
       setCurrentTurn(lastIdx);
+      setEidolonOpenIndex(null);
+      setPhaseOpenIndex(null);
+
       resetGraceNow();
       ownerOptimisticSave(0, lastIdx, "le");
       return;
@@ -2297,6 +2518,8 @@ export default function CerydraDraftPage() {
     resetGraceNow();
     bumpIgnoreSse(currentTurn - 1, "le");
     postPlayerAction({ op: "undoLast", side: playerSide, index: lastIdx });
+    setEidolonOpenIndex(null);
+    setPhaseOpenIndex(null);
   };
 
   const updateEidolon = (index: number, eidolon: number) => {
@@ -2714,19 +2937,27 @@ export default function CerydraDraftPage() {
                           }}
                         >
                           {paused[prefix] ? "⏸" : "⏱"}{" "}
-                          {fmtClock(reserveLeft[prefix])}
-                          {paused[prefix] && (
-                            <span className="badge bg-warning ms-2">
-                              Paused
+                          {fmtClock(displayClocks.reserve[prefix])}
+                          {timerPenCount[prefix] > 0 && (
+                            <span
+                              className="badge bg-danger ms-2"
+                              title="Timer penalties this draft"
+                            >
+                              ×{timerPenCount[prefix]}
                             </span>
                           )}
                           {activeSide === prefix &&
                             !draftComplete &&
                             !isFirstTurnBan && (
                               <span className="ms-2 text-white-50">
-                                (+{fmtClock(graceLeft)})
+                                (+{fmtClock(displayClocks.grace)})
                               </span>
                             )}
+                          {paused[prefix] && (
+                            <span className="badge bg-warning ms-2">
+                              Paused
+                            </span>
+                          )}
                         </button>
                       ) : (
                         // Player: read-only when enabled
@@ -2735,19 +2966,27 @@ export default function CerydraDraftPage() {
                           style={{ pointerEvents: "none" }}
                         >
                           {paused[prefix] ? "⏸" : "⏱"}{" "}
-                          {fmtClock(reserveLeft[prefix])}
-                          {paused[prefix] && (
-                            <span className="badge bg-warning ms-2">
-                              Paused
+                          {fmtClock(displayClocks.reserve[prefix])}
+                          {timerPenCount[prefix] > 0 && (
+                            <span
+                              className="badge bg-danger ms-2"
+                              title="Timer penalties this draft"
+                            >
+                              ×{timerPenCount[prefix]}
                             </span>
                           )}
                           {activeSide === prefix &&
                             !draftComplete &&
                             !isFirstTurnBan && (
                               <span className="ms-2 text-white-50">
-                                (+{fmtClock(graceLeft)})
+                                (+{fmtClock(displayClocks.grace)})
                               </span>
                             )}
+                          {paused[prefix] && (
+                            <span className="badge bg-warning ms-2">
+                              Paused
+                            </span>
+                          )}
                         </div>
                       ))}
 
@@ -3119,7 +3358,6 @@ export default function CerydraDraftPage() {
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
             <span aria-hidden="true">⚙️</span>
-            {!isOwner && <span className="text-white-50 ms-1"></span>}
           </button>
           <input
             type="text"
@@ -3310,14 +3548,27 @@ export default function CerydraDraftPage() {
 
                 const penaltyCycles =
                   side === "B" ? blueCyclePenalty : redCyclePenalty;
+                const includeCycle =
+                  side === "B" ? applyCyclePenaltyB : applyCyclePenaltyR;
+                const cycleTerm = includeCycle ? penaltyCycles : 0;
+
                 const extraCycles = round2(
                   side === "B" ? extraCyclePenaltyB : extraCyclePenaltyR
                 );
+                const timerAdd = (
+                  isBlue ? applyTimerPenaltyB : applyTimerPenaltyR
+                )
+                  ? isBlue
+                    ? timerPenCount.B
+                    : timerPenCount.R
+                  : 0;
+
                 const adjustedTotal = Number(
                   (
                     scores.reduce((a, b) => a + b, 0) +
-                    penaltyCycles +
-                    extraCycles
+                    cycleTerm +
+                    extraCycles +
+                    timerAdd
                   ).toFixed(2)
                 );
 
@@ -3329,8 +3580,55 @@ export default function CerydraDraftPage() {
                   >
                     <div className="score-header">
                       <div className="score-title">{label}</div>
+                      <div className="d-flex align-items-center gap-2 me-2">
+                        {/* Timer penalty pill (only visible if any occurred) */}
+                        {timerPenCount[side] > 0 && (
+                          <span
+                            className="badge"
+                            style={{
+                              cursor: scoresLocked ? "default" : "pointer",
+                              userSelect: "none",
+                              padding: "6px 10px",
+                              border: "1px solid rgba(255,255,255,0.25)",
+                              background: (
+                                side === "B"
+                                  ? applyTimerPenaltyB
+                                  : applyTimerPenaltyR
+                              )
+                                ? "rgba(255, 193, 7, 0.2)" // included → warm pill
+                                : "rgba(255, 255, 255, 0.10)", // excluded → neutral pill
+                              color: "white",
+                              opacity: scoresLocked ? 0.6 : 1,
+                            }}
+                            title={
+                              (
+                                side === "B"
+                                  ? applyTimerPenaltyB
+                                  : applyTimerPenaltyR
+                              )
+                                ? "Included in end score — click to remove"
+                                : "Not included — click to include in end score"
+                            }
+                            onClick={() => {
+                              if (scoresLocked) return;
+                              if (side === "B")
+                                setApplyTimerPenaltyB((v) => !v);
+                              else setApplyTimerPenaltyR((v) => !v);
+                              requestSave(150);
+                            }}
+                          >
+                            ⏱ Timer ×{timerPenCount[side]}
+                          </span>
+                        )}
+                      </div>
+
                       <div className="score-draft">
                         Cycle penalty: {penaltyCycles} (÷ {cycleBreakpoint})
+                        {!includeCycle && (
+                          <span className="text-white-50 ms-2">
+                            (not applied)
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -3375,35 +3673,39 @@ export default function CerydraDraftPage() {
                       <div className="score-input-group" key="extra">
                         <label>Extra Cycle Penalty</label>
                         <input
-                          type="number"
-                          inputMode="decimal"
-                          step="0.01"
-                          min={0}
+                          type="text" // text so we can show "" while typing
+                          inputMode="decimal" // mobile decimal keypad
                           className="form-control score-input"
                           placeholder="0"
-                          disabled={scoresLocked}
+                          disabled={scoresLocked} // keep as-is; owner-only edits post-draft
                           value={
-                            (side === "B"
-                              ? extraCyclePenaltyB
-                              : extraCyclePenaltyR) ?? 0
+                            side === "B" ? extraCycleDraftB : extraCycleDraftR
                           }
                           onChange={(e) => {
-                            const v = Math.max(
-                              0,
-                              parseFloat(e.target.value || "0") || 0
-                            );
-                            if (side === "B") setExtraCyclePenaltyB(v);
-                            else setExtraCyclePenaltyR(v);
+                            if (scoresLocked) return;
+                            const raw = sanitizeDec(e.target.value);
+                            if (side === "B") setExtraCycleDraftB(raw);
+                            else setExtraCycleDraftR(raw);
                           }}
                           onBlur={() => {
-                            if (side === "B")
-                              setExtraCyclePenaltyB((v) =>
-                                round2(Math.max(0, v))
+                            if (scoresLocked) return;
+                            if (side === "B") {
+                              const v = Math.max(
+                                0,
+                                parseFloat(extraCycleDraftB || "0") || 0
                               );
-                            else
-                              setExtraCyclePenaltyR((v) =>
-                                round2(Math.max(0, v))
+                              const vv = round2(v);
+                              setExtraCyclePenaltyB(vv);
+                              setExtraCycleDraftB(vv ? String(vv) : ""); // keep placeholder when 0
+                            } else {
+                              const v = Math.max(
+                                0,
+                                parseFloat(extraCycleDraftR || "0") || 0
                               );
+                              const vv = round2(v);
+                              setExtraCyclePenaltyR(vv);
+                              setExtraCycleDraftR(vv ? String(vv) : ""); // keep placeholder when 0
+                            }
                             requestSave(0);
                           }}
                         />
@@ -3414,15 +3716,18 @@ export default function CerydraDraftPage() {
                       <div className="score-total-label">Team Total</div>
                       <div className="score-total-value">
                         {scores.reduce((a, b) => a + b, 0)}
-                        {penaltyCycles > 0 || extraCycles > 0 ? (
+                        {(cycleTerm > 0 || extraCycles > 0 || timerAdd > 0) && (
                           <span className="score-penalty">
-                            +{penaltyCycles}
-                            {extraCycles ? ` +${extraCycles}` : ""} ={" "}
+                            {includeCycle && penaltyCycles
+                              ? ` +${penaltyCycles}`
+                              : ""}
+                            {extraCycles ? ` +${extraCycles}` : ""}
+                            {timerAdd ? ` +${timerAdd}` : ""} ={" "}
                             <span className="score-adjusted">
                               {adjustedTotal}
                             </span>
                           </span>
-                        ) : null}
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3478,14 +3783,22 @@ export default function CerydraDraftPage() {
             {/* Winner banner */}
             <div className="text-center mt-4 text-white">
               {(() => {
+                const blueTimerAdd = applyTimerPenaltyB ? timerPenCount.B : 0;
+                const redTimerAdd = applyTimerPenaltyR ? timerPenCount.R : 0;
+
+                const redCycleTerm = applyCyclePenaltyR ? redCyclePenalty : 0;
+                const blueCycleTerm = applyCyclePenaltyB ? blueCyclePenalty : 0;
+
                 const blueAdjusted =
                   blueScores.reduce((a, b) => a + b, 0) +
-                  blueCyclePenalty +
-                  extraCyclePenaltyB;
+                  blueCycleTerm +
+                  extraCyclePenaltyB +
+                  blueTimerAdd;
                 const redAdjusted =
                   redScores.reduce((a, b) => a + b, 0) +
-                  redCyclePenalty +
-                  extraCyclePenaltyR;
+                  redCycleTerm +
+                  extraCyclePenaltyR +
+                  redTimerAdd;
 
                 if (blueAdjusted < redAdjusted)
                   return (

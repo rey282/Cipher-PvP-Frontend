@@ -67,6 +67,14 @@ type SpectatorState = {
 
   extraCyclePenaltyB?: number;
   extraCyclePenaltyR?: number;
+
+  applyCyclePenaltyB?: boolean;
+  applyCyclePenaltyR?: boolean;
+
+  timerPenaltyCountB?: number;
+  timerPenaltyCountR?: number;
+  applyTimerPenaltyB?: boolean;
+  applyTimerPenaltyR?: boolean;
 };
 
 type SessionRow = {
@@ -175,6 +183,16 @@ function calcLcCostWithBase(
   return Number((base + delta).toFixed(2));
 }
 
+function isFirstBanForSide(idx: number, seq: string[]) {
+  const tok = seq[idx];
+  if (tok !== "BB" && tok !== "RR") return false;
+  for (let i = 0; i < idx; i++) {
+    if (seq[i] === tok) return false; // we’ve seen this side’s ban already
+  }
+  return true;
+}
+
+
 /* util: normalize names like draft page */
 function normName(s: string) {
   return String(s || "")
@@ -201,7 +219,6 @@ export default function HsrSpectatorPage() {
   const [error, setError] = useState<string | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const navigate = useNavigate();
-  
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
@@ -210,8 +227,6 @@ export default function HsrSpectatorPage() {
   const displayCostProfileName = costProfileName?.trim() || "Cerydra (Default)";
   const [costCharMs, setCostCharMs] = useState<Record<string, number[]>>({});
   const [costLcPhase, setCostLcPhase] = useState<Record<string, number[]>>({});
-;
-
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia(MOBILE_QUERY);
@@ -296,7 +311,6 @@ export default function HsrSpectatorPage() {
     };
   }, [session?.costProfile, session?.costProfileId]);
 
-
   const [characters, setCharacters] = useState<Character[]>([]);
   const [lightcones, setLightcones] = useState<LightCone[]>([]);
   const [cerydraLcPhase, setCerydraLcPhase] = useState<
@@ -346,6 +360,23 @@ export default function HsrSpectatorPage() {
     R: Math.max(0, Number(state?.reserveSeconds) || 0),
   });
   const [graceLeft, setGraceLeft] = useState<number>(MOVE_GRACE);
+
+  // Display-only clock baseline from the last server sync
+  const [clockSyncedAt, setClockSyncedAt] = useState<number | null>(null);
+
+  // Lightweight UI tick (doesn't mutate clocks; only re-renders)
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    let id: number | null = null;
+    const tick = () => {
+      setNowMs(Date.now());
+      id = window.setTimeout(tick, 200) as unknown as number; // ~5 fps
+    };
+    id = window.setTimeout(tick, 200) as unknown as number;
+    return () => {
+      if (id) window.clearTimeout(id);
+    };
+  }, []);
 
   useEffect(() => {
     const st = session?.state;
@@ -405,10 +436,10 @@ export default function HsrSpectatorPage() {
         ? "R"
         : null;
 
-      const firstIsBan =
-        (srvSeq[0] === "BB" || srvSeq[0] === "RR") && srvTurn === 0;
+      // freeze on EACH team’s first ban (BB or RR) wherever it appears
+      const firstBanFreeze = isFirstBanForSide(srvTurn, srvSeq);
 
-      if (active && !st.paused?.[active] && !firstIsBan) {
+      if (active && !st.paused?.[active] && !firstBanFreeze) {
         const burnFromGrace = Math.min(nextGrace, elapsed);
         nextGrace = Math.max(0, nextGrace - burnFromGrace);
         const over = Math.max(0, elapsed - burnFromGrace);
@@ -423,12 +454,12 @@ export default function HsrSpectatorPage() {
 
     setReserveLeft(nextReserve);
     setGraceLeft(nextGrace);
+    setClockSyncedAt(Date.now());
   }, [
     session?.state, // fire on any new snapshot/update
     draftSequence,
     currentTurn, // safe fallbacks if server omitted fields
   ]);
-
 
   const blueCount = draftSequence.filter((s) => s.startsWith("B")).length;
   const redCount = draftSequence.filter((s) => s.startsWith("R")).length;
@@ -651,6 +682,7 @@ export default function HsrSpectatorPage() {
 
     es.onerror = () => {
       if (!notFound) setReconnecting(true);
+      setLoading(false);
     };
 
     es.addEventListener("snapshot", onSnapshot);
@@ -791,15 +823,26 @@ export default function HsrSpectatorPage() {
   const team1Cost = teamCostMemo.B;
   const team2Cost = teamCostMemo.R;
 
-  const blueAdjusted =
-    blueScores.reduce((a, b) => a + b, 0) + blueCyclePenalty + extraPenaltyB;
-  const redAdjusted =
-    redScores.reduce((a, b) => a + b, 0) + redCyclePenalty + extraPenaltyR;
-
   const draftComplete =
     (state?.currentTurn ?? 0) >= (state?.draftSequence?.length ?? 0);
   const blueLocked = !!state?.blueLocked;
   const redLocked = !!state?.redLocked;
+
+  // Global timer penalty counts (whole draft, provided by server)
+  const timerPenCount = {
+    B: Number(state?.timerPenaltyCountB ?? 0) || 0,
+    R: Number(state?.timerPenaltyCountR ?? 0) || 0,
+  };
+
+  // Whether timer/cycle penalties are applied to end score (owner controls this)
+  const includeTimer = {
+    B: state?.applyTimerPenaltyB ?? true,
+    R: state?.applyTimerPenaltyR ?? true,
+  };
+  const includeCycle = {
+    B: state?.applyCyclePenaltyB ?? true,
+    R: state?.applyCyclePenaltyR ?? true,
+  };
 
   // Featured metadata hydration for display
   const resolveFeaturedMeta = (f: FeaturedCfg) => {
@@ -821,16 +864,16 @@ export default function HsrSpectatorPage() {
   // active side + ban guards for timer UI
   const activeSide: "B" | "R" | null = useMemo(() => {
     if (draftComplete) return null;
-    const tok = draftSequence[currentTurn];
-    if (!tok) return null;
-    return tok.startsWith("B") ? "B" : "R";
+    const tok = draftSequence[currentTurn] || "";
+    if (tok.startsWith("B")) return "B";
+    if (tok.startsWith("R")) return "R";
+    return null;
   }, [draftComplete, draftSequence, currentTurn]);
 
-  const isFirstTurnBan = useMemo(() => {
-    if (currentTurn !== 0) return false;
-    const first = draftSequence[0];
-    return first === "BB" || first === "RR";
-  }, [currentTurn, draftSequence]);
+  const isFirstTurnBan = useMemo(
+    () => isFirstBanForSide(currentTurn, draftSequence),
+    [currentTurn, draftSequence]
+  );
 
   // helpers for timer UI
   const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
@@ -841,72 +884,75 @@ export default function HsrSpectatorPage() {
     return `${m}:${pad2(r)}`;
   };
 
-  // Timer ticking (read-only reproduction of the draft logic)
-  const rafIdRef = useRef<number | null>(null);
-  const graceRef = useRef(graceLeft);
-  const reserveRef = useRef(reserveLeft);
-  const pausedRef = useRef(paused);
-  const activeSideRef = useRef<"B" | "R" | null>(null);
-  const timerEnabledRef = useRef(timerEnabled);
+  function computeGraceReserveCycles(
+    grace0: number,
+    reserve0: number,
+    elapsed: number,
+    cycleLen = 30
+  ) {
+    let g = Math.max(0, grace0);
+    let r = Math.max(0, reserve0);
+    let e = Math.max(0, elapsed);
+    let cycles = 0;
+    if (e <= g) return { grace: g - e, reserve: r, cycles };
+    e -= g;
+    g = 0;
+    if (e <= r) return { grace: 0, reserve: r - e, cycles };
+    e -= r;
+    r = 0;
+    cycles = 1 + Math.floor(e / cycleLen);
+    const within = e % cycleLen;
+    g = cycleLen - within;
+    return { grace: g, reserve: r, cycles };
+  }
 
-  useEffect(() => void (graceRef.current = graceLeft), [graceLeft]);
-  useEffect(() => void (reserveRef.current = reserveLeft), [reserveLeft]);
-  useEffect(() => void (pausedRef.current = paused), [paused]);
-  useEffect(() => void (activeSideRef.current = activeSide), [activeSide]);
-  useEffect(
-    () => void (timerEnabledRef.current = timerEnabled),
-    [timerEnabled]
-  );
+  type DisplayClocks = {
+    reserve: { B: number; R: number };
+    grace: number;
+    cycles: { B: number; R: number };
+  };
 
-  useEffect(() => {
-    if (!timerEnabled || draftComplete) return;
+  const displayClocks: DisplayClocks = useMemo(() => {
+    let g = Math.max(0, Number(graceLeft) || 0);
+    let rB = Math.max(0, Number(reserveLeft.B) || 0);
+    let rR = Math.max(0, Number(reserveLeft.R) || 0);
+    let cB = 0,
+      cR = 0;
 
-    let last: number | null = null;
-
-    const loop = (ts: number) => {
-      if (last == null) last = ts;
-      const dt = Math.max(0, (ts - last) / 1000);
-      last = ts;
-
-      const side = activeSideRef.current;
-      const enabled = timerEnabledRef.current;
-
-      if (!enabled || !side) {
-        rafIdRef.current = requestAnimationFrame(loop);
-        return;
+    if (
+      timerEnabled &&
+      !draftComplete &&
+      clockSyncedAt != null &&
+      activeSide &&
+      !paused[activeSide] &&
+      !isFirstTurnBan
+    ) {
+      const elapsed = Math.max(0, (nowMs - clockSyncedAt) / 1000);
+      if (activeSide === "B") {
+        const res = computeGraceReserveCycles(g, rB, elapsed, MOVE_GRACE);
+        g = res.grace;
+        rB = res.reserve;
+        cB = res.cycles;
+      } else {
+        const res = computeGraceReserveCycles(g, rR, elapsed, MOVE_GRACE);
+        g = res.grace;
+        rR = res.reserve;
+        cR = res.cycles;
       }
-
-      const isPaused = !!pausedRef.current[side];
-
-      if (!isPaused) {
-        if (graceRef.current > 0) {
-          const g = Math.max(0, graceRef.current - dt);
-          if (g !== graceRef.current) {
-            graceRef.current = g;
-            setGraceLeft(g);
-          }
-        } else {
-          const curr = reserveRef.current[side] ?? 0;
-          const next = Math.max(0, curr - dt);
-          if (next !== curr) {
-            const r = { ...reserveRef.current, [side]: next };
-            reserveRef.current = r;
-            setReserveLeft(r);
-          }
-        }
-      }
-
-      rafIdRef.current = requestAnimationFrame(loop);
-    };
-
-    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-    rafIdRef.current = requestAnimationFrame(loop);
-
-    return () => {
-      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
-    };
-  }, [timerEnabled, draftComplete]);
+    }
+    return { reserve: { B: rB, R: rR }, grace: g, cycles: { B: cB, R: cR } };
+  }, [
+    timerEnabled,
+    draftComplete,
+    clockSyncedAt,
+    activeSide,
+    paused,
+    isFirstTurnBan,
+    graceLeft,
+    reserveLeft.B,
+    reserveLeft.R,
+    nowMs,
+  ]);
 
   if (isMobile) return null;
 
@@ -1032,19 +1078,33 @@ export default function HsrSpectatorPage() {
                         title="Reserve time (read-only)"
                       >
                         {paused[prefix] ? "⏸" : "⏱"}{" "}
-                        {fmtClock(reserveLeft[prefix])}
-                        {paused[prefix] && (
-                          <span className="badge bg-warning ms-2">Paused</span>
+                        {fmtClock(displayClocks.reserve[prefix])}
+                        {/* Show global timer penalties pill if any occurred */}
+                        {timerPenCount[prefix] > 0 && (
+                          <span
+                            className="badge bg-danger ms-2"
+                            title="Timer penalties this draft"
+                          >
+                            ×{timerPenCount[prefix]}
+                          </span>
                         )}
+                        {/* Live grace window on the active side */}
                         {activeSide === prefix &&
                           !draftComplete &&
                           !isFirstTurnBan && (
-                            <span className="ms-2 text-white-50">
-                              (+{fmtClock(graceLeft)})
+                            <span
+                              className="ms-2 text-white-50"
+                              title="Extra 30s windows after both timers hit 0"
+                            >
+                              (+{fmtClock(displayClocks.grace)})
                             </span>
                           )}
+                        {paused[prefix] && (
+                          <span className="badge bg-warning ms-2">Paused</span>
+                        )}
                       </div>
                     )}
+
                     <div className="team-cost">Cost: {cost.total}</div>
                   </div>
                 </div>
@@ -1356,10 +1416,20 @@ export default function HsrSpectatorPage() {
               const scores = isBlue ? blueScores : redScores;
               const labels = isBlue ? nameLabelsBlue : nameLabelsRed;
 
+              const includeCycleThis = includeCycle[side];
+              const includeTimerThis = includeTimer[side];
+
               const penaltyCycles = isBlue ? blueCyclePenalty : redCyclePenalty;
+              const cycleTerm = includeCycleThis ? penaltyCycles : 0;
+
               const extraCycles = isBlue ? extraPenaltyB : extraPenaltyR;
+              const timerAdd = includeTimerThis ? timerPenCount[side] : 0;
+
               const adjustedTotal =
-                scores.reduce((a, b) => a + b, 0) + penaltyCycles + extraCycles;
+                scores.reduce((a, b) => a + b, 0) +
+                cycleTerm +
+                extraCycles +
+                timerAdd;
 
               return (
                 <div
@@ -1378,6 +1448,29 @@ export default function HsrSpectatorPage() {
                         </span>
                       )}
                     </div>
+                    <div className="d-flex align-items-center gap-2 mt-2">
+                      {timerPenCount[side] > 0 && (
+                        <span
+                          className="badge"
+                          style={{
+                            padding: "6px 10px",
+                            border: "1px solid rgba(255,255,255,0.25)",
+                            background: includeTimerThis
+                              ? "rgba(255, 193, 7, 0.2)" // included → warm
+                              : "rgba(255,255,255,0.10)", // not included → neutral
+                            color: "white",
+                          }}
+                          title={
+                            includeTimerThis
+                              ? "Timer penalty is included in the end score"
+                              : "Timer penalty is not included in the end score"
+                          }
+                        >
+                          ⏱ Timer ×{timerPenCount[side]}
+                        </span>
+                      )}
+                    </div>
+
                     <div className="score-draft">
                       Cycle penalty: {penaltyCycles} (÷ {cycleBreakpoint})
                     </div>
@@ -1412,10 +1505,13 @@ export default function HsrSpectatorPage() {
                     <div className="score-total-label">Team Total</div>
                     <div className="score-total-value">
                       {scores.reduce((a, b) => a + b, 0)}
-                      {(penaltyCycles || extraCycles) > 0 && (
+                      {(cycleTerm > 0 || extraCycles > 0 || timerAdd > 0) && (
                         <span className="score-penalty">
-                          +{penaltyCycles}
-                          {extraCycles ? ` +${extraCycles}` : ""} ={" "}
+                          {includeCycleThis && penaltyCycles
+                            ? ` +${penaltyCycles}`
+                            : ""}
+                          {extraCycles ? ` +${extraCycles}` : ""}
+                          {timerAdd ? ` +${timerAdd}` : ""} ={" "}
                           <span className="score-adjusted">
                             {adjustedTotal}
                           </span>
@@ -1432,13 +1528,35 @@ export default function HsrSpectatorPage() {
         {/* Winner strip */}
         {state && (
           <div className="text-center mt-4 text-white">
-            {blueAdjusted > redAdjusted ? (
-              <h4 style={{ color: "#3388ff" }}>🏆 {team1Name} Wins!</h4>
-            ) : redAdjusted > blueAdjusted ? (
-              <h4 style={{ color: "#cc3333" }}>🏆 {team2Name} Wins!</h4>
-            ) : (
-              <h4 className="text-warning">Draw!</h4>
-            )}
+            {(() => {
+              const blueCycleTerm = includeCycle.B ? blueCyclePenalty : 0;
+              const redCycleTerm = includeCycle.R ? redCyclePenalty : 0;
+
+              const blueTimerAdd = includeTimer.B ? timerPenCount.B : 0;
+              const redTimerAdd = includeTimer.R ? timerPenCount.R : 0;
+
+              const blueAdj =
+                blueScores.reduce((a, b) => a + b, 0) +
+                blueCycleTerm +
+                (extraPenaltyB || 0) +
+                blueTimerAdd;
+
+              const redAdj =
+                redScores.reduce((a, b) => a + b, 0) +
+                redCycleTerm +
+                (extraPenaltyR || 0) +
+                redTimerAdd;
+
+              if (blueAdj > redAdj)
+                return (
+                  <h4 style={{ color: "#3388ff" }}>🏆 {team1Name} Wins!</h4>
+                );
+              if (redAdj > blueAdj)
+                return (
+                  <h4 style={{ color: "#cc3333" }}>🏆 {team2Name} Wins!</h4>
+                );
+              return <h4 className="text-warning">Draw!</h4>;
+            })()}
           </div>
         )}
       </div>

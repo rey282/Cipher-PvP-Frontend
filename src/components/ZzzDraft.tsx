@@ -1786,6 +1786,7 @@ export default function ZzzDraftPage() {
     updated[index] = { ...updated[index]!, eidolon };
     setDraftPicks(updated);
     requestSave(250);
+    
 
     ownerOptimisticSave(150);
   };
