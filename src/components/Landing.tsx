@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./Landing.css";
+import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 
 import VivianSections, { type VivianSectionHandle } from "./VivianSections";
@@ -83,7 +84,40 @@ export default function Landing() {
   const [leaving, setLeaving] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
 
+  const location = useLocation();
+
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const blocked = (location.state as any)?.blocked as
+      | "hsr-draft-mobile"
+      | "hsr-spectator-mobile"
+      | "hsr-draft-no-team"
+      | undefined;
+
+    if (!blocked) return;
+
+    // show the toast
+    switch (blocked) {
+      case "hsr-draft-mobile":
+        toast.warning("Draft is desktop-only. Please use a laptop/desktop.");
+        break;
+      case "hsr-spectator-mobile":
+        toast.warning("Spectator is desktop-only. Please switch to desktop.");
+        break;
+      case "hsr-draft-no-team":
+        toast.info("Please fill in team names before starting a draft.");
+        break;
+      default:
+        toast.info("That page isn’t available right now.");
+        break;
+    }
+
+    // clear the state so it doesn't retrigger on refresh/back
+    navigate(location.pathname, { replace: true, state: {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+
 
   const vivianRef = useRef<VivianSectionHandle | null>(null);
 

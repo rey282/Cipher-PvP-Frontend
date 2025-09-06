@@ -71,19 +71,24 @@ type SpectatorState = {
 
 type FeaturedCfg = {
   kind: "character" | "lightcone";
-  code?: string;     // for characters
-  id?: string;       // for light cones
+  code?: string; // for characters
+  id?: string; // for light cones
   name?: string;
   image_url?: string;
   rule: "none" | "globalBan" | "globalPick";
   customCost?: number | null;
 };
 
+type HsrMode = "2ban" | "3ban" | "6ban";
+
+const coerceMode = (v: any): HsrMode =>
+  v === "3ban" ? "3ban" : v === "6ban" ? "6ban" : "2ban";
+
 // Landing seeds this
 type DraftInit = {
   team1?: string;
   team2?: string;
-  mode?: "2ban" | "3ban";
+  mode?: "2ban" | "3ban" | "6ban";
   featured?: FeaturedCfg[];
   costProfileId?: string | null;
   costLimit?: number;
@@ -193,10 +198,8 @@ function calcLcCostHSR(lc: LightCone | undefined, phase: number): number {
 }
 
 /* ───────────── Build default local sequences (server may override via SSE) ───────────── */
-function buildSequenceForMode(mode: "2ban" | "3ban"): string[] {
-  // Token legend: "B" = Blue pick, "R" = Red pick, "BB"/"RR" = team ban slot
-  // These are sane defaults; the server snapshot will overwrite with exact flow.
-  if (mode === "3ban") {
+function buildSequenceForMode(mode: HsrMode): string[] {
+  if (mode === "6ban") {
     return [
       "BB",
       "RR",
@@ -204,8 +207,8 @@ function buildSequenceForMode(mode: "2ban" | "3ban"): string[] {
       "R",
       "R",
       "B",
-      "BB",
       "RR",
+      "BB",
       "R",
       "B",
       "B",
@@ -222,6 +225,38 @@ function buildSequenceForMode(mode: "2ban" | "3ban"): string[] {
       "B",
     ];
   }
+
+  if (mode === "3ban") {
+    return [
+      "BB",
+      "RR",
+      "B",
+      "R",
+      "R",
+      "B",
+      "B",
+      "R",
+      "R",
+      "B",
+      "B",
+      "R",
+      "R(ACE)",
+      "B(ACE)",
+      "B",
+      "R",
+      "R",
+      "B",
+      "B",
+      "R",
+      "R",
+      "B",
+      "B",
+      "R",
+      "B(ACE)",
+      "R(ACE)",
+    ];
+  }
+
   // 2ban default
   return [
     "BB",
@@ -394,12 +429,10 @@ export default function CerydraDraftPage() {
   );
 
   /* Mode & team names (owner seeds, server truth overrides via SSE/GET) */
-  const [mode, setMode] = useState<"2ban" | "3ban">(
-    ((seed.mode || (query.get("mode") as "2ban" | "3ban") || "2ban") as any) ===
-      "3ban"
-      ? "3ban"
-      : "2ban"
+  const [mode, setMode] = useState<HsrMode>(
+    coerceMode(seed.mode ?? (query.get("mode") as string | null))
   );
+
   const is3ban = mode === "3ban";
 
   const [team1Name, setTeam1Name] = useState<string>(
@@ -639,6 +672,41 @@ export default function CerydraDraftPage() {
     Array(draftSequence.length).fill(null)
   );
   const [currentTurn, setCurrentTurn] = useState(0);
+  // Live mirror of currentTurn so handlers don't read a stale value
+  const currentTurnRef = useRef(currentTurn);
+  useEffect(() => {
+    currentTurnRef.current = currentTurn;
+  }, [currentTurn]);
+
+  // "Busy" flag while a player action is in-flight (prevents double-picks)
+  const [actionBusy, setActionBusy] = useState(false);
+  const actionBusyRef = useRef(false);
+  const setBusy = (v: boolean) => {
+    actionBusyRef.current = v;
+    setActionBusy(v);
+  };
+
+  // Expect SSE to advance to this turn after we optimistically pick
+  const pendingAckTurnRef = useRef<number | null>(null);
+
+  // Track which way we expect the server turn to move for the ack
+  const pendingAckModeRef = useRef<"ge" | "le" | "eq">("ge");
+
+  // Helper: clear busy once server turn satisfies the expected relation
+  const clearBusyIfAcked = (srvTurn: number) => {
+    if (pendingAckTurnRef.current == null) return;
+    const target = pendingAckTurnRef.current;
+    const mode = pendingAckModeRef.current;
+    const ok =
+      (mode === "ge" && srvTurn >= target) ||
+      (mode === "le" && srvTurn <= target) ||
+      (mode === "eq" && srvTurn === target);
+    if (ok) {
+      pendingAckTurnRef.current = null;
+      setBusy(false);
+    }
+  };
+
   const [, setError] = useState<string | null>(null);
 
   const [eidolonOpenIndex, setEidolonOpenIndex] = useState<number | null>(null);
@@ -1187,6 +1255,8 @@ export default function CerydraDraftPage() {
     };
   };
 
+  
+
   /* ───────────── Timers (reserve + per-move grace) ───────────── */
   const MOVE_GRACE = 30; // seconds before reserve burns
 
@@ -1524,8 +1594,8 @@ export default function CerydraDraftPage() {
         setFinishedFromServer(true);
       }
 
-      if (payload?.mode === "2ban" || payload?.mode === "3ban")
-        setMode(payload.mode);
+      if (payload?.mode) setMode(coerceMode(payload.mode));
+
       if (typeof payload?.team1 === "string") setTeam1Name(payload.team1);
       if (typeof payload?.team2 === "string") setTeam2Name(payload.team2);
 
@@ -1788,6 +1858,8 @@ export default function CerydraDraftPage() {
       }
       setHydrated(true);
 
+      clearBusyIfAcked(mapped.currentTurn);
+
       // late-load featured (in case SSE joined midstream)
       if (
         !Array.isArray(payload?.featured) &&
@@ -1851,7 +1923,8 @@ export default function CerydraDraftPage() {
         }
         const data = await res.json();
 
-        if (data?.mode === "2ban" || data?.mode === "3ban") setMode(data.mode);
+        if (data?.mode) setMode(coerceMode(data.mode));
+
         if (typeof data?.team1 === "string") setTeam1Name(data.team1);
         if (typeof data?.team2 === "string") setTeam2Name(data.team2);
 
@@ -2076,8 +2149,19 @@ export default function CerydraDraftPage() {
             })
           );
         } catch {}
-        if (data?.state)
+        if (data?.state) {
           pendingServerStateRef.current = data.state as SpectatorState;
+
+          // If server already progressed to/over our expected turn, drop busy now
+          const srvTurn = Math.max(
+            0,
+            Math.min(
+              data.state.draftSequence?.length ?? draftSequence.length,
+              Number(data.state.currentTurn ?? 0)
+            )
+          );
+          clearBusyIfAcked(srvTurn);
+        }
       } catch {}
     })();
     return () => ctrl.abort();
@@ -2098,6 +2182,7 @@ export default function CerydraDraftPage() {
     const payload = JSON.stringify({
       featured: featuredList,
       costProfileId,
+      mode,
       state: collectSpectatorState(),
       isComplete: isComplete || undefined,
       penaltyPerPoint: cycleBreakpoint,
@@ -2263,9 +2348,12 @@ export default function CerydraDraftPage() {
     });
 
     setDraftPicks(mappedPicks);
-    setCurrentTurn(
-      Math.max(0, Math.min(pending.draftSequence.length, pending.currentTurn))
+    const appliedTurn = Math.max(
+      0,
+      Math.min(pending.draftSequence.length, pending.currentTurn)
     );
+    setCurrentTurn(appliedTurn);
+    clearBusyIfAcked(appliedTurn);
 
     if (Array.isArray(pending.draftSequence) && pending.draftSequence.length) {
       setDraftSequence(pending.draftSequence);
@@ -2341,8 +2429,16 @@ export default function CerydraDraftPage() {
     return side === playerSide;
   })();
 
-  async function postPlayerAction(action: any) {
-    if (!spectatorKey || !playerToken) return;
+  useEffect(() => {
+    if (isOwner && spectatorKey && hydrated) {
+      // push new mode + new draftSequence in state
+      requestSave(0); // or ownerOptimisticSave(0)
+    }
+  }, [mode, isOwner, spectatorKey, hydrated]);
+
+
+  async function postPlayerAction(action: any): Promise<boolean> {
+    if (!spectatorKey || !playerToken) return false;
     try {
       const res = await fetch(
         `${
@@ -2358,9 +2454,12 @@ export default function CerydraDraftPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.warn("player action failed", res.status, err);
+        return false;
       }
+      return true;
     } catch (e) {
       console.warn("player action network error", e);
+      return false;
     }
   }
 
@@ -2374,6 +2473,9 @@ export default function CerydraDraftPage() {
   const slotIsBan = (i: number) =>
     draftSequence[i] === "BB" || draftSequence[i] === "RR";
   type Side = "B" | "R";
+
+  const tokenIsAce = (tok?: string) => !!tok && /\(ace\)/i.test(tok);
+  const slotIsAce = (i: number) => tokenIsAce(draftSequence[i]);
 
   const sideOfToken = (tok?: string): Side =>
     tok?.startsWith("B") ? "B" : "R";
@@ -2414,6 +2516,8 @@ export default function CerydraDraftPage() {
     const mySideNow: "B" | "R" = currentStep.startsWith("B") ? "B" : "R";
     const isBanSlot = currentStep === "BB" || currentStep === "RR";
 
+    const isAce = tokenIsAce(currentStep);
+
     // Cannot ban a global-pick character
     if (isBanSlot && featuredGlobalPick.has(char.code)) return;
 
@@ -2440,33 +2544,96 @@ export default function CerydraDraftPage() {
 
     if (!isBanSlot) {
       if (featuredGlobalPick.has(char.code)) {
-        // Global pick: each team can pick at most once
+        // Uni-pick: each team can take once
         if (alreadyPickedByMe) return;
       } else {
-        // Normal pick: unique across both teams
-        if (alreadyPickedByMe || alreadyPickedByOpp) return;
+        // Normal: one copy per team; opponent's copy allowed ONLY on ACE
+        if (alreadyPickedByMe) return;
+        if (!isAce && alreadyPickedByOpp) return;
       }
     }
 
     // Apply pick/ban
     const nextPick: DraftPick = { character: char, eidolon: 0, phase: 1 };
     materializeActiveBurn();
+    // ───── Player flow ─────
     if (isPlayer) {
+      // Use live ref to avoid stale turn during super-fast clicks
+      const turn = currentTurnRef.current;
+      const currentStepNow = draftSequence[turn];
+      if (!currentStepNow) return;
+
+      const mySideNow2: "B" | "R" = currentStepNow.startsWith("B") ? "B" : "R";
+      const isBanSlot = currentStepNow === "BB" || currentStepNow === "RR";
+      const isAce = tokenIsAce(currentStepNow);
+
+      if (mySideNow2 !== playerSide) return;
+      if (actionBusyRef.current) return; // block double-pick while waiting for ack
+
+      // Cannot ban a global-pick; also guard against effective bans
+      if (isBanSlot && featuredGlobalPick.has(char.code)) return;
+      if (effectiveBanned.has(char.code)) return;
+
+      // Enforce uniqueness rules (same as before)
+      const myTeamPicks = draftPicks.filter((_, i) =>
+        draftSequence[i].startsWith(mySideNow2)
+      );
+      const oppSide = mySideNow2 === "B" ? "R" : "B";
+      const opponentPicks = draftPicks.filter((_, i) =>
+        draftSequence[i].startsWith(oppSide)
+      );
+      const alreadyPickedByMe = myTeamPicks.some(
+        (p) => p?.character.code === char.code
+      );
+      const alreadyPickedByOpp = opponentPicks.some(
+        (p) => p?.character.code === char.code
+      );
+      if (!isBanSlot) {
+        if (featuredGlobalPick.has(char.code)) {
+          // Uni-pick: each team can take once
+          if (alreadyPickedByMe) return;
+        } else {
+          // Normal: one copy per team; opponent copy allowed ONLY on ACE
+          if (alreadyPickedByMe) return;
+          if (!isAce && alreadyPickedByOpp) return;
+        }
+      }
+
+      // Enter busy & remember the expected server turn
+      pendingAckModeRef.current = "ge"; // ✅ picks move the turn forward
+      setBusy(true);
+      pendingAckTurnRef.current = turn + 1;
+
+      // Optimistic local write using the exact turn we read
+      const nextPick: DraftPick = { character: char, eidolon: 0, phase: 1 };
+      materializeActiveBurn();
       setDraftPicks((prev) => {
         const updated = [...prev];
-        updated[currentTurn] = nextPick;
+        updated[turn] = nextPick;
         return updated;
       });
       setCurrentTurn((t) => t + 1);
+      currentTurnRef.current = turn + 1; // keep ref in sync immediately
       resetGraceNow();
       setKeyboardSearch("");
-      bumpIgnoreSse(currentTurn + 1, "ge");
+
+      // Don't ignore the ack we're expecting
+      bumpIgnoreSse(turn + 1, "ge");
+
+      // Persist to server with the same index
       postPlayerAction({
         op: isBanSlot ? "ban" : "pick",
         side: playerSide,
-        index: currentTurn,
+        index: turn,
         characterCode: char.code,
+      }).then((ok) => {
+        if (!ok) {
+          // POST failed → let player try again; SSE/GET will resync state anyway
+          setBusy(false);
+          pendingAckTurnRef.current = null;
+        }
       });
+
       return;
     }
 
@@ -2483,31 +2650,64 @@ export default function CerydraDraftPage() {
   };
 
   const handleUndo = () => {
-    if (currentTurn === 0) return;
-    const lastIdx = currentTurn - 1;
-    const lastTok = draftSequence[lastIdx];
-    const lastSide = sideOfToken(lastTok);
+    // Use the live ref for players to avoid races; normal state for owner.
+    const turnNow = isPlayer ? currentTurnRef.current : currentTurn;
+    if (turnNow === 0) return;
+
+    // Burn timer up to now (only once).
     materializeActiveBurn();
 
-    if (!isPlayer) {
-      if (uiLocked || blueLocked || redLocked) return;
+    /* ───────────── Player undo ───────────── */
+    if (isPlayer) {
+      const lastIdx = turnNow - 1;
+      const lastTok = draftSequence[lastIdx];
+      const lastSide = sideOfToken(lastTok);
+
+      // Only the side that made the last move can undo it
+      if (playerSide !== lastSide) return;
+      if (sideLocked(playerSide)) return;
+      if (actionBusyRef.current) return; // prevent double-undo while waiting for ack
+
+      // Expect the server turn to move backward to lastIdx
+      pendingAckModeRef.current = "le";
+      pendingAckTurnRef.current = lastIdx;
+      setBusy(true);
+
+      // Optimistic local revert
       setDraftPicks((prev) => {
         const next = [...prev];
         next[lastIdx] = null;
         return next;
       });
       setCurrentTurn(lastIdx);
+      currentTurnRef.current = lastIdx; // keep ref in sync
+      resetGraceNow();
       setEidolonOpenIndex(null);
       setPhaseOpenIndex(null);
 
-      resetGraceNow();
-      ownerOptimisticSave(0, lastIdx, "le");
+      // Ignore out-of-order SSE briefly; expect <= lastIdx
+      bumpIgnoreSse(lastIdx, "le");
+
+      // Tell server
+      postPlayerAction({
+        op: "undoLast",
+        side: playerSide,
+        index: lastIdx,
+      }).then((ok) => {
+        if (!ok) {
+          // Let the user try again; SSE/GET will resync state anyway
+          pendingAckTurnRef.current = null;
+          setBusy(false);
+        }
+      });
       return;
     }
 
+    /* ───────────── Owner undo ───────────── */
+    if (uiLocked || blueLocked || redLocked) return; // respect locks
     if (draftComplete) return;
-    if (playerSide !== lastSide) return;
-    if (sideLocked(playerSide)) return;
+
+    const lastIdx = currentTurn - 1;
 
     setDraftPicks((prev) => {
       const next = [...prev];
@@ -2516,10 +2716,11 @@ export default function CerydraDraftPage() {
     });
     setCurrentTurn(lastIdx);
     resetGraceNow();
-    bumpIgnoreSse(currentTurn - 1, "le");
-    postPlayerAction({ op: "undoLast", side: playerSide, index: lastIdx });
     setEidolonOpenIndex(null);
     setPhaseOpenIndex(null);
+
+    // Save and temporarily ignore out-of-order SSE; expect the turn to move back
+    ownerOptimisticSave(0, lastIdx, "le");
   };
 
   const updateEidolon = (index: number, eidolon: number) => {
@@ -2856,413 +3057,397 @@ export default function CerydraDraftPage() {
                 scale: redScale,
                 locked: redLocked,
               },
-            ].map(({ prefix, name, color, cost, ref, scale, locked }) => (
-              <div className="w-100 text-center" key={prefix}>
-                <div className="team-header">
-                  <div className="team-title" style={{ color }}>
-                    <span
-                      className="team-dot"
-                      style={{ backgroundColor: color }}
-                    />
-                    {name}
-                    {draftComplete && (
-                      <>
-                        {locked ? (
-                          <>
-                            <span
-                              className="badge bg-secondary ms-2"
-                              title="Draft locked"
-                            >
-                              🔒 Locked
-                            </span>
-                            {!isPlayer && (
-                              <button
-                                className="btn back-button-glass ms-2"
-                                onClick={() => toggleSideLock(prefix, false)}
-                                title="Unlock this team's draft"
-                              >
-                                🔓 Unlock
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {!isPlayer && (
-                              <button
-                                className="btn back-button-glass ms-2"
-                                onClick={() => toggleSideLock(prefix, true)}
-                                title="Lock this team's draft"
-                              >
-                                🔒 Lock
-                              </button>
-                            )}
-                            {isPlayer && playerSide === prefix && (
-                              <button
-                                className="btn back-button-glass ms-2"
-                                onClick={() => toggleSideLock(prefix, true)}
-                                title="Lock your draft"
-                              >
-                                🔒 Lock
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
+            ].map(({ prefix, name, color, cost, ref, scale, locked }) => {
+              const useSmall = mode === "3ban" || mode === "6ban";
 
-                  {/* RIGHT SIDE: cost + timer */}
-                  <div
-                    className="d-flex align-items-center"
-                    style={{ gap: 10 }}
-                  >
-                    {timerEnabled &&
-                      (isOwner ? (
-                        // Owner: clickable pause/resume
-                        <button
-                          type="button"
-                          className="btn btn-sm back-button-glass"
-                          onClick={() => togglePause(prefix)}
-                          title={
-                            paused[prefix] ? "Resume timer" : "Pause timer"
-                          }
-                          style={{
-                            opacity:
-                              activeSide === prefix &&
-                              !paused[prefix] &&
-                              !draftComplete
-                                ? 1
-                                : 0.8,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {paused[prefix] ? "⏸" : "⏱"}{" "}
-                          {fmtClock(displayClocks.reserve[prefix])}
-                          {timerPenCount[prefix] > 0 && (
-                            <span
-                              className="badge bg-danger ms-2"
-                              title="Timer penalties this draft"
-                            >
-                              ×{timerPenCount[prefix]}
-                            </span>
-                          )}
-                          {activeSide === prefix &&
-                            !draftComplete &&
-                            !isFirstTurnBan && (
-                              <span className="ms-2 text-white-50">
-                                (+{fmtClock(displayClocks.grace)})
-                              </span>
-                            )}
-                          {paused[prefix] && (
-                            <span className="badge bg-warning ms-2">
-                              Paused
-                            </span>
-                          )}
-                        </button>
-                      ) : (
-                        // Player: read-only when enabled
-                        <div
-                          className="btn btn-sm back-button-glass disabled"
-                          style={{ pointerEvents: "none" }}
-                        >
-                          {paused[prefix] ? "⏸" : "⏱"}{" "}
-                          {fmtClock(displayClocks.reserve[prefix])}
-                          {timerPenCount[prefix] > 0 && (
-                            <span
-                              className="badge bg-danger ms-2"
-                              title="Timer penalties this draft"
-                            >
-                              ×{timerPenCount[prefix]}
-                            </span>
-                          )}
-                          {activeSide === prefix &&
-                            !draftComplete &&
-                            !isFirstTurnBan && (
-                              <span className="ms-2 text-white-50">
-                                (+{fmtClock(displayClocks.grace)})
-                              </span>
-                            )}
-                          {paused[prefix] && (
-                            <span className="badge bg-warning ms-2">
-                              Paused
-                            </span>
-                          )}
-                        </div>
-                      ))}
-
-                    <div className="team-cost">Cost: {cost.total}</div>
-                  </div>
-                </div>
-
-                <div ref={ref} className="draft-row-wrap">
-                  <div
-                    className="draft-row"
-                    style={
-                      {
-                        "--card-scale": scale,
-                        "--card-w": `${CARD_W}px`,
-                        "--card-h": `${CARD_H}px`,
-                        "--card-gap": `${CARD_GAP}px`,
-                        pointerEvents: uiLocked ? "none" : "auto",
-                        opacity: uiLocked ? 0.7 : 1,
-                      } as React.CSSProperties
-                    }
-                  >
-                    {draftSequence.map((tok, i) =>
-                      tok.startsWith(prefix) ? (
-                        <div
-                          key={i}
-                          className={[
-                            "draft-card",
-                            tok === "BB" || tok === "RR" ? "ban" : "",
-                            prefix === "B" ? "blue" : "red",
-                            i === currentTurn && !draftComplete ? "active" : "",
-                          ].join(" ")}
-                          style={{
-                            zIndex: 10,
-                            pointerEvents:
-                              draftComplete && locked ? "none" : "auto",
-                            opacity: draftComplete && locked ? 0.8 : 1,
-                            position: "relative",
-                          }}
-                          onClick={(e) => {
-                            if (uiLocked) return;
-                            const isBan = tok === "BB" || tok === "RR";
-                            if (isBan) return;
-                            if (draftComplete && locked) return;
-                            if (isPlayer && prefix !== playerSide) return;
-
-                            if (
-                              eidolonOpenIndex === i ||
-                              phaseOpenIndex === i
-                            ) {
-                              e.stopPropagation();
-                              return;
-                            }
-                            if (draftPicks[i]?.character) openLcModal(i);
-                          }}
-                        >
-                          {/* Lock badge */}
-                          {draftComplete && locked && (
-                            <div
-                              title="Draft locked"
-                              style={{
-                                position: "absolute",
-                                top: 6,
-                                left: 6,
-                                fontSize: 16,
-                                opacity: 0.9,
-                              }}
-                            >
-                              🔒
-                            </div>
-                          )}
-
-                          {/* Ribbon (only when empty & ban slot) */}
-                          {(() => {
-                            const isBan = tok === "BB" || tok === "RR";
-                            const showRibbon = !draftPicks[i] && isBan;
-                            if (!showRibbon) return null;
-                            return <div className="ribbon ban">BAN</div>;
-                          })()}
-
-                          {draftPicks[i] ? (
+              return (
+                <div className="w-100 text-center" key={prefix}>
+                  <div className="team-header">
+                    <div className="team-title" style={{ color }}>
+                      <span
+                        className="team-dot"
+                        style={{ backgroundColor: color }}
+                      />
+                      {name}
+                      {draftComplete && (
+                        <>
+                          {locked ? (
                             <>
-                              {/* Character image */}
-                              <img
-                                src={draftPicks[i]!.character.image_url}
-                                alt={draftPicks[i]!.character.name}
-                                className="draft-img"
-                                style={{
-                                  filter:
-                                    tok === "BB" || tok === "RR"
-                                      ? "grayscale(100%) brightness(0.5)"
-                                      : "none",
-                                }}
-                              />
+                              <span
+                                className="badge bg-secondary ms-2"
+                                title="Draft locked"
+                              >
+                                🔒 Locked
+                              </span>
+                              {!isPlayer && (
+                                <button
+                                  className="btn back-button-glass ms-2"
+                                  onClick={() => toggleSideLock(prefix, false)}
+                                  title="Unlock this team's draft"
+                                >
+                                  🔓 Unlock
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {!isPlayer && (
+                                <button
+                                  className="btn back-button-glass ms-2"
+                                  onClick={() => toggleSideLock(prefix, true)}
+                                  title="Lock this team's draft"
+                                >
+                                  🔒 Lock
+                                </button>
+                              )}
+                              {isPlayer && playerSide === prefix && (
+                                <button
+                                  className="btn back-button-glass ms-2"
+                                  onClick={() => toggleSideLock(prefix, true)}
+                                  title="Lock your draft"
+                                >
+                                  🔒 Lock
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
 
-                              {/* Light Cone badge */}
-                              {draftPicks[i]?.lightcone && (
+                    {/* RIGHT SIDE: cost + timer */}
+                    <div
+                      className="d-flex align-items-center"
+                      style={{ gap: 10 }}
+                    >
+                      {timerEnabled &&
+                        (isOwner ? (
+                          // Owner: clickable pause/resume
+                          <button
+                            type="button"
+                            className="btn btn-sm back-button-glass"
+                            onClick={() => togglePause(prefix)}
+                            title={
+                              paused[prefix] ? "Resume timer" : "Pause timer"
+                            }
+                            style={{
+                              opacity:
+                                activeSide === prefix &&
+                                !paused[prefix] &&
+                                !draftComplete
+                                  ? 1
+                                  : 0.8,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {paused[prefix] ? "⏸" : "⏱"}{" "}
+                            {fmtClock(displayClocks.reserve[prefix])}
+                            {timerPenCount[prefix] > 0 && (
+                              <span
+                                className="badge bg-danger ms-2"
+                                title="Timer penalties this draft"
+                              >
+                                ×{timerPenCount[prefix]}
+                              </span>
+                            )}
+                            {activeSide === prefix &&
+                              !draftComplete &&
+                              !isFirstTurnBan && (
+                                <span className="ms-2 text-white-50">
+                                  (+{fmtClock(displayClocks.grace)})
+                                </span>
+                              )}
+                            {paused[prefix] && (
+                              <span className="badge bg-warning ms-2">
+                                Paused
+                              </span>
+                            )}
+                          </button>
+                        ) : (
+                          // Player: read-only when enabled
+                          <div
+                            className="btn btn-sm back-button-glass disabled"
+                            style={{ pointerEvents: "none" }}
+                          >
+                            {paused[prefix] ? "⏸" : "⏱"}{" "}
+                            {fmtClock(displayClocks.reserve[prefix])}
+                            {timerPenCount[prefix] > 0 && (
+                              <span
+                                className="badge bg-danger ms-2"
+                                title="Timer penalties this draft"
+                              >
+                                ×{timerPenCount[prefix]}
+                              </span>
+                            )}
+                            {activeSide === prefix &&
+                              !draftComplete &&
+                              !isFirstTurnBan && (
+                                <span className="ms-2 text-white-50">
+                                  (+{fmtClock(displayClocks.grace)})
+                                </span>
+                              )}
+                            {paused[prefix] && (
+                              <span className="badge bg-warning ms-2">
+                                Paused
+                              </span>
+                            )}
+                          </div>
+                        ))}
+
+                      <div className="team-cost">Cost: {cost.total}</div>
+                    </div>
+                  </div>
+
+                  <div ref={ref} className="draft-row-wrap">
+                    <div
+                      className="draft-row"
+                      style={
+                        {
+                          "--card-scale": scale,
+                          "--card-w": `${CARD_W}px`,
+                          "--card-h": `${CARD_H}px`,
+                          "--card-gap": `${CARD_GAP}px`,
+                          pointerEvents: uiLocked ? "none" : "auto",
+                          opacity: uiLocked ? 0.7 : 1,
+                        } as React.CSSProperties
+                      }
+                    >
+                      {draftSequence.map((tok, i) =>
+                        tok.startsWith(prefix) ? (
+                          <div
+                            key={i}
+                            className={[
+                              "draft-card",
+                              tok === "BB" || tok === "RR" ? "ban" : "",
+                              prefix === "B" ? "blue" : "red",
+                              i === currentTurn && !draftComplete
+                                ? "active"
+                                : "",
+                              useSmall ? "small" : "",
+                              slotIsAce(i) ? "ace" : "",
+                            ].join(" ")}
+                            style={{
+                              zIndex: 10,
+                              pointerEvents:
+                                draftComplete && locked ? "none" : "auto",
+                              opacity: draftComplete && locked ? 0.8 : 1,
+                              position: "relative",
+                            }}
+                            onClick={(e) => {
+                              if (uiLocked) return;
+                              const isBan = tok === "BB" || tok === "RR";
+                              if (isBan) return;
+                              if (draftComplete && locked) return;
+                              if (isPlayer && prefix !== playerSide) return;
+
+                              if (
+                                eidolonOpenIndex === i ||
+                                phaseOpenIndex === i
+                              ) {
+                                e.stopPropagation();
+                                return;
+                              }
+                              if (draftPicks[i]?.character) openLcModal(i);
+                            }}
+                          >
+                            {/* Lock badge */}
+                            {draftComplete && locked && (
+                              <div
+                                title="Draft locked"
+                                style={{
+                                  position: "absolute",
+                                  top: 6,
+                                  left: 6,
+                                  fontSize: 16,
+                                  opacity: 0.9,
+                                }}
+                              >
+                                🔒
+                              </div>
+                            )}
+
+                            {/* Ribbon (only when empty & ban slot) */}
+                            {(() => {
+                              const isBan = tok === "BB" || tok === "RR";
+                              const isAceSlot = slotIsAce(i);
+                              const showRibbon =
+                                !draftPicks[i] && (isBan || isAceSlot);
+                              if (!showRibbon) return null;
+                              return (
+                                <div
+                                  className={`ribbon ${
+                                    isAceSlot ? "ace" : "ban"
+                                  }`}
+                                >
+                                  {isAceSlot ? "ACE" : "BAN"}
+                                </div>
+                              );
+                            })()}
+
+                            {draftPicks[i] ? (
+                              <>
+                                {/* Character image */}
                                 <img
-                                  src={draftPicks[i]!.lightcone!.image_url}
-                                  alt={draftPicks[i]!.lightcone!.name}
-                                  title={draftPicks[i]!.lightcone!.name}
-                                  className="engine-badge"
-                                  onClick={(e) => {
-                                    if (uiLocked) return;
-                                    if (draftComplete && locked) return;
-                                    if (isPlayer && prefix !== playerSide)
-                                      return;
-                                    e.stopPropagation();
-                                    openLcModal(i);
+                                  src={draftPicks[i]!.character.image_url}
+                                  alt={draftPicks[i]!.character.name}
+                                  className="draft-img"
+                                  style={{
+                                    filter:
+                                      tok === "BB" || tok === "RR"
+                                        ? "grayscale(100%) brightness(0.5)"
+                                        : "none",
                                   }}
                                 />
-                              )}
 
-                              {/* Eidolon slider */}
-                              {eidolonOpenIndex === i &&
-                                !uiLocked &&
-                                !(draftComplete && locked) && (
-                                  <div
-                                    className="slider-panel"
-                                    ref={(el) => {
-                                      eidolonRefs.current[i] = el;
+                                {/* Light Cone badge */}
+                                {draftPicks[i]?.lightcone && (
+                                  <img
+                                    src={draftPicks[i]!.lightcone!.image_url}
+                                    alt={draftPicks[i]!.lightcone!.name}
+                                    title={draftPicks[i]!.lightcone!.name}
+                                    className="engine-badge"
+                                    onClick={(e) => {
+                                      if (uiLocked) return;
+                                      if (draftComplete && locked) return;
+                                      if (isPlayer && prefix !== playerSide)
+                                        return;
+                                      e.stopPropagation();
+                                      openLcModal(i);
                                     }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                  >
-                                    <div className="slider-label">Eidolon</div>
-                                    <input
-                                      type="range"
-                                      min={0}
-                                      max={6}
-                                      className="big-slider"
-                                      value={draftPicks[i]!.eidolon}
-                                      onChange={(e) =>
-                                        updateEidolon(
-                                          i,
-                                          parseInt(
-                                            (e.target as HTMLInputElement).value
-                                          )
-                                        )
-                                      }
-                                    />
-                                    <div className="slider-ticks mt-1">
-                                      {[0, 1, 2, 3, 4, 5, 6].map((v) => (
-                                        <span
-                                          key={v}
-                                          className={
-                                            draftPicks[i]!.eidolon === v
-                                              ? "active"
-                                              : ""
-                                          }
-                                        >
-                                          {v}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
+                                  />
                                 )}
 
-                              {/* Phase slider */}
-                              {phaseOpenIndex === i &&
-                                !uiLocked &&
-                                !(draftComplete && locked) && (
-                                  <div
-                                    className="slider-panel"
-                                    ref={(el) => {
-                                      phaseRefs.current[i] = el;
-                                    }}
-                                    style={{ bottom: 70 }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                  >
-                                    <div className="slider-label">
-                                      Superimposition
-                                    </div>
-                                    <input
-                                      type="range"
-                                      min={1}
-                                      max={5}
-                                      className="big-slider"
-                                      value={draftPicks[i]!.phase}
-                                      onChange={(e) =>
-                                        updatePhase(
-                                          i,
-                                          parseInt(
-                                            (e.target as HTMLInputElement).value
-                                          )
-                                        )
-                                      }
-                                    />
-                                    <div className="slider-ticks mt-1">
-                                      {[1, 2, 3, 4, 5].map((v) => (
-                                        <span
-                                          key={v}
-                                          className={
-                                            draftPicks[i]!.phase === v
-                                              ? "active"
-                                              : ""
-                                          }
-                                        >
-                                          {v}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                              {/* Bottom info bar */}
-                              {(() => {
-                                const c = getSlotCost(draftPicks[i]);
-                                const name = draftPicks[i]!.character.name;
-                                const banSlot = tok === "BB" || tok === "RR";
-                                const hasLc = !!draftPicks[i]?.lightcone;
-                                return (
-                                  <div
-                                    className="info-bar"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <div className="char-name" title={name}>
-                                      {name}
-                                    </div>
-                                    {!banSlot && (
-                                      <div className="chip-row">
-                                        <span
-                                          className={`chip clickable chip-left ${
-                                            uiLocked ||
-                                            (draftComplete && locked)
-                                              ? "disabled"
-                                              : ""
-                                          }`}
-                                          title={
-                                            uiLocked ||
-                                            (draftComplete && locked)
-                                              ? "Locked"
-                                              : "Set Eidolon"
-                                          }
-                                          onClick={(e) => {
-                                            if (uiLocked) return;
-                                            if (draftComplete && locked) return;
-                                            if (
-                                              isPlayer &&
-                                              prefix !== playerSide
+                                {/* Eidolon slider */}
+                                {eidolonOpenIndex === i &&
+                                  !uiLocked &&
+                                  !(draftComplete && locked) && (
+                                    <div
+                                      className="slider-panel"
+                                      ref={(el) => {
+                                        eidolonRefs.current[i] = el;
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="slider-label">
+                                        Eidolon
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={6}
+                                        className="big-slider"
+                                        value={draftPicks[i]!.eidolon}
+                                        onChange={(e) =>
+                                          updateEidolon(
+                                            i,
+                                            parseInt(
+                                              (e.target as HTMLInputElement)
+                                                .value
                                             )
-                                              return;
-                                            e.stopPropagation();
-                                            setPhaseOpenIndex(null);
-                                            setEidolonOpenIndex(
-                                              eidolonOpenIndex === i ? null : i
-                                            );
-                                          }}
-                                        >
-                                          E{draftPicks[i]!.eidolon}
-                                        </span>
-
-                                        <span
-                                          className="chip cost chip-center"
-                                          title={`Char ${c.charCost} + LC ${c.lcCost}`}
-                                        >
-                                          {c.total}
-                                        </span>
-
-                                        {hasLc ? (
+                                          )
+                                        }
+                                      />
+                                      <div className="slider-ticks mt-1">
+                                        {[0, 1, 2, 3, 4, 5, 6].map((v) => (
                                           <span
-                                            className={`chip clickable chip-right ${
-                                              uiLocked ||
-                                              (draftComplete && locked)
-                                                ? "disabled"
+                                            key={v}
+                                            className={
+                                              draftPicks[i]!.eidolon === v
+                                                ? "active"
                                                 : ""
-                                            }`}
+                                            }
+                                          >
+                                            {v}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                {/* Phase slider */}
+                                {phaseOpenIndex === i &&
+                                  !uiLocked &&
+                                  !(draftComplete && locked) && (
+                                    <div
+                                      className="slider-panel"
+                                      ref={(el) => {
+                                        phaseRefs.current[i] = el;
+                                      }}
+                                      style={{ bottom: 70 }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="slider-label">
+                                        Superimposition
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min={1}
+                                        max={5}
+                                        className="big-slider"
+                                        value={draftPicks[i]!.phase}
+                                        onChange={(e) =>
+                                          updatePhase(
+                                            i,
+                                            parseInt(
+                                              (e.target as HTMLInputElement)
+                                                .value
+                                            )
+                                          )
+                                        }
+                                      />
+                                      <div className="slider-ticks mt-1">
+                                        {[1, 2, 3, 4, 5].map((v) => (
+                                          <span
+                                            key={v}
+                                            className={
+                                              draftPicks[i]!.phase === v
+                                                ? "active"
+                                                : ""
+                                            }
+                                          >
+                                            {v}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                {/* Cost + Info */}
+                                {(() => {
+                                  const costInfo = getSlotCost(draftPicks[i]);
+                                  const name = draftPicks[i]!.character.name;
+                                  const banSlot = tok === "BB" || tok === "RR";
+                                  const hasLc = !!draftPicks[i]?.lightcone;
+
+                                  return (
+                                    <>
+                                      {/* 3v3 ONLY: mini E/S beside the cost bubble */}
+                                      {useSmall && !banSlot && (
+                                        <div className="cost-stack">
+                                          <button
+                                            type="button"
+                                            className={[
+                                              "cost-btn",
+                                              uiLocked ||
+                                              (draftComplete && locked) ||
+                                              (isPlayer &&
+                                                prefix !== playerSide)
+                                                ? "disabled"
+                                                : "",
+                                            ].join(" ")}
                                             title={
                                               uiLocked ||
                                               (draftComplete && locked)
                                                 ? "Locked"
-                                                : "Set Superimposition"
+                                                : "Set Eidolon"
                                             }
                                             onClick={(e) => {
-                                              if (uiLocked) return;
-                                              if (draftComplete && locked)
+                                              if (
+                                                uiLocked ||
+                                                (draftComplete && locked)
+                                              )
                                                 return;
                                               if (
                                                 isPlayer &&
@@ -3270,38 +3455,187 @@ export default function CerydraDraftPage() {
                                               )
                                                 return;
                                               e.stopPropagation();
-                                              setEidolonOpenIndex(null);
-                                              setPhaseOpenIndex(
-                                                phaseOpenIndex === i ? null : i
+                                              setPhaseOpenIndex(null);
+                                              setEidolonOpenIndex(
+                                                eidolonOpenIndex === i
+                                                  ? null
+                                                  : i
                                               );
                                             }}
                                           >
-                                            S{draftPicks[i]!.phase}
-                                          </span>
-                                        ) : (
-                                          <span
-                                            className="chip-spacer"
-                                            aria-hidden="true"
-                                          />
+                                            E{draftPicks[i]!.eidolon}
+                                          </button>
+
+                                          {hasLc && (
+                                            <button
+                                              type="button"
+                                              className={[
+                                                "cost-btn",
+                                                uiLocked ||
+                                                (draftComplete && locked) ||
+                                                (isPlayer &&
+                                                  prefix !== playerSide)
+                                                  ? "disabled"
+                                                  : "",
+                                              ].join(" ")}
+                                              title={
+                                                uiLocked ||
+                                                (draftComplete && locked)
+                                                  ? "Locked"
+                                                  : "Set Superimposition"
+                                              }
+                                              onClick={(e) => {
+                                                if (
+                                                  uiLocked ||
+                                                  (draftComplete && locked)
+                                                )
+                                                  return;
+                                                if (
+                                                  isPlayer &&
+                                                  prefix !== playerSide
+                                                )
+                                                  return;
+                                                e.stopPropagation();
+                                                setEidolonOpenIndex(null);
+                                                setPhaseOpenIndex(
+                                                  phaseOpenIndex === i
+                                                    ? null
+                                                    : i
+                                                );
+                                              }}
+                                            >
+                                              S{draftPicks[i]!.phase}
+                                            </button>
+                                          )}
+
+                                          <div
+                                            className="cost-bubble"
+                                            title={`Char ${costInfo.charCost} + LC ${costInfo.lcCost}`}
+                                          >
+                                            {costInfo.total}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Bottom info bar */}
+                                      <div
+                                        className="info-bar"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {/* Hide the long name on small cards to avoid overlap */}
+                                        {!useSmall && (
+                                          <div
+                                            className="char-name"
+                                            title={name}
+                                          >
+                                            {name}
+                                          </div>
+                                        )}
+
+                                        {/* Normal (2v2) chip row */}
+                                        {!banSlot && !useSmall && (
+                                          <div className="chip-row">
+                                            <span
+                                              className={`chip clickable chip-left ${
+                                                uiLocked ||
+                                                (draftComplete && locked)
+                                                  ? "disabled"
+                                                  : ""
+                                              }`}
+                                              title={
+                                                uiLocked ||
+                                                (draftComplete && locked)
+                                                  ? "Locked"
+                                                  : "Set Eidolon"
+                                              }
+                                              onClick={(e) => {
+                                                if (uiLocked) return;
+                                                if (draftComplete && locked)
+                                                  return;
+                                                if (
+                                                  isPlayer &&
+                                                  prefix !== playerSide
+                                                )
+                                                  return;
+                                                e.stopPropagation();
+                                                setPhaseOpenIndex(null);
+                                                setEidolonOpenIndex(
+                                                  eidolonOpenIndex === i
+                                                    ? null
+                                                    : i
+                                                );
+                                              }}
+                                            >
+                                              E{draftPicks[i]!.eidolon}
+                                            </span>
+
+                                            <span
+                                              className="chip cost chip-center"
+                                              title={`Char ${costInfo.charCost} + LC ${costInfo.lcCost}`}
+                                            >
+                                              {costInfo.total}
+                                            </span>
+
+                                            {hasLc ? (
+                                              <span
+                                                className={`chip clickable chip-right ${
+                                                  uiLocked ||
+                                                  (draftComplete && locked)
+                                                    ? "disabled"
+                                                    : ""
+                                                }`}
+                                                title={
+                                                  uiLocked ||
+                                                  (draftComplete && locked)
+                                                    ? "Locked"
+                                                    : "Set Superimposition"
+                                                }
+                                                onClick={(e) => {
+                                                  if (uiLocked) return;
+                                                  if (draftComplete && locked)
+                                                    return;
+                                                  if (
+                                                    isPlayer &&
+                                                    prefix !== playerSide
+                                                  )
+                                                    return;
+                                                  e.stopPropagation();
+                                                  setEidolonOpenIndex(null);
+                                                  setPhaseOpenIndex(
+                                                    phaseOpenIndex === i
+                                                      ? null
+                                                      : i
+                                                  );
+                                                }}
+                                              >
+                                                S{draftPicks[i]!.phase}
+                                              </span>
+                                            ) : (
+                                              <span
+                                                className="chip-spacer"
+                                                aria-hidden="true"
+                                              />
+                                            )}
+                                          </div>
                                         )}
                                       </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
-                            </>
-                          ) : (
-                            <div className="d-flex w-100 h-100 align-items-center justify-content-center text-white-50">
-                              #{i + 1}
-                            </div>
-                          )}
-                        </div>
-                      ) : null
-                    )}
+                                    </>
+                                  );
+                                })()}
+                              </>
+                            ) : (
+                              <div className="d-flex w-100 h-100 align-items-center justify-content-center text-white-50">
+                                #{i + 1}
+                              </div>
+                            )}
+                          </div>
+                        ) : null
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ));
+              );
+            });
           })()}
         </div>
 
@@ -3386,7 +3720,7 @@ export default function CerydraDraftPage() {
               if (draftComplete) return true;
               if (playerSide !== lastSide) return true;
               if (sideLocked(playerSide)) return true;
-              return false;
+              return actionBusy;
             })()}
             title={(() => {
               if (currentTurn === 0) return "Nothing to undo";
@@ -3424,8 +3758,11 @@ export default function CerydraDraftPage() {
               className="character-pool-scroll"
               style={{
                 pointerEvents:
-                  uiLocked || (isPlayer && !isMyTurn) ? "none" : "auto",
-                opacity: uiLocked || (isPlayer && !isMyTurn) ? 0.6 : 1,
+                  uiLocked || (isPlayer && (!isMyTurn || actionBusy))
+                    ? "none"
+                    : "auto",
+                opacity:
+                  uiLocked || (isPlayer && (!isMyTurn || actionBusy)) ? 0.6 : 1,
               }}
             >
               <div className="character-pool-grid upscaled">
@@ -3464,6 +3801,7 @@ export default function CerydraDraftPage() {
                     const isBanned = effectiveBanned.has(char.code);
                     const isBanSlot =
                       currentStep === "BB" || currentStep === "RR";
+                    const isAcePickStep = tokenIsAce(currentStep);
 
                     let isDisabled =
                       uiLocked ||
@@ -3472,11 +3810,10 @@ export default function CerydraDraftPage() {
 
                     if (!isDisabled) {
                       if (featuredGlobalPick.has(char.code)) {
-                        // each team can take once
                         if (pickedByMe) isDisabled = true;
                       } else {
-                        // unique globally
-                        if (pickedByMe || pickedByOpp) isDisabled = true;
+                        if (pickedByMe) isDisabled = true;
+                        if (!isAcePickStep && pickedByOpp) isDisabled = true; // opponent’s copy allowed on ACE
                       }
                     }
 
@@ -3623,7 +3960,7 @@ export default function CerydraDraftPage() {
                       </div>
 
                       <div className="score-draft">
-                        Cycle penalty: {penaltyCycles} (÷ {cycleBreakpoint})
+                        Cycle penalty: {penaltyCycles}
                         {!includeCycle && (
                           <span className="text-white-50 ms-2">
                             (not applied)

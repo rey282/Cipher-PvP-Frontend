@@ -608,6 +608,23 @@ export default function ZzzDraftPage() {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  // Live currentTurn so handlers don't read stale closure values
+  const currentTurnRef = useRef(currentTurn);
+  useEffect(() => {
+    currentTurnRef.current = currentTurn;
+  }, [currentTurn]);
+
+  // Simple busy flag to block super-fast double clicks on picks/bans
+  const [actionBusy, setActionBusy] = useState(false);
+  const actionBusyRef = useRef(false);
+  const setBusy = (v: boolean) => {
+    actionBusyRef.current = v;
+    setActionBusy(v);
+  };
+
+  // Track the turn we expect after an optimistic action
+  const pendingAckTurnRef = useRef<number | null>(null);
+
   function buildNameLabels(rawList: string[], count: number): string[] {
     const primary = rawList.find(Boolean) || "";
     return Array(count)
@@ -1130,6 +1147,13 @@ export default function ZzzDraftPage() {
       setBlueLocked(mapped.blueLocked);
       setRedLocked(mapped.redLocked);
       setHydrated(true);
+      if (
+        pendingAckTurnRef.current != null &&
+        mapped.currentTurn >= pendingAckTurnRef.current
+      ) {
+        pendingAckTurnRef.current = null;
+        setBusy(false);
+      }
 
       if (
         !Array.isArray(payload?.featured) &&
@@ -1225,7 +1249,6 @@ export default function ZzzDraftPage() {
             if (incoming !== penaltyRef.current) setPenaltyPerPoint(incoming);
           }
         }
-
 
         if (
           data?.costProfile &&
@@ -1446,9 +1469,21 @@ export default function ZzzDraftPage() {
     });
 
     setDraftPicks(mappedPicks);
-    setCurrentTurn(
-      Math.max(0, Math.min(pending.draftSequence.length, pending.currentTurn))
+    const appliedTurn = Math.max(
+      0,
+      Math.min(pending.draftSequence.length, pending.currentTurn)
     );
+    setCurrentTurn(appliedTurn);
+
+    // Clear busy if hydration already reached/advanced the expected turn
+    if (
+      pendingAckTurnRef.current != null &&
+      appliedTurn >= pendingAckTurnRef.current
+    ) {
+      pendingAckTurnRef.current = null;
+      setBusy(false);
+    }
+
 
     if (Array.isArray(pending.blueScores) && pending.blueScores.length)
       setBlueScores(pending.blueScores);
@@ -1566,8 +1601,8 @@ export default function ZzzDraftPage() {
     if (isOwner) ownerOptimisticSave(0);
   }
 
-  async function postPlayerAction(action: any) {
-    if (!spectatorKey || !playerToken) return;
+  async function postPlayerAction(action: any): Promise<boolean> {
+    if (!spectatorKey || !playerToken) return false;
     try {
       const res = await fetch(
         `${
@@ -1583,11 +1618,15 @@ export default function ZzzDraftPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.warn("player action failed", res.status, err);
+        return false;
       }
+      return true;
     } catch (e) {
       console.warn("player action network error", e);
+      return false;
     }
   }
+
 
   useEffect(() => {
     // only warn for owner-ish flow (not player link joins)
@@ -1624,7 +1663,9 @@ export default function ZzzDraftPage() {
   const handleCharacterPick = (char: Character) => {
     if (uiLocked || draftComplete) return;
 
-    const currentStep = draftSequence[currentTurn];
+    // Use the live ref so rapid clicks don't read a stale turn
+    const turn = currentTurnRef.current;
+    const currentStep = draftSequence[turn];
     if (!currentStep) return;
 
     const mySideNow = currentStep.startsWith("B") ? "B" : "R";
@@ -1633,30 +1674,45 @@ export default function ZzzDraftPage() {
     // Cannot ban a global-pick
     if (isBanSlot && featuredGlobalPick.has(char.code)) return;
 
-    // Common validations (respect featured rules)
     if (effectiveBanned.has(char.code)) return;
 
-    // ───── Player flow ─────
+    // PLAYER flow
     if (isPlayer) {
+      // Block if not our turn or we're still waiting for the last pick to ack
       if (mySideNow !== playerSide) return;
+      if (actionBusyRef.current) return;
 
-      // 🟦 OPTIMISTIC local apply
+      // 🔒 enter busy mode until SSE advances to (turn + 1) or POST fails
+      setBusy(true);
+      pendingAckTurnRef.current = turn + 1;
+
+      // 🟦 OPTIMISTIC local apply using the turn we just read
       setDraftPicks((prev) => {
         const updated = [...prev];
-        updated[currentTurn] = { character: char, eidolon: 0, superimpose: 1 };
+        updated[turn] = { character: char, eidolon: 0, superimpose: 1 };
         return updated;
       });
-      setCurrentTurn((t) => t + 1);
+      setCurrentTurn((t) => t + 1); // state
+      currentTurnRef.current = turn + 1; // ref mirrors it immediately
       setKeyboardSearch("");
-      bumpIgnoreSse(currentTurn + 1, "ge");
+      bumpIgnoreSse(turn + 1, "ge"); // use the same turn value
+      setEidolonOpenIndex(null);
+      setSuperOpenIndex(null);
 
-      // Persist to server (ban vs pick)
+      // Persist to server with the exact index we used locally
       postPlayerAction({
         op: isBanSlot ? "ban" : "pick",
         side: playerSide,
-        index: currentTurn,
+        index: turn,
         characterCode: char.code,
+      }).then((ok) => {
+        if (!ok) {
+          // Drop busy so the player can try again; SSE will resync the board
+          setBusy(false);
+          pendingAckTurnRef.current = null;
+        }
       });
+
       return;
     }
 
@@ -1699,52 +1755,71 @@ export default function ZzzDraftPage() {
   };
 
   const handleUndo = () => {
-    if (currentTurn === 0) return;
+    // Use the live ref for players to avoid races; normal state for owner.
+    const turnNow = isPlayer ? currentTurnRef.current : currentTurn;
+    if (turnNow === 0) return;
 
-    const lastIdx = currentTurn - 1;
+    const lastIdx = turnNow - 1;
     const lastTok = draftSequence[lastIdx];
     const lastSide = sideOfToken(lastTok);
 
-    // OWNER flow
-    if (!isPlayer) {
-      // prevent undo if any side is locked or UI is locked
-      if (uiLocked || blueLocked || redLocked) return;
+    /* ───────────── Player undo ───────────── */
+    if (isPlayer) {
+      if (draftComplete) return;
+      if (playerSide !== lastSide) return; // only the side who moved last can undo
+      if (sideLocked(playerSide)) return; // respect post-draft locks
+      if (actionBusyRef.current) return; // prevent double-undo while awaiting ack
 
-      // optimistic revert
+      // Expect the server turn to move backward to lastIdx
+      pendingAckTurnRef.current = lastIdx;
+      setBusy(true);
+
+      // Optimistic local revert using the exact index we computed
       setDraftPicks((prev) => {
         const next = [...prev];
         next[lastIdx] = null;
         return next;
       });
       setCurrentTurn(lastIdx);
+      currentTurnRef.current = lastIdx; // keep ref in sync
+      setEidolonOpenIndex(null);
+      setSuperOpenIndex(null);
 
-      // stop SSE echo flicker, then persist
-      ownerOptimisticSave(0, lastIdx, "le");
+      // Ignore out-of-order SSE briefly; expect <= lastIdx
+      bumpIgnoreSse(lastIdx, "le");
+
+      // Tell server (include index for old/new compatibility)
+      postPlayerAction({
+        op: "undoLast",
+        side: playerSide,
+        index: lastIdx,
+      }).then((ok) => {
+        if (!ok) {
+          // Let the user try again; SSE/GET will resync anyway
+          pendingAckTurnRef.current = null;
+          setBusy(false);
+        }
+      });
       return;
     }
 
-    // PLAYER flow
-    // must be my side’s last pick, not locked, and draft not complete
-    if (draftComplete) return;
-    if (playerSide !== lastSide) return;
-    if (sideLocked(playerSide)) return;
+    /* ───────────── Owner undo ───────────── */
+    if (uiLocked || blueLocked || redLocked) return; // respect locks
 
-    // optimistic revert
+    // Optimistic revert
     setDraftPicks((prev) => {
       const next = [...prev];
       next[lastIdx] = null;
       return next;
     });
     setCurrentTurn(lastIdx);
-    bumpIgnoreSse(currentTurn - 1, "le");
+    setEidolonOpenIndex(null);
+    setSuperOpenIndex(null);
 
-    // send undo to server (include index for compatibility)
-    postPlayerAction({
-      op: "undoLast",
-      side: playerSide,
-      index: lastIdx, // safe both for old (requires index) and new (ignores it)
-    });
+    // Save and temporarily ignore out-of-order SSE; expect the turn to move back
+    ownerOptimisticSave(0, lastIdx, "le");
   };
+
 
   const slotIsBan = (i: number) =>
     draftSequence[i] === "BB" || draftSequence[i] === "RR";
@@ -1786,7 +1861,6 @@ export default function ZzzDraftPage() {
     updated[index] = { ...updated[index]!, eidolon };
     setDraftPicks(updated);
     requestSave(250);
-    
 
     ownerOptimisticSave(150);
   };
@@ -2545,7 +2619,6 @@ export default function ZzzDraftPage() {
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
             <span aria-hidden="true">⚙️</span>
-            {!isOwner && <span className="text-white-50 ms-1"></span>}
           </button>
           <input
             type="text"
@@ -2621,8 +2694,11 @@ export default function ZzzDraftPage() {
               className="character-pool-scroll"
               style={{
                 pointerEvents:
-                  uiLocked || (isPlayer && !isMyTurn) ? "none" : "auto",
-                opacity: uiLocked || (isPlayer && !isMyTurn) ? 0.6 : 1,
+                  uiLocked || (isPlayer && (!isMyTurn || actionBusy))
+                    ? "none"
+                    : "auto",
+                opacity:
+                  uiLocked || (isPlayer && (!isMyTurn || actionBusy)) ? 0.6 : 1,
               }}
             >
               <div className="character-pool-grid upscaled">

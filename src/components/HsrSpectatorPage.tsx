@@ -77,8 +77,10 @@ type SpectatorState = {
   applyTimerPenaltyR?: boolean;
 };
 
+type HsrMode = "2ban" | "3ban" | "6ban";
+
 type SessionRow = {
-  mode: "2ban" | "3ban";
+  mode: "2ban" | "3ban" | "6ban";
   team1: string;
   team2: string;
   state: SpectatorState;
@@ -325,8 +327,11 @@ export default function HsrSpectatorPage() {
   const redRowRef = useRef<HTMLDivElement>(null);
 
   // Derived (safe defaults while loading)
-  const mode: "2ban" | "3ban" = session?.mode ?? "2ban";
-  const is3ban = mode === "3ban";
+  // AFTER
+  const mode: HsrMode = session?.mode ?? "2ban";
+  const is3ban = mode === "3ban"; 
+  const useSmall = mode === "3ban" || mode === "6ban"; 
+
   const state: SpectatorState | null = session?.state ?? null;
 
   const draftSequence = state?.draftSequence ?? [];
@@ -1130,6 +1135,7 @@ export default function HsrSpectatorPage() {
                             step === "BB" || step === "RR" ? "ban" : "",
                             prefix === "B" ? "blue" : "red",
                             i === currentTurn ? "active" : "",
+                            useSmall ? "small" : "",
                           ].join(" ")}
                           style={{ zIndex: 10 }}
                         >
@@ -1172,7 +1178,6 @@ export default function HsrSpectatorPage() {
                               ? lcById.get(String(p.lightconeId))
                               : undefined;
                             const isBanSlot = step === "BB" || step === "RR";
-
                             const { charCost, lcCost, total } = getSlotCost(p);
 
                             return (
@@ -1205,16 +1210,43 @@ export default function HsrSpectatorPage() {
                                   />
                                 )}
 
+                                {/* 3v3 ONLY: mini E/S + cost bubble */}
+                                {useSmall && !isBanSlot && (
+                                  <div className="cost-stack">
+                                    <span className="cost-btn" title="Eidolon">
+                                      E{p.eidolon}
+                                    </span>
+                                    {lc && (
+                                      <span
+                                        className="cost-btn"
+                                        title="Superimpose"
+                                      >
+                                        S{p.superimpose}
+                                      </span>
+                                    )}
+                                    <div
+                                      className="cost-bubble"
+                                      title={`Char ${charCost} + LC ${lcCost}`}
+                                    >
+                                      {total}
+                                    </div>
+                                  </div>
+                                )}
+
                                 {/* Bottom info (read-only) */}
                                 <div className="info-bar">
-                                  <div
-                                    className="char-name"
-                                    title={char?.name || ""}
-                                  >
-                                    {char?.name || ""}
-                                  </div>
+                                  {/* hide long name on small cards so it doesn't clash */}
+                                  {!useSmall && (
+                                    <div
+                                      className="char-name"
+                                      title={char?.name || ""}
+                                    >
+                                      {char?.name || ""}
+                                    </div>
+                                  )}
 
-                                  {!isBanSlot && (
+                                  {/* show the big chip row only on 2v2 */}
+                                  {!isBanSlot && !useSmall && (
                                     <div className="chip-row">
                                       <span
                                         className="chip chip-left"
@@ -1472,7 +1504,7 @@ export default function HsrSpectatorPage() {
                     </div>
 
                     <div className="score-draft">
-                      Cycle penalty: {penaltyCycles} (÷ {cycleBreakpoint})
+                      Cycle penalty: {penaltyCycles}
                     </div>
                   </div>
 
@@ -1547,11 +1579,11 @@ export default function HsrSpectatorPage() {
                 (extraPenaltyR || 0) +
                 redTimerAdd;
 
-              if (blueAdj > redAdj)
+              if (blueAdj < redAdj)
                 return (
                   <h4 style={{ color: "#3388ff" }}>🏆 {team1Name} Wins!</h4>
                 );
-              if (redAdj > blueAdj)
+              if (redAdj < blueAdj)
                 return (
                   <h4 style={{ color: "#cc3333" }}>🏆 {team2Name} Wins!</h4>
                 );

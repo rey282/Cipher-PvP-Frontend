@@ -1271,6 +1271,7 @@ body,
   color: #ffd54d;
 }
 
+
 /* Bottom info bar */
 .info-bar {
   position: absolute;
@@ -2409,4 +2410,93 @@ input[type="range"].big-slider {
     padding: 6px 10px;
     font-size: 12px;
   }
+}
+/* ===== 3v3 “small-card” UI only ===== */
+
+/* If some markup accidentally renders cost-stack, hide it unless .small */
+.draft-card:not(.small) .cost-stack {
+  display: none !important;
+}
+
+/* Keep the small stack anchored bottom-right */
+.draft-card.small .cost-stack {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 33;
+}
+
+/* Bubble inside the stack (not the global one) */
+.draft-card.small .cost-stack .cost-bubble {
+  position: static !important;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  pointer-events: none;
+}
+
+/* Mini E/S buttons */
+.draft-card.small .cost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .85);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
+  cursor: pointer;
+}
+
+.draft-card.small .cost-btn.disabled {
+  opacity: .45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Hide the long name on small cards to avoid overlap */
+.draft-card.small .char-name {
+  display: none;
+}
+
+/* Hide big chip row on small cards (we render the mini buttons instead) */
+.draft-card.small .chip-row {
+  display: none;
+}
+
+/* Ensure the bottom bar doesn't darken the cost stack */
+.draft-card.small .info-bar {
+  padding: 6px 8px;
+  mix-blend-mode: normal !important;
+  position: relative;
+  z-index: 30;
+  /* under cost-stack */
+}
+
+/* Smaller Light Cone badge for small cards */
+.draft-card.small .engine-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+  object-fit: cover;
+  z-index: 6;
 }

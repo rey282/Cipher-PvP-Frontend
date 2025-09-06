@@ -35,7 +35,27 @@ type Props = {
 
 const ENABLE_HSR_SESSIONS_CHECK = true;
 
-const THREE_BAN_DISABLED = true;
+const THREE_BAN_DISABLED = false;
+
+type HsrMode = "2ban" | "3ban" | "6ban";
+
+const MODE_LABEL: Record<HsrMode, string> = {
+  "2ban": "4 Ban",
+  "6ban": "6 Ban",
+  "3ban": "3v3",
+};
+
+const fmtMode = (m?: string) => (m ? MODE_LABEL[m as HsrMode] ?? m : "");
+
+
+const DEFAULT_TIMER: Record<HsrMode, number> = {
+  "2ban": 8,
+  "6ban": 8,
+  "3ban": 12,
+};
+const getDefaultMinutesForMode = (m: HsrMode) => DEFAULT_TIMER[m] ?? 8;
+
+
 
 type CostProfile = {
   id: string;
@@ -104,8 +124,9 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
 
     // ───── Draft modal / mode / players ─────
     const [showDraftModal, setShowDraftModal] = useState(false);
-    const [mode, setMode] = useState<"2ban" | "3ban">("2ban");
-    const modeRef = useRef<"2ban" | "3ban">("2ban");
+    const [mode, setMode] = useState<HsrMode>("2ban");
+    const modeRef = useRef<HsrMode>("2ban");
+
     const nPlayers = 2;
 
     const [team1Names, setTeam1Names] = useState<string[]>(
@@ -150,7 +171,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
     };
     // ───── Side Pick state/types ─────
     type StartCore = {
-      mode: "2ban" | "3ban";
+      mode: HsrMode;
       costProfileId: string | null;
       featured: Array<{
         kind: "character" | "lightcone";
@@ -181,13 +202,18 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
     const [enableTimer, setEnableTimer] = useState<boolean>(true);
 
     // keep this as a string so users can backspace/clear while typing
-    const [reserveMinutesStr, setReserveMinutesStr] = useState<string>("8");
+    const [reserveMinutesStr, setReserveMinutesStr] = useState<string>(() =>
+      String(getDefaultMinutesForMode(modeRef.current))
+    );
+
 
     // what we display in the pill (falls back to 8 if empty/invalid)
     const reserveMinutesDisplay = (() => {
       const v = parseInt(reserveMinutesStr, 10);
-      return Number.isFinite(v) && v >= 1 ? v : 8;
+      const def = getDefaultMinutesForMode(mode);
+      return Number.isFinite(v) && v >= 1 ? v : def;
     })();
+
 
     const showTimerPill = enableTimer;
 
@@ -1033,7 +1059,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
     // Owner unfinished session handling
     const [ownerOpen, setOwnerOpen] = useState<null | {
       key: string;
-      mode: "2ban" | "3ban";
+      mode: HsrMode;
       team1: string;
       team2: string;
     }>(null);
@@ -1093,10 +1119,15 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
           return;
         }
         setShowDraftModal(true);
-        const raw = (params.get("mode") as "2ban" | "3ban") || "2ban";
-        const m = THREE_BAN_DISABLED && raw === "3ban" ? "2ban" : raw;
+
+        const rawParam = params.get("mode")?.toLowerCase();
+        let raw: HsrMode =
+          rawParam === "3ban" || rawParam === "6ban" ? rawParam : "2ban";
+        const m: HsrMode = THREE_BAN_DISABLED && raw === "3ban" ? "2ban" : raw;
+
         setMode(m);
         modeRef.current = m;
+
         const len = nPlayers;
         const t1 = (params.get("team1") || "").split("|").filter(Boolean);
         const t2 = (params.get("team2") || "").split("|").filter(Boolean);
@@ -1104,6 +1135,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         setTeam2Names(ensureLen(t2, len));
       }
     }, [location.search, isMobile]);
+
 
     const clearLocalDraftKeys = () => {
       try {
@@ -1173,8 +1205,15 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
     );
 
     const reserveMinsForStart = enableTimer
-      ? Math.max(1, parseInt(reserveMinutesStr || "8", 10) || 8)
+      ? Math.max(
+          1,
+          parseInt(
+            reserveMinutesStr || String(getDefaultMinutesForMode(mode)),
+            10
+          ) || getDefaultMinutesForMode(mode)
+        )
       : 0;
+
 
     const handleStart = () => {
       if (ownerOpen) {
@@ -1326,25 +1365,62 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
               <div className="d-flex gap-3">
                 <Form.Check
                   inline
-                  label="2 ban"
+                  label="4 Ban"
                   name="mode"
                   type="radio"
                   checked={mode === "2ban"}
                   onChange={() => {
                     setMode("2ban");
+                    const prevDef = getDefaultMinutesForMode(modeRef.current);
                     modeRef.current = "2ban";
+                    const nextDef = getDefaultMinutesForMode("2ban"); // 8
+                    if (
+                      reserveMinutesStr.trim() === "" ||
+                      reserveMinutesStr === String(prevDef)
+                    ) {
+                      setReserveMinutesStr(String(nextDef));
+                    }
                   }}
                 />
+
                 <Form.Check
                   inline
-                  label="3 ban"
+                  label="6 Ban"
+                  name="mode"
+                  type="radio"
+                  checked={mode === "6ban"}
+                  onChange={() => {
+                    setMode("6ban");
+                    const prevDef = getDefaultMinutesForMode(modeRef.current);
+                    modeRef.current = "6ban";
+                    const nextDef = getDefaultMinutesForMode("6ban"); // 8 by default
+                    if (
+                      reserveMinutesStr.trim() === "" ||
+                      reserveMinutesStr === String(prevDef)
+                    ) {
+                      setReserveMinutesStr(String(nextDef));
+                    }
+                  }}
+                />
+
+                <Form.Check
+                  inline
+                  label="3v3"
                   name="mode"
                   type="radio"
                   checked={mode === "3ban"}
                   onChange={() => {
                     if (!THREE_BAN_DISABLED) {
                       setMode("3ban");
+                      const prevDef = getDefaultMinutesForMode(modeRef.current);
                       modeRef.current = "3ban";
+                      const nextDef = getDefaultMinutesForMode("3ban"); // 12
+                      if (
+                        reserveMinutesStr.trim() === "" ||
+                        reserveMinutesStr === String(prevDef)
+                      ) {
+                        setReserveMinutesStr(String(nextDef));
+                      }
                     }
                   }}
                   disabled={THREE_BAN_DISABLED}
@@ -1497,7 +1573,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                           pattern="\d*"
                           className="form-control"
                           style={{ maxWidth: 140 }}
-                          placeholder="8"
+                          placeholder={String(getDefaultMinutesForMode(mode))}
                           disabled={!enableTimer}
                           value={reserveMinutesStr}
                           onChange={(e) => {
@@ -1511,10 +1587,12 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                           onBlur={() => {
                             // clamp to >=1 if provided; keep empty allowed (Start uses default 8)
                             if (reserveMinutesStr !== "") {
+                              const def = getDefaultMinutesForMode(mode);
                               const n = Math.max(
                                 1,
-                                parseInt(reserveMinutesStr || "8", 10)
+                                parseInt(reserveMinutesStr || String(def), 10)
                               );
+
                               setReserveMinutesStr(String(n));
                             }
                           }}
@@ -1522,8 +1600,8 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                         <span className="text-white-50 small">min</span>
                       </div>
                       <small className="text-white-50">
-                        Default: 8 minutes per team. Disable timer to play
-                        without clocks.
+                        Default: {getDefaultMinutesForMode(mode)} minutes per
+                        team. Disable timer to play without clocks.
                       </small>
                     </div>
                   </div>
@@ -2887,8 +2965,8 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                               {m.team2}
                             </div>
                             <div className="small text-white-50">
-                              Mode: {m.mode?.toUpperCase?.() || m.mode} • Last
-                              activity: {fmtWhen(m.lastActivityAt)}
+                              Mode: {fmtMode(m.mode)} • Last activity:{" "}
+                              {fmtWhen(m.lastActivityAt)}
                             </div>
                           </div>
                           <span className="badge bg-danger">LIVE</span>
@@ -2921,8 +2999,8 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                               {m.team2}
                             </div>
                             <div className="small text-white-50">
-                              Mode: {m.mode?.toUpperCase?.() || m.mode} •
-                              Completed: {fmtWhen(m.completedAt)}
+                              Mode: {fmtMode(m.mode)} • Completed:{" "}
+                              {fmtWhen(m.completedAt)}
                             </div>
                           </div>
                           <span className="badge bg-success">Done</span>
@@ -3012,7 +3090,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                 {ownerOpen?.team2}
               </div>
               <div className="small text-white-50">
-                Mode: {ownerOpen?.mode?.toUpperCase?.()}
+                Mode: {fmtMode(ownerOpen?.mode)}
               </div>
             </div>
             <div className="text-white-50">
@@ -3067,7 +3145,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                 {ownerOpen?.team2}
               </div>
               <div className="small text-white-50">
-                Mode: {ownerOpen?.mode.toUpperCase()}
+                Mode: {fmtMode(ownerOpen?.mode)}
               </div>
             </div>
             <p className="text-white-50 mb-0">
