@@ -24,6 +24,7 @@ type LightCone = {
   rarity: number; // 5★ / 4★
   image_url: string;
   limited: boolean;
+  signatureForNames?: string[];
 };
 
 type DraftPick = {
@@ -1255,8 +1256,6 @@ export default function CerydraDraftPage() {
     };
   };
 
-  
-
   /* ───────────── Timers (reserve + per-move grace) ───────────── */
   const MOVE_GRACE = 30; // seconds before reserve burns
 
@@ -2230,6 +2229,26 @@ export default function CerydraDraftPage() {
   const blueScale = useRowScale(blueRowRef, blueCount);
   const redScale = useRowScale(redRowRef, redCount);
 
+  // Accent/spacing tolerant search
+  const norm = (s: string = "") =>
+    s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "") // strip accents
+      .replace(/[^a-z0-9]+/g, " ") // collapse punctuation/extra spaces
+      .trim();
+
+  const matchesCharacterQuery = (char: Character, query: string) => {
+    if (!query) return true;
+    const safeSub =
+      char.subname && char.subname.toLowerCase() !== "null" ? char.subname : "";
+    const haystack = [char.name, safeSub].filter(Boolean).map(norm).join(" ");
+    const needles = norm(query).split(" ").filter(Boolean); // supports multi-word queries
+    return needles.every((t) => haystack.includes(t));
+  };
+
+  
+
   /* ───────────── Slot Cost (preset + featured overrides; fallback rules) ───────────── */
   function getSlotCost(pick: DraftPick | null | undefined) {
     if (!pick) return { charCost: 0, lcCost: 0, total: 0 };
@@ -2298,14 +2317,23 @@ export default function CerydraDraftPage() {
         if (!cRes.ok || !lcRes.ok)
           throw new Error("Failed to fetch HSR catalogs");
 
-        const chars: Character[] = (cJson?.data || []).map((c: any) => ({
-          code: c.code,
-          name: c.name,
-          subname: c.subname,
-          image_url: c.image_url,
-          rarity: Number(c.rarity) || 5,
-          limited: !!c.limited,
-        }));
+        const chars: Character[] = (cJson?.data || []).map((c: any) => {
+          const rawSub =
+            c.subname ?? c.sub_name ?? c.aka ?? c.alias ?? c.alt_name ?? null;
+          const subname =
+            typeof rawSub === "string" && rawSub.toLowerCase() !== "null"
+              ? rawSub
+              : "";
+          return {
+            code: c.code,
+            name: c.name,
+            subname,
+            image_url: c.image_url,
+            rarity: Number(c.rarity) || 5,
+            limited: !!c.limited,
+          };
+        });
+
         const lcs: LightCone[] = (lcJson?.cones || []).map((w: any) => ({
           id: String(w.id),
           name: w.name,
@@ -2313,6 +2341,9 @@ export default function CerydraDraftPage() {
           rarity: Number(w.rarity) || 5,
           limited: !!w.limited,
           image_url: w.imageUrl,
+          signatureForNames: Array.isArray(w.signatureForNames)
+            ? w.signatureForNames
+            : [],
         }));
 
         setCharacters(chars);
@@ -2436,7 +2467,6 @@ export default function CerydraDraftPage() {
     }
   }, [mode, isOwner, spectatorKey, hydrated]);
 
-
   async function postPlayerAction(action: any): Promise<boolean> {
     if (!spectatorKey || !playerToken) return false;
     try {
@@ -2485,12 +2515,22 @@ export default function CerydraDraftPage() {
   const sideLocked = (side: "B" | "R") =>
     side === "B" ? blueLocked : redLocked;
 
-  const isSignatureLC = (lc: LightCone, char: Character | undefined) => {
+  const isSignatureLC = (lc: any, char?: Character) => {
     if (!char) return false;
-    const lcSub = lc.subname?.toLowerCase() || "";
-    const charName = char.name.toLowerCase();
-    return lcSub === charName;
+    const candidates = [
+      lc.subname, // the usual “owner” name
+      ...(Array.isArray(lc.signatureForNames) ? lc.signatureForNames : []), // extra owners
+    ]
+      .filter(Boolean)
+      .map(norm);
+
+    const charNames = [char.name, (char as any).subname]
+      .filter(Boolean)
+      .map(norm);
+
+    return charNames.some((n) => candidates.includes(n));
   };
+
 
   const toggleSideLock = (side: "B" | "R", nextLocked: boolean) => {
     if (isPlayer) {
@@ -2888,15 +2928,6 @@ export default function CerydraDraftPage() {
     setDraftPicks(updated);
     ownerOptimisticSave(150);
   };
-
-  // Signature hint support for LC search ordering
-  const subnameToCharacterName = useMemo(() => {
-    const m = new Map<string, string>();
-    characters.forEach((c) => {
-      if (c.subname) m.set(c.subname.toLowerCase(), c.name);
-    });
-    return m;
-  }, [characters]);
 
   /* ───────────── Team Cost & penalties ───────────── */
   function getTeamCost(prefix: "B" | "R") {
@@ -3779,15 +3810,7 @@ export default function CerydraDraftPage() {
             >
               <div className="character-pool-grid upscaled">
                 {characters
-                  .filter((char) => {
-                    const q = keyboardSearch.toLowerCase();
-                    const name = char.name.toLowerCase();
-                    const sub =
-                      char.subname && char.subname.toLowerCase() !== "null"
-                        ? char.subname.toLowerCase()
-                        : "";
-                    return name.includes(q) || sub.includes(q);
-                  })
+                  .filter((char) => matchesCharacterQuery(char, keyboardSearch))
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((char) => {
                     const currentStep = draftSequence[currentTurn];
@@ -4194,60 +4217,63 @@ export default function CerydraDraftPage() {
                   None
                 </li>
                 {(() => {
-                  const searchLower = lcSearch.toLowerCase();
-                  const activeChar =
-                    activeSlotIndex !== null
-                      ? draftPicks[activeSlotIndex]?.character
+                  // Get the active character object safely
+                  const activePick =
+                    activeSlotIndex != null
+                      ? draftPicks[activeSlotIndex]
                       : undefined;
-                  const activeCharName = activeChar?.name?.toLowerCase();
-                  const activeCharSubname = activeChar?.subname?.toLowerCase();
 
-                  const filtered = lightcones.filter((w: LightCone) => {
-                    const name = w.name?.toLowerCase() || "";
-                    const sub = w.subname?.toLowerCase() || "";
-                    if (name.includes(searchLower) || sub.includes(searchLower))
-                      return true;
+                  // Prefer the embedded object; fall back to a lookup by code if present
+                  const activeChar =
+                    (activePick && (activePick as any).character) ||
+                    characters.find(
+                      (c) =>
+                        c.code === (activePick as any)?.characterCode ||
+                        c.code === (activePick as any)?.code
+                    );
 
-                    // signature hint: match character-name subname
-                    for (const [
-                      subn,
-                      charName,
-                    ] of subnameToCharacterName.entries()) {
-                      if (
-                        subn.includes(searchLower) &&
-                        (name.includes(charName.toLowerCase()) ||
-                          sub.includes(charName.toLowerCase()))
-                      ) {
-                        return true;
-                      }
-                    }
-                    return false;
+                  const q = norm(lcSearch); // your accent/spacing tolerant helper
+
+                  // Filter by name, subname, and signatureForNames (if available)
+                  const filtered = lightcones.filter((w: any) => {
+                    if (!q) return true;
+                    const haystack = [
+                      w.name,
+                      w.subname,
+                      ...(Array.isArray(w.signatureForNames)
+                        ? w.signatureForNames
+                        : []),
+                    ]
+                      .filter(Boolean)
+                      .map(norm)
+                      .join(" ");
+
+                    const terms = q.split(" ").filter(Boolean);
+                    return terms.every((t) => haystack.includes(t));
                   });
 
-                  // signature first
-                  filtered.sort((a: LightCone, b: LightCone) => {
-                    if (!activeCharName && !activeCharSubname) return 0;
-                    const aSub = a.subname?.toLowerCase() || "";
-                    const bSub = b.subname?.toLowerCase() || "";
-                    const aMatches =
-                      (activeCharName && aSub === activeCharName) ||
-                      (activeCharSubname && aSub === activeCharSubname);
-                    const bMatches =
-                      (activeCharName && bSub === activeCharName) ||
-                      (activeCharSubname && bSub === activeCharSubname);
-                    if (aMatches && !bMatches) return -1;
-                    if (!aMatches && bMatches) return 1;
-                    return 0;
+                  // Sort: signature for active char first, then rarity desc, then name
+                  filtered.sort((a: any, b: any) => {
+                    const aSig = isSignatureLC(a, activeChar);
+                    const bSig = isSignatureLC(b, activeChar);
+                    if (aSig && !bSig) return -1;
+                    if (!aSig && bSig) return 1;
+
+                    const ra = Number(a.rarity) || 0;
+                    const rb = Number(b.rarity) || 0;
+                    if (rb !== ra) return rb - ra;
+
+                    return String(a.name).localeCompare(String(b.name));
                   });
 
-                  return filtered.map((w: LightCone) => {
+                  return filtered.map((w: any) => {
                     const isSig = !!activeChar && isSignatureLC(w, activeChar);
                     const isBanned = lightconeGlobalBan.has(String(w.id));
                     return (
                       <li
                         key={w.id}
                         className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center
-                          ${selectedLcId === String(w.id) ? "active" : ""} ${
+          ${selectedLcId === String(w.id) ? "active" : ""} ${
                           isBanned ? "disabled" : ""
                         }`}
                         onClick={() => {
