@@ -31,6 +31,7 @@ interface LightCone {
   imageUrl: string;
   subname: string;
   rarity: string;
+  signatureForNames?: string[];
 }
 
 interface TeamMember {
@@ -68,6 +69,16 @@ export default function CostTestPage() {
 
   // Data
   const [charInfos, setCharInfos] = useState<CharacterInfo[]>([]);
+  // after setCharInfos state
+  const uniqueCharInfos = useMemo(() => {
+    const byCode = new Map<string, CharacterInfo>();
+    for (const c of charInfos) {
+      // keep the first seen; or swap to overwrite if you prefer “last wins”
+      if (!byCode.has(c.code)) byCode.set(c.code, c);
+    }
+    return Array.from(byCode.values());
+  }, [charInfos]);
+
   const [charCosts, setCharCosts] = useState<CharacterCost[]>([]);
   const [cones, setCones] = useState<LightCone[]>([]);
 
@@ -320,7 +331,7 @@ export default function CostTestPage() {
   }, [user?.id]);
 
   /* ───────────── Maps for fast lookups ───────────── */
-  // Cerydra
+
   const cerydraCharCostMap = useMemo(() => {
     const m = new Map<string, number[]>();
     for (const c of charCosts) m.set(c.id, c.costs);
@@ -1261,7 +1272,7 @@ export default function CostTestPage() {
                       justifyContent: "center",
                     }}
                   >
-                    {charInfos
+                    {uniqueCharInfos
                       .filter((c) => {
                         const q = search.toLowerCase();
                         return (

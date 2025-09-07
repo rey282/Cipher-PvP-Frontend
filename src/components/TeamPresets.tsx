@@ -24,6 +24,7 @@ interface LightCone {
   imageUrl: string;
   subname: string;
   rarity: string;
+  signatureForNames?: string[];
 }
 
 type PresetSlot = {
@@ -80,6 +81,16 @@ export default function TeamPresets() {
 
   // data (for cards + modal)
   const [charInfos, setCharInfos] = useState<CharacterInfo[]>([]);
+  // One row per code (guards against backend dupes)
+  const uniqueCharInfos = useMemo(() => {
+    const byCode = new Map<string, CharacterInfo>();
+    for (const c of charInfos) {
+      if (!byCode.has(c.code)) byCode.set(c.code, c); // “first wins”
+      // if you prefer “last wins”, just always set: byCode.set(c.code, c);
+    }
+    return Array.from(byCode.values());
+  }, [charInfos]);
+
   const [cones, setCones] = useState<LightCone[]>([]); // Cerydra cone costs
   const [search, setSearch] = useState("");
 
@@ -147,6 +158,24 @@ export default function TeamPresets() {
 
   useEffect(() => () => unlockBody(), []);
 
+  // Accent/spacing tolerant search
+  const norm = (s: string = "") =>
+    s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "") // strip accents
+      .replace(/[^a-z0-9]+/g, " ") // collapse punctuation/extra spaces
+      .trim();
+
+  const matchesCharacterQuery = (char: CharacterInfo, query: string) => {
+    if (!query) return true;
+    const safeSub =
+      char.subname && char.subname.toLowerCase() !== "null" ? char.subname : "";
+    const haystack = [char.name, safeSub].filter(Boolean).map(norm).join(" ");
+    const needles = norm(query).split(" ").filter(Boolean); // supports multi-word
+    return needles.every((t) => haystack.includes(t));
+  };
+
   /* ───────────── Fetch presets ───────────── */
   useEffect(() => {
     if (!user || !targetId) return;
@@ -165,8 +194,7 @@ export default function TeamPresets() {
         let j: any = null;
         try {
           j = await r.json();
-        } catch {
-        }
+        } catch {}
 
         if (!r.ok) {
           const msg =
@@ -375,7 +403,6 @@ export default function TeamPresets() {
     }
   };
 
-
   /* ───────────── Assign character / cone ───────────── */
   const assignCharacterToSlot = (char: CharacterInfo) => {
     // block duplicates
@@ -444,9 +471,18 @@ export default function TeamPresets() {
   // Resolve ids -> objects
   const charByCode = useMemo(() => {
     const m = new Map<string, CharacterInfo>();
-    for (const c of charInfos) m.set(c.code, c);
+    for (const c of uniqueCharInfos) m.set(c.code, c);
     return m;
-  }, [charInfos]);
+  }, [uniqueCharInfos]);
+
+  const subnameToCharacterName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of uniqueCharInfos) {
+      if (c.subname) m.set(c.subname.toLowerCase(), c.name);
+    }
+    return m;
+  }, [uniqueCharInfos]);
+
 
   const coneById = useMemo(() => {
     const m = new Map<string, LightCone>();
@@ -663,13 +699,6 @@ export default function TeamPresets() {
   };
 
   /* ───────────── Signature helpers (cone modal) ───────────── */
-  const subnameToCharacterName = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const c of charInfos) {
-      if (c.subname) m.set(c.subname.toLowerCase(), c.name);
-    }
-    return m;
-  }, [charInfos]);
 
   const isSignatureCone = (
     cone: LightCone,
@@ -1585,14 +1614,8 @@ export default function TeamPresets() {
                               gap: 6,
                             }}
                           >
-                            {charInfos
-                              .filter((c) => {
-                                const q = search.toLowerCase();
-                                return (
-                                  c.name.toLowerCase().includes(q) ||
-                                  c.subname?.toLowerCase().includes(q)
-                                );
-                              })
+                            {uniqueCharInfos
+                              .filter((c) => matchesCharacterQuery(c, search))
                               .sort((a, b) => a.name.localeCompare(b.name))
                               .map((char) => {
                                 const alreadyPicked = slotsState.some(
