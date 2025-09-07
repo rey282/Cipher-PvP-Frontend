@@ -2500,3 +2500,36 @@ input[type="range"].big-slider {
   object-fit: cover;
   z-index: 6;
 }
+/* Base styling for timers */
+.timer-pill {
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+/* Active timer: animate glow by team color */
+.timer-active {
+  animation: timerGlow 1s infinite alternate;
+}
+
+/* Blue vs Red border colors */
+.timer-active[data-team="blue"] {
+  border-color: #3b82f6;
+  /* blue-500 */
+  box-shadow: 0 0 10px #3b82f688;
+}
+
+.timer-active[data-team="red"] {
+  border-color: #ef4444;
+  /* red-500 */
+  box-shadow: 0 0 10px #ef444488;
+}
+
+@keyframes timerGlow {
+  from {
+    box-shadow: 0 0 4px currentColor, 0 0 8px currentColor;
+  }
+
+  to {
+    box-shadow: 0 0 12px currentColor, 0 0 20px currentColor;
+  }
+}

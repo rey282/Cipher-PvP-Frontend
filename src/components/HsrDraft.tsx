@@ -3125,7 +3125,13 @@ export default function CerydraDraftPage() {
                           // Owner: clickable pause/resume
                           <button
                             type="button"
-                            className="btn btn-sm back-button-glass"
+                            className={`btn btn-sm back-button-glass timer-pill ${
+                              activeSide === prefix &&
+                              !paused[prefix] &&
+                              !draftComplete
+                                ? "timer-active"
+                                : ""
+                            }`}
                             onClick={() => togglePause(prefix)}
                             title={
                               paused[prefix] ? "Resume timer" : "Pause timer"
@@ -3166,7 +3172,13 @@ export default function CerydraDraftPage() {
                         ) : (
                           // Player: read-only when enabled
                           <div
-                            className="btn btn-sm back-button-glass disabled"
+                            className={`btn btn-sm back-button-glass disabled timer-pill ${
+                              activeSide === prefix &&
+                              !paused[prefix] &&
+                              !draftComplete
+                                ? "timer-active"
+                                : ""
+                            }`}
                             style={{ pointerEvents: "none" }}
                           >
                             {paused[prefix] ? "⏸" : "⏱"}{" "}
