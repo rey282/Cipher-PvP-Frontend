@@ -1078,7 +1078,13 @@ export default function HsrSpectatorPage() {
                   >
                     {timerEnabled && (
                       <div
-                        className="btn btn-sm back-button-glass disabled"
+                        className={`btn btn-sm back-button-glass timer-pill ${
+                          activeSide === prefix &&
+                          !paused[prefix] &&
+                          !draftComplete
+                            ? "timer-active"
+                            : ""
+                        }`}
                         style={{ pointerEvents: "none" }}
                         title="Reserve time (read-only)"
                       >
