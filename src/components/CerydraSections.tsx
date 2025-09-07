@@ -127,14 +127,16 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
     const [mode, setMode] = useState<HsrMode>("2ban");
     const modeRef = useRef<HsrMode>("2ban");
 
-    const nPlayers = 2;
+    const MAX_PLAYERS = 3;
+    const nPlayers = mode === "3ban" ? 3 : 2;
 
     const [team1Names, setTeam1Names] = useState<string[]>(
-      Array(nPlayers).fill("")
+      Array(MAX_PLAYERS).fill("")
     );
     const [team2Names, setTeam2Names] = useState<string[]>(
-      Array(nPlayers).fill("")
+      Array(MAX_PLAYERS).fill("")
     );
+
     const [randomizeLocked, setRandomizeLocked] = useState(false);
     const [showResumeModal, setShowResumeModal] = useState(false);
 
@@ -1128,11 +1130,12 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         setMode(m);
         modeRef.current = m;
 
-        const len = nPlayers;
         const t1 = (params.get("team1") || "").split("|").filter(Boolean);
         const t2 = (params.get("team2") || "").split("|").filter(Boolean);
-        setTeam1Names(ensureLen(t1, len));
-        setTeam2Names(ensureLen(t2, len));
+        // keep 3 slots so switching modes doesn’t drop a name
+        setTeam1Names(ensureLen(t1, MAX_PLAYERS));
+        setTeam2Names(ensureLen(t2, MAX_PLAYERS));
+
       }
     }, [location.search, isMobile]);
 
@@ -1178,10 +1181,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
     const handleRandomizeFromFields = () => {
       if (randomizeLocked) return;
       const len = nPlayers;
-      const pool = [
-        ...ensureLen(team1Names, len),
-        ...ensureLen(team2Names, len),
-      ]
+      const pool = [...team1Names.slice(0, len), ...team2Names.slice(0, len)]
         .map((s) => (s ?? "").trim())
         .filter(Boolean);
       if (pool.length === 0) {
@@ -1195,8 +1195,16 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
       const next2 = Array(len)
         .fill("")
         .map((_, i) => shuf[i + len] ?? "");
-      setTeam1Names(next1);
-      setTeam2Names(next2);
+      setTeam1Names((prev) => {
+        const next = [...prev];
+        for (let i = 0; i < len; i++) next[i] = next1[i] ?? "";
+        return next;
+      });
+      setTeam2Names((prev) => {
+        const next = [...prev];
+        for (let i = 0; i < len; i++) next[i] = next2[i] ?? "";
+        return next;
+      });
       setRandomizeLocked(true);
     };
 
@@ -1706,9 +1714,11 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                         value={team1Names[i] ?? ""}
                         maxLength={40}
                         onChange={(e) => {
-                          const next = ensureLen(team1Names, nPlayers);
-                          next[i] = e.target.value ?? "";
-                          setTeam1Names(next);
+                          setTeam1Names((prev) => {
+                            const next = [...prev];
+                            next[i] = e.target.value ?? "";
+                            return next;
+                          });
                         }}
                         style={{
                           background: "rgba(0,0,0,0.35)",
@@ -1740,9 +1750,11 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                         value={team2Names[i] ?? ""}
                         maxLength={40}
                         onChange={(e) => {
-                          const next = ensureLen(team2Names, nPlayers);
-                          next[i] = e.target.value ?? "";
-                          setTeam2Names(next);
+                          setTeam2Names((prev) => {
+                            const next = [...prev];
+                            next[i] = e.target.value ?? "";
+                            return next;
+                          });
                         }}
                         style={{
                           background: "rgba(0,0,0,0.35)",

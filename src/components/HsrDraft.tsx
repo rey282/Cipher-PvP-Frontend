@@ -2764,9 +2764,8 @@ export default function CerydraDraftPage() {
 
     /* ───────────── Owner undo ───────────── */
     if (uiLocked || blueLocked || redLocked) return; // respect locks
-    if (draftComplete) return;
 
-    const lastIdx = currentTurn - 1;
+    const lastIdx = (isPlayer ? currentTurnRef.current : currentTurn) - 1;
 
     setDraftPicks((prev) => {
       const next = [...prev];
