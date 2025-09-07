@@ -1138,6 +1138,7 @@ export default function HsrSpectatorPage() {
                           key={i}
                           className={[
                             "draft-card",
+                            step.includes("ACE") ? "ace" : "",
                             step === "BB" || step === "RR" ? "ban" : "",
                             prefix === "B" ? "blue" : "red",
                             i === currentTurn ? "active" : "",
@@ -1164,9 +1165,18 @@ export default function HsrSpectatorPage() {
                           {(() => {
                             const p = state?.picks?.[i] ?? null;
                             const isBanSlot = step === "BB" || step === "RR";
+                            const isAceSlot = step.includes("ACE");
                             const showRibbon = !p && isBanSlot;
                             if (!showRibbon) return null;
-                            return <div className="ribbon ban">BAN</div>;
+                            return (
+                              <div
+                                className={`ribbon ${
+                                  isAceSlot ? "ace" : "ban"
+                                }`}
+                              >
+                                {isAceSlot ? "ACE" : "BAN"}
+                              </div>
+                            );
                           })()}
 
                           {(() => {
