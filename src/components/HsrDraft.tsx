@@ -2426,7 +2426,6 @@ export default function CerydraDraftPage() {
       setPaused({ B: !!pending.paused.B, R: !!pending.paused.R });
     }
 
-    // ⬇️ NEW: hydrate timer from pending.state for players too
     if (typeof pending.timerEnabled === "boolean") {
       setTimerEnabled(!!pending.timerEnabled);
     }

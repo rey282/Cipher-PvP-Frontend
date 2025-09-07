@@ -581,7 +581,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         [],
       ];
       rows.push(["Characters"]);
-      rows.push(["code", "name", "M0", "M1", "M2", "M3", "M4", "M5", "M6"]);
+      rows.push(["code", "name", "E0", "E1", "E2", "E3", "E4", "E5", "E6"]);
       Object.keys(charMeta)
         .sort((a, b) =>
           (charMeta[a]?.name || a).localeCompare(charMeta[b]?.name || b)
@@ -592,7 +592,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
 
       rows.push([]);
       rows.push(["Light Cones"]);
-      rows.push(["id", "name", "subname", "P1", "P2", "P3", "P4", "P5"]);
+      rows.push(["id", "name", "subname", "S1", "S2", "S3", "S4", "S5"]);
       Object.keys(lcMeta)
         .sort((a, b) =>
           (lcMeta[a]?.name || a).localeCompare(lcMeta[b]?.name || b)
@@ -657,7 +657,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         const isCharsHeader = (r: string[]) => {
           const hasName = findIndexCI(r, "name") !== -1;
           const hasCode = findIndexCI(r, "code") !== -1;
-          const ms = ["m0", "m1", "m2", "m3", "m4", "m5", "m6"].map((k) =>
+          const ms = ["e0", "e1", "e2", "e3", "e4", "e5", "e6"].map((k) =>
             findIndexCI(r, k)
           );
           return ms.every((i) => i !== -1) && (hasName || hasCode);
@@ -666,7 +666,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         const isLcHeader = (r: string[]) => {
           const hasName = findIndexCI(r, "name") !== -1;
           const hasId = findIndexCI(r, "id") !== -1;
-          const ps = ["p1", "p2", "p3", "p4", "p5"].map((k) =>
+          const ps = ["s1", "s2", "s3", "s4", "s5"].map((k) =>
             findIndexCI(r, k)
           );
           return ps.every((i) => i !== -1) && (hasName || hasId);
@@ -685,7 +685,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
           const r = rows[i];
           if (!r || r.length === 0) continue;
 
-          // Header key-value (optional)
+          // Header key-value
           if (/^name$/i.test(norm(r[0]))) {
             presetName = (norm(r[1]) || "Imported Preset").slice(0, 40);
             continue;
@@ -712,7 +712,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
             const hdr: CharHeaderIdx = {
               name: findIndexCI(r.map(norm), "name"),
               code: findIndexCI(r.map(norm), "code"),
-              m: ["m0", "m1", "m2", "m3", "m4", "m5", "m6"].map((k) =>
+              m: ["e0", "e1", "e2", "e3", "e4", "e5", "e6"].map((k) =>
                 findIndexCI(r.map(norm), k)
               ),
             };
@@ -727,7 +727,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
               name: findIndexCI(r.map(norm), "name"),
               subname: findIndexCI(r.map(norm), "subname"),
               id: findIndexCI(r.map(norm), "id"),
-              p: ["p1", "p2", "p3", "p4", "p5"].map((k) =>
+              p: ["s1", "s2", "s3", "s4", "s5"].map((k) =>
                 findIndexCI(r.map(norm), k)
               ),
             };
@@ -873,7 +873,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         ["VERSION", 2],
         [],
         ["Characters"],
-        ["code", "name", "M0", "M1", "M2", "M3", "M4", "M5", "M6"],
+        ["code", "name", "E0", "E1", "E2", "E3", "E4", "E5", "E6"],
       ];
       Object.keys(buildZeroCharMs())
         .sort((a, b) =>
@@ -887,7 +887,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
 
       rows.push([]);
       rows.push(["Light Cones"]);
-      rows.push(["id", "name", "subname", "P1", "P2", "P3", "P4", "P5"]);
+      rows.push(["id", "name", "subname", "S1", "S2", "S3", "S4", "S5"]);
 
       Object.keys(buildZeroLcPhase())
         .sort((a, b) =>
@@ -913,7 +913,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         ["VERSION", 2],
         [],
         ["Characters"],
-        ["code", "name", "M0", "M1", "M2", "M3", "M4", "M5", "M6"],
+        ["code", "name", "E0", "E1", "E2", "E3", "E4", "E5", "E6"],
       ];
       Object.keys(buildZeroCharMs())
         .sort((a, b) =>
@@ -927,7 +927,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
 
       rows.push([]);
       rows.push(["Light Cones"]);
-      rows.push(["id", "name", "subname", "P1", "P2", "P3", "P4", "P5"]);
+      rows.push(["id", "name", "subname", "S1", "S2", "S3", "S4", "S5"]);
 
       Object.keys(buildZeroLcPhase())
         .sort((a, b) =>
@@ -2238,13 +2238,18 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                         style={{
                           position: "sticky",
                           top: 0,
-                          background: "rgba(0,0,0,.4)",
+                          background: "rgba(0,0,0,0.5)",
+                          backdropFilter: "blur(6px)",
+                          WebkitBackdropFilter: "blur(6px)",
+                          fontWeight: 700,
+                          fontSize: "0.9rem",
+                          zIndex: 2,
                         }}
                       >
                         <tr>
                           <th style={{ minWidth: 220 }}>Light Cone</th>
                           {Array.from({ length: 5 }, (_, i) => (
-                            <th key={i}>P{i + 1}</th>
+                            <th key={i}>S{i + 1}</th>
                           ))}
                         </tr>
                       </thead>

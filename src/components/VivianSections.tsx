@@ -2047,7 +2047,12 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
                         style={{
                           position: "sticky",
                           top: 0,
-                          background: "rgba(0,0,0,.4)",
+                          background: "rgba(0,0,0,0.5)",
+                          backdropFilter: "blur(6px)",
+                          WebkitBackdropFilter: "blur(6px)",
+                          fontWeight: 700,
+                          fontSize: "0.9rem",
+                          zIndex: 2,
                         }}
                       >
                         <tr>
