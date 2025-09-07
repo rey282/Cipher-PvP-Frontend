@@ -2247,7 +2247,27 @@ export default function CerydraDraftPage() {
     return needles.every((t) => haystack.includes(t));
   };
 
-  
+  // Higher score = higher in the list
+  const signatureScore = (lc: any, char?: Character) => {
+    if (!char) return 0;
+
+    const lcSub = norm(lc.subname || "");
+    const charName = norm(char.name || "");
+    const charSub = norm(char.subname || "");
+    const extras = Array.isArray(lc.signatureForNames)
+      ? lc.signatureForNames.map(norm)
+      : [];
+
+    // Order of precedence:
+    // 4) LC subname matches character subname (primary)
+    // 3) LC subname matches character name
+    // 2) Extras include character subname or name (alt owners)
+    if (charSub && lcSub === charSub) return 4;
+    if (lcSub === charName) return 3;
+    if (charSub && extras.includes(charSub)) return 2;
+    if (extras.includes(charName)) return 2;
+    return 0;
+  };
 
   /* ───────────── Slot Cost (preset + featured overrides; fallback rules) ───────────── */
   function getSlotCost(pick: DraftPick | null | undefined) {
@@ -2530,7 +2550,6 @@ export default function CerydraDraftPage() {
 
     return charNames.some((n) => candidates.includes(n));
   };
-
 
   const toggleSideLock = (side: "B" | "R", nextLocked: boolean) => {
     if (isPlayer) {
@@ -4252,12 +4271,11 @@ export default function CerydraDraftPage() {
                     return terms.every((t) => haystack.includes(t));
                   });
 
-                  // Sort: signature for active char first, then rarity desc, then name
+                  // signature first (primary-by-subname at the very top), then rarity desc, then name
                   filtered.sort((a: any, b: any) => {
-                    const aSig = isSignatureLC(a, activeChar);
-                    const bSig = isSignatureLC(b, activeChar);
-                    if (aSig && !bSig) return -1;
-                    if (!aSig && bSig) return 1;
+                    const sa = signatureScore(a, activeChar);
+                    const sb = signatureScore(b, activeChar);
+                    if (sa !== sb) return sb - sa;
 
                     const ra = Number(a.rarity) || 0;
                     const rb = Number(b.rarity) || 0;
