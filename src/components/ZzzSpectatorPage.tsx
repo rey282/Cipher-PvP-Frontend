@@ -575,7 +575,7 @@ export default function ZzzSpectatorPage() {
       <div className="position-relative z-2 text-white px-4">
         <Navbar />
 
-        {/* Top-right stack: LIVE (if any) + Cost Preset */}
+        {/* Top-right stack: LIVE (if any) + Settings */}
         <div
           className="position-absolute"
           style={{ top: 70, right: 20, zIndex: 10 }}
@@ -594,6 +594,19 @@ export default function ZzzSpectatorPage() {
               </span>
             </div>
           )}
+
+          {/* Read-only settings button (mirrors HSR) */}
+          <div className="mb-3 w-100 d-flex justify-content-center">
+            <button
+              type="button"
+              className="btn btn-sm btn-glass"
+              title="View settings"
+              onClick={() => setShowSettings(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <span aria-hidden="true">⚙️</span>
+            </button>
+          </div>
         </div>
       </div>
 
