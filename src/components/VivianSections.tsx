@@ -129,6 +129,10 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
     const showLimitPill = Number(costLimit) !== defaultCostLimit;
     const showPenaltyPill = Number(penaltyPerPoint) !== 2500;
 
+    const [showSidePickModal, setShowSidePickModal] = useState(false);
+    const [pendingPayload, setPendingPayload] = useState<any>(null);
+
+
     const userTouchedCost = useRef(false);
     useEffect(() => {
       if (!userTouchedCost.current) setCostLimit(mode === "3v3" ? 9 : 6);
@@ -176,6 +180,11 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
 
     const [pickerTab, setPickerTab] = useState<"char" | "weng">("char");
     const [pickerQuery, setPickerQuery] = useState("");
+
+    const [sideWinner, setSideWinner] = useState<"team1" | "team2" | null>(
+      null
+    );
+
 
     const [charMeta, setCharMeta] = useState<
       Record<
@@ -1161,6 +1170,7 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
         );
         return;
       }
+
       const m = modeRef.current;
       const len = m === "3v3" ? 3 : 2;
 
@@ -1171,9 +1181,9 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
         toast.warn("Please enter at least one player name.");
         return;
       }
+
       const t1 = safe1.filter(Boolean).join("|");
       const t2 = safe2.filter(Boolean).join("|");
-      const [team1, team2] = Math.random() < 0.5 ? [t1, t2] : [t2, t1];
 
       const invalidFeatured = featuredList.some(
         (f) => f.rule === "none" && typeof f.customCost !== "number"
@@ -1185,8 +1195,8 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
       }
 
       const payload = {
-        team1,
-        team2,
+        team1: t1,
+        team2: t2,
         mode: m,
         costProfileId: selectedCostProfileId ?? null,
         featured: featuredList.map((f) => ({
@@ -1202,14 +1212,42 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
         penaltyPerPoint,
       };
 
+      setPendingPayload(payload);
+      // Randomly decide who won the side pick
+      setSideWinner(Math.random() < 0.5 ? "team1" : "team2");
+      setShowSidePickModal(true);
+
+    };
+    const finalizeSideChoice = (color: "blue" | "red") => {
+      if (!pendingPayload || !sideWinner) return;
+
       const draftId =
         (crypto as any).randomUUID?.() ??
         `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const winnerTeam = pendingPayload[sideWinner];
+      const loserTeam =
+        sideWinner === "team1" ? pendingPayload.team2 : pendingPayload.team1;
+
+      const finalPayload = {
+        ...pendingPayload,
+        team1: color === "blue" ? winnerTeam : loserTeam,
+        team2: color === "blue" ? loserTeam : winnerTeam,
+      };
+
       sessionStorage.setItem("zzzDraftId", draftId);
-      sessionStorage.setItem("zzzDraftInit", JSON.stringify(payload));
+      sessionStorage.setItem("zzzDraftInit", JSON.stringify(finalPayload));
       sessionStorage.removeItem("zzzSpectatorKey");
-      navigate("/zzz/draft", { state: { ...payload, draftId } });
+
+      navigate("/zzz/draft", { state: { ...finalPayload, draftId } });
+
+      setShowSidePickModal(false);
+      setPendingPayload(null);
+      setSideWinner(null);
     };
+
+
+
 
     // ───────────────────────────────
     // Expose a tiny control surface
@@ -2932,6 +2970,65 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
               disabled={deleting}
             >
               {deleting ? "Deleting…" : "Delete Draft"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* ───────────────── Side Pick Modal ───────────────── */}
+        <Modal
+          show={showSidePickModal}
+          onHide={() => {
+            setShowSidePickModal(false);
+            setPendingPayload(null);
+            setSideWinner(null);
+          }}
+          centered
+          contentClassName="custom-dark-modal"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Side Pick</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {pendingPayload ? (
+              <>
+                <div className="mb-2">
+                  <strong>
+                    {sideWinner === "team1"
+                      ? pendingPayload.team1
+                      : pendingPayload.team2}
+                  </strong>{" "}
+                  won the side pick.
+                </div>
+                <div className="text-white-50">
+                  Choose which side to start on:
+                </div>
+              </>
+            ) : (
+              <div className="text-white-50">Preparing…</div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              className="btn-glass btn-glass-secondary"
+              onClick={() => {
+                setShowSidePickModal(false);
+                setPendingPayload(null);
+                setSideWinner(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="btn-glass"
+              onClick={() => finalizeSideChoice("blue")}
+            >
+              Blue
+            </Button>
+            <Button
+              className="btn-glass btn-glass-warning"
+              onClick={() => finalizeSideChoice("red")}
+            >
+              Red
             </Button>
           </Modal.Footer>
         </Modal>
