@@ -31,7 +31,7 @@ const games = [
     id: "hsr2",
     name: "Cerydra PvP",
     bg: "/cerydra-bg.webp",
-    icon: "/cerydra-icon.jpg",
+    icon: "/cerydra-icon.webp",
     live: true,
     link: "/cerydra",
   },

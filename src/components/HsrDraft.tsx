@@ -4501,6 +4501,23 @@ export default function CerydraDraftPage() {
             <Modal.Title>Links</Modal.Title>
           </Modal.Header>
           <Modal.Body>
+            {/* NEW: Privacy notice */}
+            <div
+              className="alert alert-warning d-flex align-items-start"
+              role="alert"
+              style={{ fontWeight: 600 }}
+            >
+              <div style={{ fontSize: "1.1rem", marginRight: 8 }}>⚠️</div>
+              <div>
+                <div>Do not share these links publicly.</div>
+                <div className="fw-normal">
+                  Send each player link privately (DM) to exactly one drafter on
+                  that team. Anyone with the link can act as that team’s
+                  drafter.
+                </div>
+              </div>
+            </div>
+
             <div className="mb-3">
               <div className="fw-semibold mb-1">Spectator</div>
               <div className="d-flex gap-2">
@@ -4536,7 +4553,9 @@ export default function CerydraDraftPage() {
                   Copy
                 </Button>
               </div>
-              <small className="text-white-50">For blue team players.</small>
+              <small className="text-white-50">
+                DM this to exactly one Blue drafter. Do not post publicly.
+              </small>
             </div>
 
             <div className="mb-2">
@@ -4553,9 +4572,12 @@ export default function CerydraDraftPage() {
                   Copy
                 </Button>
               </div>
-              <small className="text-white-50">For red team players.</small>
+              <small className="text-white-50">
+                DM this to exactly one Red drafter. Do not post publicly.
+              </small>
             </div>
           </Modal.Body>
+
           <Modal.Footer>
             <Button
               variant="secondary"
