@@ -1,5 +1,5 @@
 // src/pages/BalancePage.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
@@ -80,6 +80,237 @@ export default function BalancePage() {
     return out;
   };
 
+  /* ───────── CSV helpers (Vivian-style) ───────── */
+  const importCsvInputRef = useRef<HTMLInputElement | null>(null);
+
+  const csvEscape = (s: string) =>
+    s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+
+  const downloadCsv = (filename: string, rows: (string | number)[][]) => {
+    const text = rows
+      .map((r) => r.map((v) => csvEscape(String(v ?? ""))).join(","))
+      .join("\n");
+    const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const parseCsv = (text: string): string[][] => {
+    const data = text.replace(/\r/g, "");
+    const lines = data.split("\n");
+    const first = lines.find((l) => l.trim().length > 0) || "";
+    let delim = ",";
+    if (first.includes(";") && !first.includes(",")) delim = ";";
+    else if (first.includes("\t")) delim = "\t";
+
+    const out: string[][] = [];
+    for (const raw of lines) {
+      if (raw.length === 0) {
+        out.push([]);
+        continue;
+      }
+      let row: string[] = [];
+      let cell = "";
+      let i = 0;
+      let inQuotes = false;
+
+      while (i < raw.length) {
+        const ch = raw[i];
+        if (ch === '"') {
+          if (inQuotes && raw[i + 1] === '"') {
+            cell += '"';
+            i += 2;
+            continue;
+          }
+          inQuotes = !inQuotes;
+          i++;
+          continue;
+        }
+        if (!inQuotes && ch === delim) {
+          row.push(cell.trim().replace(/^\uFEFF/, ""));
+          cell = "";
+          i++;
+          continue;
+        }
+        cell += ch;
+        i++;
+      }
+      row.push(cell.trim().replace(/^\uFEFF/, ""));
+      out.push(row);
+    }
+    return out;
+  };
+
+  const parseQuarter = (v: any): number => {
+    if (v == null) return 0;
+    let s = String(v).trim();
+    if (!s || s === "-" || s === "—") return 0;
+    s = s.replace(/[\s\u00A0\u2000-\u200B\u202F]/g, "");
+    const lastDot = s.lastIndexOf(".");
+    const lastComma = s.lastIndexOf(",");
+    if (lastComma > -1 && lastDot > -1) {
+      if (lastComma > lastDot) {
+        s = s.replace(/\./g, "").replace(",", ".");
+      } else {
+        s = s.replace(/,/g, "");
+      }
+    } else if (lastComma > -1 && lastDot === -1) {
+      s = s.replace(",", ".");
+    }
+    const num = Number(s);
+    if (!isFinite(num) || num < 0) return 0;
+    return Math.round(num * 4) / 4; // 0.25 steps
+  };
+
+  /* ───────── lookups over current sheet ───────── */
+  const nameToId = useMemo(() => {
+    const m = new Map<string, string>();
+    chars.forEach((c) => m.set(c.name.toLowerCase(), c.id));
+    return m;
+  }, [chars]);
+
+  const idSet = useMemo(() => new Set(chars.map((c) => c.id)), [chars]);
+
+  /* ───────── template / export / import ───────── */
+  const downloadTemplateCsv = () => {
+    const rows: (string | number)[][] = [
+      ["Characters"],
+      ["id", "name", "E0", "E1", "E2", "E3", "E4", "E5", "E6"],
+    ];
+    // include current list for convenience
+    chars
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((c) => rows.push([c.id, c.name, 0, 0, 0, 0, 0, 0, 0]));
+    downloadCsv("balance-template.csv", rows);
+    toast.success("Template CSV downloaded.");
+  };
+
+  const exportToCSV = () => {
+    const rows: (string | number)[][] = [
+      ["id", "name", "E0", "E1", "E2", "E3", "E4", "E5", "E6"],
+    ];
+    chars
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((c) => rows.push([c.id, c.name, ...c.costs]));
+    downloadCsv("balance_costs.csv", rows);
+    toast.success("Exported CSV.");
+  };
+
+  const handleImportCsv = async (ev: React.ChangeEvent<HTMLInputElement>) => {
+    const file = ev.target.files?.[0];
+    ev.target.value = "";
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (!rows.length) {
+        toast.error("Empty CSV.");
+        return;
+      }
+
+      // detect header
+      const norm = (s: any) =>
+        String(s ?? "")
+          .trim()
+          .replace(/^\uFEFF/, "");
+      const findIndexCI = (arr: string[], label: string) =>
+        arr.findIndex(
+          (h) => (h || "").trim().toLowerCase() === label.toLowerCase()
+        );
+
+      let hdrRow: string[] | null = null;
+      for (const r of rows) {
+        if (!r || r.length === 0) continue;
+        const lower = r.map((x) => norm(x).toLowerCase());
+        const hasName = findIndexCI(lower, "name") !== -1;
+        const hasId = findIndexCI(lower, "id") !== -1;
+        const es = ["e0", "e1", "e2", "e3", "e4", "e5", "e6"].map((k) =>
+          findIndexCI(lower, k)
+        );
+        if ((hasName || hasId) && es.every((i) => i !== -1)) {
+          hdrRow = r;
+          break;
+        }
+      }
+      if (!hdrRow) {
+        toast.error(
+          "No valid header found. Expected columns: id/name + E0..E6."
+        );
+        return;
+      }
+
+      const lowerHdr = hdrRow.map((x) => norm(x).toLowerCase());
+      const idxName = findIndexCI(lowerHdr, "name");
+      const idxId = findIndexCI(lowerHdr, "id");
+      const idxE = ["e0", "e1", "e2", "e3", "e4", "e5", "e6"].map((k) =>
+        findIndexCI(lowerHdr, k)
+      );
+
+      // start from zeros for overwrite semantics
+      const zeroed: CharacterCost[] = chars.map((c) => ({
+        ...c,
+        costs: [0, 0, 0, 0, 0, 0, 0],
+      }));
+
+      const nextById: Record<string, number[]> = {};
+      const unknowns: string[] = [];
+
+      let start = rows.indexOf(hdrRow) + 1;
+      for (let i = start; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r || r.length === 0) continue;
+        const idRaw = idxId >= 0 ? norm(r[idxId]) : "";
+        const nameRaw = idxName >= 0 ? norm(r[idxName]) : "";
+        let idMatch = "";
+
+        if (idRaw && idSet.has(idRaw)) {
+          idMatch = idRaw;
+        } else if (nameRaw) {
+          const guess = nameToId.get(nameRaw.toLowerCase());
+          if (guess) idMatch = guess;
+        }
+
+        if (!idMatch) {
+          const label = nameRaw || idRaw;
+          if (label) unknowns.push(`${label} @row ${i + 1}`);
+          continue;
+        }
+
+        const costs = idxE.map((ix) => parseQuarter(ix >= 0 ? r[ix] : 0));
+        nextById[idMatch] = costs;
+      }
+
+      const merged = zeroed.map((c) => ({
+        ...c,
+        costs: nextById[c.id] ?? c.costs,
+      }));
+
+      setChars(merged);
+      setSumm(compareCosts(originalChars, merged));
+
+      const notes: string[] = [];
+      notes.push(
+        `Updated ${Object.keys(nextById).length} character(s)${
+          unknowns.length ? ` • ${unknowns.length} not recognized` : ""
+        }`
+      );
+      if (unknowns.length && unknowns.length <= 5) {
+        notes.push(`Unknown: ${unknowns.join(", ")}`);
+      }
+      toast[unknowns.length ? "warn" : "success"](notes.join(" • "));
+    } catch (e) {
+      console.error(e);
+      toast.error("Could not read CSV file.");
+    }
+  };
+
   /* ───────── save ───────── */
   const handleSave = async () => {
     setSaving(true);
@@ -105,22 +336,6 @@ export default function BalancePage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  /* ───────── CSV export ───────── */
-  const exportToCSV = () => {
-    const headers = ["Character", "E0", "E1", "E2", "E3", "E4", "E5", "E6"];
-    const rows = chars.map((c) => [c.name, ...c.costs]);
-    const csv = [headers, ...rows]
-      .map((r) => r.map((v) => `"${v}"`).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "balance_costs.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
   };
 
   /* ───────── render ───────── */
@@ -157,6 +372,15 @@ export default function BalancePage() {
         }}
       />
 
+      {/* hidden input for CSV import */}
+      <input
+        ref={importCsvInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        style={{ display: "none" }}
+        onChange={handleImportCsv}
+      />
+
       {/* content */}
       <div
         className="position-relative z-2 text-white d-flex flex-column px-4"
@@ -179,19 +403,34 @@ export default function BalancePage() {
           >
             <div className="d-flex flex-column flex-md-row justify-content-between w-100 align-items-start align-items-md-center gap-2">
               <h2 className="fw-bold mb-0">Cipher Balance Cost</h2>
-              <div className="d-flex gap-2">
+              <div className="d-flex gap-2 flex-wrap">
+                <button
+                  className="back-button-glass btn btn-sm"
+                  onClick={downloadTemplateCsv}
+                  title="Download a template with all characters"
+                >
+                  ⬇️ Template CSV
+                </button>
+                <button
+                  className="back-button-glass btn btn-sm"
+                  onClick={() => importCsvInputRef.current?.click()}
+                  title="Import a CSV to overwrite values (unmatched rows are ignored)"
+                >
+                  ⬆️ Import CSV
+                </button>
+                <button
+                  className="back-button-glass btn btn-sm"
+                  onClick={exportToCSV}
+                  title="Export current sheet to CSV"
+                >
+                  ⭳ Export CSV
+                </button>
                 <button
                   className="back-button-glass btn"
                   disabled={saving}
                   onClick={handleSave}
                 >
                   {saving ? "Saving…" : "Save All Changes"}
-                </button>
-                <button
-                  className="back-button-glass btn btn-sm"
-                  onClick={exportToCSV}
-                >
-                  Import to CSV
                 </button>
               </div>
             </div>
@@ -387,14 +626,17 @@ export default function BalancePage() {
                         >
                           <input
                             type="number"
+                            step="0.25"
                             min={0}
                             className="form-control form-control-sm bg-dark text-white border-secondary"
                             style={{ width: 80 }}
-                            value={v}
+                            value={String(v)}
                             onChange={(e) => {
                               const val = Number(e.target.value);
                               if (!Number.isNaN(val) && val >= 0) {
-                                updateCost(ci, ei, val);
+                                // snap to .25
+                                const snapped = Math.round(val * 4) / 4;
+                                updateCost(ci, ei, snapped);
                               }
                             }}
                           />
