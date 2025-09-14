@@ -1,0 +1,29 @@
+BEGIN;
+
+-- ===== Players rollover =====
+CREATE TABLE IF NOT EXISTS public.players_2 (LIKE public.players INCLUDING ALL);
+INSERT INTO public.players_2 SELECT * FROM public.players;
+
+UPDATE public.players
+SET
+  elo = 200,
+  games_played = 0,
+  win_rate = 0,
+  points = 0;
+
+-- ===== Characters rollover =====
+CREATE TABLE IF NOT EXISTS public.characters_4 (LIKE public.characters INCLUDING ALL);
+INSERT INTO public.characters_4 SELECT * FROM public.characters;
+
+UPDATE public.characters
+SET
+  pick_count = 0,
+  ban_count = 0,
+  e0_uses = 0, e1_uses = 0, e2_uses = 0, e3_uses = 0, e4_uses = 0, e5_uses = 0, e6_uses = 0,
+  e0_wins = 0, e1_wins = 0, e2_wins = 0, e3_wins = 0, e4_wins = 0, e5_wins = 0, e6_wins = 0,
+  preban_count = 0,
+  joker_count = 0,
+  appearance_count = 0,
+  debut_date = CURRENT_DATE;
+
+COMMIT;

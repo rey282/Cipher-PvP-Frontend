@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import "./Landing.css";
 import Navbar from "../components/Navbar";
 import { toast } from "react-toastify";
+import { mocOptions, getMocByValue, type MocValue } from "../data/season";
 
 /* ---------- types ---------- */
 type EidolonTuple = { uses: number; wins: number };
@@ -79,44 +80,6 @@ const sortOptions = [
   { label: "Bans", value: "ban_count" },
 ] as const;
 
-const mocOptions = [
-  {
-    label: "All-Time Stats",
-    value: -1,
-    name: "All-Time Stats",
-    duration: "All matches recorded",
-    bossImages: ["/bosses/alltime.png"],
-  },
-  {
-    label: "Gambler's Plight (3.4)",
-    value: 0,
-    name: "Gambler's Plight",
-    duration: "04 Aug 2025 → 15 Sep 2025",
-    bossImages: ["/bosses/svarog.png", "/bosses/aventurine.png"],
-  },
-  {
-    label: "Lupine Moon-Devourer (3.3)",
-    value: 3,
-    name: "Lupine Moon-Devourer",
-    duration: "23 Jun 2025 → 04 Aug 2025",
-    bossImages: ["/bosses/sting.png", "/bosses/hoolay.png"],
-  },
-  {
-    label: "Breath of the Othershore (3.2)",
-    value: 2,
-    name: "Breath of the Othershore",
-    duration: "12 May 2025 → 23 Jun 2025",
-    bossImages: ["/bosses/reaver.png", "/bosses/tv.png"],
-  },
-  {
-    label: "Out of Home (3.1)",
-    value: 1,
-    name: "Out of Home",
-    duration: "31 Mar 2025 → 12 May 2025",
-    bossImages: ["/bosses/hoolay.png", "/bosses/reaver.png"],
-  },
-];
-
 /* ---------- helpers ---------- */
 const eidolonArr = (c: CharacterStats): EidolonTuple[] => [
   { uses: c.e0_uses, wins: c.e0_wins },
@@ -136,7 +99,7 @@ export default function CharacterStats() {
   const [lastFetched, setLast] = useState<string | null>(null);
   const [isLoading, setLoading] = useState(true);
 
-  const [cycle, setCycle] = useState(-1);
+  const [cycle, setCycle] = useState<MocValue>(-1);
   const [sortBy, setSort] =
     useState<(typeof sortOptions)[number]["value"]>("name");
   const [rarity, setRarity] = useState<number | null>(null);
@@ -202,7 +165,7 @@ export default function CharacterStats() {
       return sortAsc ? aVal - bVal : bVal - aVal;
     });
 
-  const moc = mocOptions.find((m) => m.value === cycle)!;
+  const moc = getMocByValue(cycle);
 
   /* ---------- UI ---------- */
   return (
@@ -353,7 +316,7 @@ export default function CharacterStats() {
                 <select
                   className="form-select bg-dark text-white border-light"
                   value={cycle}
-                  onChange={(e) => setCycle(+e.target.value)}
+                  onChange={(e) => setCycle(Number(e.target.value) as MocValue)}
                 >
                   {mocOptions.map((o) => (
                     <option key={o.value} value={o.value}>
