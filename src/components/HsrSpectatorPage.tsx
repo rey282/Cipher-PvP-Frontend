@@ -1473,12 +1473,15 @@ export default function HsrSpectatorPage() {
               const extraCycles = isBlue ? extraPenaltyB : extraPenaltyR;
               const timerAdd = includeTimerThis ? timerPenCount[side] : 0;
 
-              const adjustedTotal =
-                scores.reduce((a, b) => a + b, 0) +
-                cycleTerm +
-                extraCycles +
-                timerAdd;
-
+              const adjustedTotal = Number(
+                (
+                  scores.reduce((a, b) => a + b, 0) +
+                  cycleTerm +
+                  extraCycles +
+                  timerAdd
+                ).toFixed(2)
+              );
+              
               return (
                 <div
                   key={side}
