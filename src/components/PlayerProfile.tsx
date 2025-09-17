@@ -2,6 +2,10 @@ import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { toast } from "react-toastify";
+// seasons
+import { getSeasonLabel, isSeasonValue } from "../data/season";
+import type { SeasonValue } from "../data/season";
+
 
 /* ---------- types ---------- */
 type CharTiny = { code: string; name?: string; image_url?: string };
@@ -80,7 +84,11 @@ export default function PlayerProfile() {
   const { id } = useParams();
   const location = useLocation();
   const query = new URLSearchParams(location.search);
-  const season = query.get("season") || "players";
+  const rawSeason = query.get("season");
+  const season: SeasonValue = isSeasonValue(rawSeason)
+    ? (rawSeason as SeasonValue)
+    : "players";
+
   const navigate = useNavigate();
 
   const [charMap, setCharMap] = useState<CharMap>({});
@@ -331,14 +339,7 @@ export default function PlayerProfile() {
           </div>
           {season && (
             <p className="text-center text-white-50 mb-2">
-              Season View:{" "}
-              <strong>
-                {season === "all"
-                  ? "All-Time"
-                  : season === "players_1"
-                  ? "Season 1"
-                  : "Season 2"}
-              </strong>
+              Season View: <strong>{getSeasonLabel(season)}</strong>
             </p>
           )}
 

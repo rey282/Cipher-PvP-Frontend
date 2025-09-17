@@ -3,14 +3,26 @@
 export const seasonOptions = [
   { label: "All-Time", value: "all" },
   { label: "Season 3", value: "players" },
-  { label: "Season 2", value: "players_2" },   
+  { label: "Season 2", value: "players_2" },
   { label: "Season 1", value: "players_1" },
 ] as const;
 
 export type SeasonValue = (typeof seasonOptions)[number]["value"];
 
-/* ---------------- MOC cycles ---------------- */
+/* --- helpers --- */
+export const seasonValues: SeasonValue[] = seasonOptions.map(s => s.value);
 
+export function isSeasonValue(x: string | null | undefined): x is SeasonValue {
+  return !!x && seasonValues.includes(x as SeasonValue);
+}
+
+export function getSeasonLabel(value: string | null | undefined): string {
+  if (!value) return "";
+  const found = seasonOptions.find(s => s.value === value);
+  return found ? found.label : value; // safe fallback if backend ever adds a new one
+}
+
+/* ---------------- MOC cycles ---------------- */
 export const mocOptions = [
   {
     label: "All-Time Stats",
@@ -59,7 +71,6 @@ export const mocOptions = [
 export type MocOption = (typeof mocOptions)[number];
 export type MocValue = MocOption["value"];
 
-/** Helper to safely pick a MOC by value, defaulting to first (All-Time). */
 export function getMocByValue(value: MocValue): MocOption {
   return mocOptions.find((m) => m.value === value) ?? mocOptions[0];
 }
