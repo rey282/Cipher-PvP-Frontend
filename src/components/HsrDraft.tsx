@@ -253,8 +253,8 @@ function buildSequenceForMode(mode: HsrMode): string[] {
       "B",
       "B",
       "R",
-      "B(ACE)",
       "R(ACE)",
+      "B(ACE)",
     ];
   }
 
