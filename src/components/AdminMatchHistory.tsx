@@ -161,7 +161,7 @@ export default function AdminMatchHistory() {
       });
   }, [page, reloadKey]); // 👈 include reloadKey
 
-  /* auto-scroll to top on page change */
+  /* auto-scroll to top on page change  */
   useLayoutEffect(() => {
     scrollTopRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [page]);
