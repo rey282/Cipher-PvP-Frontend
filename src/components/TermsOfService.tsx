@@ -35,7 +35,7 @@ export default function TermsOfService() {
         </div>
 
         <div className="container">
-          {/* -------- page heading -------- */}
+          {/* -------- page heading  -------- */}
           <h1 className="display-5 fw-bold text-center mb-4">
             Terms&nbsp;of&nbsp;Service
           </h1>
