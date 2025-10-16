@@ -106,7 +106,7 @@ export default function BalanceView() {
               WebkitOverflowScrolling: "touch",
             }}
           >
-            {/* give the table room to breathe on narrow screens */}
+            {/* give the table room to breathe on narrow screens  */}
             <div style={{ minWidth: "950px" }}>
               <table
                 className="table table-hover mb-0 text-white text-center"
