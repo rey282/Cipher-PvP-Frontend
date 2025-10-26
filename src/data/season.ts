@@ -32,8 +32,15 @@ export const mocOptions = [
     bossImages: ["/bosses/alltime.png"],
   },
   {
-    label: "Pillar of Genesis (3.5)",
+    label: "Pillar of Genesis (3.6)",
     value: 0,
+    name: "Category Mistake",
+    duration: "27 Oct 2025 → 08 Des 2025",
+    bossImages: ["/bosses/aventurine.png", "/bosses/reaver.png"],
+  },
+  {
+    label: "Pillar of Genesis (3.5)",
+    value: 5,
     name: "Pillar of Genesis",
     duration: "15 Sep 2025 → 27 Oct 2025",
     bossImages: ["/bosses/gepard.png", "/bosses/lygus.png"],
