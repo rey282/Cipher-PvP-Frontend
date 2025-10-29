@@ -23,7 +23,7 @@ export default function Navbar() {
 
   // Cipher section navbar remains as-is
   const cipherNav = [
-    { label: "Home", path: "/cipher" },
+    { label: "Home", path: "/" },
     { label: "Balance Cost", path: "/cipher/balance-cost" },
     { label: "Player Stats", path: "/cipher/players" },
     { label: "Season Stats", path: "/cipher/insights" },

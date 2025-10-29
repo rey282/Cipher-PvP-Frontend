@@ -42,7 +42,7 @@ export default function Footer() {
             <ul className="list-unstyled small">
               <li>
                 <Link
-                  to="/cipher"
+                  to="/"
                   className="footer-link"
                   onClick={handleInternalClick}
                 >
