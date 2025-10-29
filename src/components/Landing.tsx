@@ -40,6 +40,7 @@ const CIPHER_PLAY_URL = "https://draft.cipher.uno/draft?mode=cipher";
 const cipherMenu = [
   { label: "Roster Setup", url: "https://draft.cipher.uno/player" },
   { label: "Balance Cost", url: "/cipher/balance-cost" },
+  { label: "Draft Cost", url: "https://draft.cipher.uno/draft-cost" },
   { label: "Player Statistics", url: "/cipher/players" },
   { label: "Season Insights", url: "/cipher/insights" },
   { label: "Character Statistics", url: "/cipher/characters" },
