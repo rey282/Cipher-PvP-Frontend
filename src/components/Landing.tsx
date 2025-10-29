@@ -5,9 +5,7 @@ import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 
 import VivianSections, { type VivianSectionHandle } from "./VivianSections";
-
 import CerydraSections, { type CerydraSectionHandle } from "./CerydraSections";
-
 
 /* ───────────────── Game data ───────────────── */
 const games = [
@@ -35,6 +33,29 @@ const games = [
     live: true,
     link: "/cerydra",
   },
+];
+
+/** Cipher actions (from HsrHome cards) */
+const CIPHER_PLAY_URL = "https://draft.cipher.uno/draft?mode=cipher";
+const cipherMenu = [
+  { label: "Roster Setup", url: "https://draft.cipher.uno/player" },
+  { label: "Balance Cost", url: "/cipher/balance-cost" },
+  { label: "Player Statistics", url: "/cipher/players" },
+  { label: "Season Insights", url: "/cipher/insights" },
+  { label: "Character Statistics", url: "/cipher/characters" },
+];
+
+/** Vivian actions (dropdown only) */
+const vivianMenu = [
+  { label: "Rules", type: "rules" as const },
+  { label: "Match History", type: "matches" as const },
+];
+
+/** Cerydra actions (dropdown only) */
+const cerydraMenu = [
+  { label: "Rules", type: "rules" as const },
+  { label: "Match History", type: "matches" as const },
+  { label: "Cerydra Cost Table", url: "/cerydra/balance-cost" },
 ];
 
 // Team member IDs + roles
@@ -70,11 +91,7 @@ const teamCache: {
   hsr: any[] | null;
   genshin: any[] | null;
   zzz: any[] | null;
-} = {
-  hsr: null,
-  genshin: null,
-  zzz: null,
-};
+} = { hsr: null, genshin: null, zzz: null };
 
 export default function Landing() {
   const [selected, setSelected] = useState(1);
@@ -85,7 +102,6 @@ export default function Landing() {
   const [showTeam, setShowTeam] = useState(false);
 
   const location = useLocation();
-
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -97,7 +113,6 @@ export default function Landing() {
 
     if (!blocked) return;
 
-    // show the toast
     switch (blocked) {
       case "hsr-draft-mobile":
         toast.warning("Draft is desktop-only. Please use a laptop/desktop.");
@@ -113,14 +128,11 @@ export default function Landing() {
         break;
     }
 
-    // clear the state so it doesn't retrigger on refresh/back
     navigate(location.pathname, { replace: true, state: {} });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key]);
 
-
   const vivianRef = useRef<VivianSectionHandle | null>(null);
-
   const cerydraRef = useRef<CerydraSectionHandle>(null);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -132,7 +144,6 @@ export default function Landing() {
     return () =>
       mq.removeEventListener?.("change", update) ?? mq.removeListener(update);
   }, []);
-
 
   // Team popup data
   const [hsrTeamProfiles, setHsrTeamProfiles] = useState<any[]>([]);
@@ -342,19 +353,10 @@ export default function Landing() {
 
             <div className="mt-3">
               {gamesel.id === "zzz" ? (
+                /* ─────────── VIVIAN (ZZZ) — Start + More dropdown ─────────── */
                 <div className="d-flex flex-column justify-content-center align-items-center gap-2">
                   <div className="d-flex justify-content-center align-items-center gap-2">
-                    <button
-                      className="btn btn-info-circle"
-                      onClick={() => {
-                        if (vivianRef.current?.openRulesModal)
-                          vivianRef.current.openRulesModal();
-                        else navigate("/zzz");
-                      }}
-                      title="View Rules"
-                    >
-                      !
-                    </button>
+                    {/* Start -> open draft modal (fallback to /zzz) */}
                     <button
                       className="btn angled-btn"
                       onClick={() => {
@@ -367,34 +369,54 @@ export default function Landing() {
                       Start Now
                     </button>
 
-                    <button
-                      className="btn btn-info-circle"
-                      title="Match History"
-                      onClick={() => {
-                        if (vivianRef.current?.openMatchesModal)
-                          vivianRef.current.openMatchesModal();
-                        else navigate("/zzz");
-                      }}
-                      style={{ fontSize: "1.2rem", zIndex: 5 }}
-                    >
-                      📖
-                    </button>
+                    {/* More dropdown */}
+                    <div className="btn-group">
+                      <button
+                        type="button"
+                        className="btn angled-btn dropdown-toggle"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        title="More Vivian actions"
+                      >
+                        More
+                      </button>
+                      <ul className="dropdown-menu dropdown-menu-dark">
+                        {vivianMenu.map((item) => (
+                          <li key={item.label}>
+                            {item.type === "rules" ? (
+                              <button
+                                className="dropdown-item"
+                                onClick={() => {
+                                  if (vivianRef.current?.openRulesModal)
+                                    vivianRef.current.openRulesModal();
+                                  else navigate("/zzz");
+                                }}
+                              >
+                                Rules
+                              </button>
+                            ) : (
+                              <button
+                                className="dropdown-item"
+                                onClick={() => {
+                                  if (vivianRef.current?.openMatchesModal)
+                                    vivianRef.current.openMatchesModal();
+                                  else navigate("/zzz");
+                                }}
+                              >
+                                Match History
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
               ) : gamesel.id === "hsr2" ? (
+                /* ─────────── CERYDRA — Start + More dropdown ─────────── */
                 <div className="d-flex flex-column justify-content-center align-items-center gap-2">
                   <div className="d-flex justify-content-center align-items-center gap-2">
-                    <button
-                      className="btn btn-info-circle"
-                      onClick={() => {
-                        if (cerydraRef.current?.openRulesModal)
-                          cerydraRef.current.openRulesModal();
-                        else navigate("/cerydra");
-                      }}
-                      title="View Rules"
-                    >
-                      !
-                    </button>
+                    {/* Start -> open draft modal (fallback to /cerydra) */}
                     <button
                       className="btn angled-btn"
                       onClick={() => {
@@ -407,28 +429,108 @@ export default function Landing() {
                       Start Now
                     </button>
 
+                    {/* More dropdown */}
+                    <div className="btn-group">
+                      <button
+                        type="button"
+                        className="btn angled-btn dropdown-toggle"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        title="More Cerydra actions"
+                      >
+                        More
+                      </button>
+                      <ul className="dropdown-menu dropdown-menu-dark">
+                        {cerydraMenu.map((item) => (
+                          <li key={item.label}>
+                            {"url" in item ? (
+                              <button
+                                className="dropdown-item"
+                                onClick={() => navigate(item.url!)}
+                              >
+                                {item.label}
+                              </button>
+                            ) : item.type === "rules" ? (
+                              <button
+                                className="dropdown-item"
+                                onClick={() => {
+                                  if (cerydraRef.current?.openRulesModal)
+                                    cerydraRef.current.openRulesModal();
+                                  else navigate("/cerydra");
+                                }}
+                              >
+                                Rules
+                              </button>
+                            ) : (
+                              <button
+                                className="dropdown-item"
+                                onClick={() => {
+                                  if (cerydraRef.current?.openMatchesModal)
+                                    cerydraRef.current.openMatchesModal();
+                                  else navigate("/cerydra");
+                                }}
+                              >
+                                Match History
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ) : gamesel.id === "hsr" ? (
+                /* ─────────── CIPHER (HSR) — Start -> Play link + More dropdown ─────────── */
+                <div className="d-flex flex-column justify-content-center align-items-center gap-2">
+                  <div className="d-flex justify-content-center align-items-center gap-2">
                     <button
-                      className="btn btn-info-circle"
-                      title="Match History"
-                      onClick={() => {
-                        if (cerydraRef.current?.openMatchesModal)
-                          cerydraRef.current.openMatchesModal();
-                        else navigate("/cerydra");
-                      }}
-                      style={{ fontSize: "1.2rem", zIndex: 5 }}
+                      className="btn angled-btn"
+                      onClick={() =>
+                        window.open(
+                          CIPHER_PLAY_URL,
+                          "_blank",
+                          "noopener,noreferrer"
+                        )
+                      }
+                      title="Start draft"
                     >
-                      📖
+                      Start Now
                     </button>
 
-                    {/* NEW: Cerydra Cost Table button */}
-                    <button
-                      className="btn btn-info-circle"
-                      title="Cerydra Cost Table"
-                      onClick={() => navigate("/cerydra/balance-cost")}
-                      style={{ fontSize: "1.2rem" }}
-                    >
-                      📊
-                    </button>
+                    <div className="btn-group">
+                      <button
+                        type="button"
+                        className="btn angled-btn dropdown-toggle"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        title="More Cipher actions"
+                      >
+                        More
+                      </button>
+                      <ul className="dropdown-menu dropdown-menu-dark">
+                        {cipherMenu.map((item) => (
+                          <li key={item.label}>
+                            {item.url.startsWith("http") ? (
+                              <a
+                                className="dropdown-item"
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {item.label}
+                              </a>
+                            ) : (
+                              <button
+                                className="dropdown-item"
+                                onClick={() => navigate(item.url)}
+                              >
+                                {item.label}
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
               ) : gamesel.live ? (

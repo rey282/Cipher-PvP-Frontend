@@ -26,8 +26,7 @@ export default function Footer() {
               />
             </a>
             <p className="text-white-50 small mb-3">
-              Cipher is a competitive Honkai platform built for stats
-              enthusiasts and passionate players.
+              Cipher is a community-built PvP platform for Honkai Star Rail and Zenless Zone Zero.
             </p>
             <p className="text-white-50 small mb-0">
               <em>

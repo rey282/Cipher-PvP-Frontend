@@ -33,8 +33,8 @@ export default function Navbar() {
   // Home/Landing navbar (shared by Landing pages AND Cerydra pages)
   // NOTE: Cerydra link removed here per request; Cost Test stays.
   const homeNav = [
-    { label: "Cipher Format", path: "/cipher" },
-    // { label: "Cerydra Format", path: "/cerydra" }, // removed
+    //{ label: "Cipher Format", path: "/cipher" },
+    // { label: "Cerydra Format", path: "/cerydra" },
     { label: "Cost Test", path: "/cerydra/cost-test" },
   ];
 
