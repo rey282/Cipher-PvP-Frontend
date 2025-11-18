@@ -148,13 +148,19 @@ export default function Profile() {
 
   const sortedChars = useMemo(() => {
     const list = Object.values(charMap);
+
     return list.sort((a, b) => {
       const ownedA = ownedRoster[a.id] !== undefined;
       const ownedB = ownedRoster[b.id] !== undefined;
+
       if (ownedA !== ownedB) return ownedA ? -1 : 1;
+
+      if (a.rarity !== b.rarity) return b.rarity - a.rarity;
+
       return a.name.localeCompare(b.name);
     });
   }, [charMap, ownedRoster]);
+
 
 
   const handleSave = async () => {
@@ -542,84 +548,77 @@ export default function Profile() {
                 <h5 className="m-0">{profile.display_name}&apos;s Roster</h5>
               </div>
               <div className="d-flex flex-wrap gap-2 justify-content-start">
-                {sortedChars
-                  .sort((a, b) => {
-                    const ownedA = ownedRoster[a.id] !== undefined;
-                    const ownedB = ownedRoster[b.id] !== undefined;
-                    if (ownedA !== ownedB) return ownedB ? 1 : -1;
-                    return a.name.localeCompare(b.name);
-                  })
-                  .map((char) => {
-                    const isOwned = ownedRoster[char.id] !== undefined;
-                    const eidolon = ownedRoster[char.id] ?? 0;
-                    const borderColor =
-                      char.rarity === 5
-                        ? "2px solid gold"
-                        : char.rarity === 4
-                        ? "2px solid #b666d2"
-                        : "none";
+                {sortedChars.map((char) => {
+                  const isOwned = ownedRoster[char.id] !== undefined;
+                  const eidolon = ownedRoster[char.id] ?? 0;
+                  const borderColor =
+                    char.rarity === 5
+                      ? "2px solid gold"
+                      : char.rarity === 4
+                      ? "2px solid #b666d2"
+                      : "none";
 
-                    return (
-                      <div
-                        key={char.id}
-                        title={char.name}
-                        onClick={() => setSelectedChar(char)}
-                        style={{
-                          cursor: "pointer",
-                          zIndex: 1,
-                          width: 64,
-                          height: 64,
-                          position: "relative",
-                          borderRadius: 8,
-                          overflow: "hidden",
-                          border: borderColor,
-                          backgroundColor: "#222",
-                          filter: isOwned
-                            ? "none"
-                            : "grayscale(100%) brightness(0.4)",
-                          transition: "transform 0.2s",
+                  return (
+                    <div
+                      key={char.id}
+                      title={char.name}
+                      onClick={() => setSelectedChar(char)}
+                      style={{
+                        cursor: "pointer",
+                        zIndex: 1,
+                        width: 64,
+                        height: 64,
+                        position: "relative",
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        border: borderColor,
+                        backgroundColor: "#222",
+                        filter: isOwned
+                          ? "none"
+                          : "grayscale(100%) brightness(0.4)",
+                        transition: "transform 0.2s",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.transform = "scale(1.05)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.transform = "scale(1)")
+                      }
+                    >
+                      <img
+                        src={char.image_url}
+                        alt={char.name}
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src =
+                            "/default.png";
                         }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.transform = "scale(1.05)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.transform = "scale(1)")
-                        }
-                      >
-                        <img
-                          src={char.image_url}
-                          alt={char.name}
-                          loading="lazy"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src =
-                              "/default.png";
-                          }}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
 
-                        {isOwned && (
-                          <span
-                            className="position-absolute bottom-0 start-0"
-                            style={{
-                              fontSize: "0.75rem",
-                              fontWeight: 600,
-                              backgroundColor: "rgba(0, 0, 0, 0.7)",
-                              color: "#fff",
-                              padding: "2px 6px",
-                              borderTopRightRadius: 6,
-                              lineHeight: 1,
-                            }}
-                          >
-                            E{eidolon}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                      {isOwned && (
+                        <span
+                          className="position-absolute bottom-0 start-0"
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            backgroundColor: "rgba(0, 0, 0, 0.7)",
+                            color: "#fff",
+                            padding: "2px 6px",
+                            borderTopRightRadius: 6,
+                            lineHeight: 1,
+                          }}
+                        >
+                          E{eidolon}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               <Modal

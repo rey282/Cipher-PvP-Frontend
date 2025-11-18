@@ -35,7 +35,7 @@ const games = [
   },
 ];
 
-/** Cipher actions (from HsrHome cards) */
+/** Cipher actions */
 const CIPHER_PLAY_URL = "https://draft.cipher.uno/draft?mode=cipher";
 const cipherMenu = [
   { label: "Roster Setup", url: "https://draft.cipher.uno/player" },
@@ -46,13 +46,13 @@ const cipherMenu = [
   { label: "Character Statistics", url: "/cipher/characters" },
 ];
 
-/** Vivian actions (dropdown only) */
+/** Vivian actions */
 const vivianMenu = [
   { label: "Rules", type: "rules" as const },
   { label: "Match History", type: "matches" as const },
 ];
 
-/** Cerydra actions (dropdown only) */
+/** Cerydra actions */
 const cerydraMenu = [
   { label: "Rules", type: "rules" as const },
   { label: "Match History", type: "matches" as const },
