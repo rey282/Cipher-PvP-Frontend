@@ -91,6 +91,31 @@ export default function BalancePage2() {
     );
   };
 
+  // Apply delta
+  const applyCharDelta = (charIdx: number, delta: number) => {
+    setChars((prev) =>
+      prev.map((c, i) =>
+        i === charIdx
+          ? {
+              ...c,
+              costs: c.costs.map((oldVal) => {
+                const next = oldVal + delta;
+                return Math.max(0, Math.round(next * 4) / 4); // snap to .25
+              }),
+            }
+          : c
+      )
+    );
+  };
+
+  // Reset character to original
+  const resetCharacter = (charIdx: number) => {
+    const original = originalChars[charIdx];
+    setChars((prev) =>
+      prev.map((c, i) => (i === charIdx ? { ...original } : c))
+    );
+  };
+
   const updateConeCost = (
     coneIdx: number,
     superimpose: number,
@@ -789,6 +814,16 @@ export default function BalancePage2() {
                         E{i}
                       </th>
                     ))}
+                    <th
+                      style={{
+                        width: "220px",
+                        minWidth: "220px",
+                        maxWidth: "220px",
+                        textAlign: "center",
+                      }}
+                    >
+                      Adjust
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -835,6 +870,81 @@ export default function BalancePage2() {
                           />
                         </td>
                       ))}
+                      <td
+                        style={{
+                          width: "220px",
+                          minWidth: "220px",
+                          maxWidth: "220px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {/* Input */}
+                          <input
+                            id={`delta-${ci}`}
+                            type="number"
+                            step="0.25"
+                            placeholder="0"
+                            className="form-control form-control-sm bg-dark text-white border-secondary"
+                            style={{
+                              width: 80,
+                              padding: "2px 6px",
+                              borderRadius: "6px",
+                              background: "rgba(0, 0, 0, 0.4)",
+                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                              textAlign: "center",
+                            }}
+                          />
+
+                          {/* Apply */}
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              padding: "3px 7px",
+                              borderRadius: "50%",
+                              background: "rgba(255, 255, 255, 0.12)",
+                              border: "1px solid rgba(255, 255, 255, 0.25)",
+                              color: "#fff",
+                              fontSize: "0.8rem",
+                            }}
+                            onClick={() => {
+                              const el = document.getElementById(
+                                `delta-${ci}`
+                              ) as HTMLInputElement;
+                              const raw = Number(el.value);
+                              if (!Number.isNaN(raw)) {
+                                applyCharDelta(ci, Math.round(raw * 4) / 4);
+                              }
+                              el.value = "";
+                            }}
+                          >
+                            ✔
+                          </button>
+
+                          {/* Reset */}
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              padding: "3px 7px",
+                              borderRadius: "50%",
+                              background: "rgba(255, 255, 255, 0.12)",
+                              border: "1px solid rgba(255, 255, 255, 0.25)",
+                              color: "#fff",
+                              fontSize: "0.8rem",
+                            }}
+                            onClick={() => resetCharacter(ci)}
+                          >
+                            ↺
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

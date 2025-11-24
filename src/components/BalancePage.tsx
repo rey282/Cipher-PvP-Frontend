@@ -163,7 +163,30 @@ export default function BalancePage() {
     }
     const num = Number(s);
     if (!isFinite(num) || num < 0) return 0;
-    return Math.round(num * 4) / 4; // 0.25 steps
+    return Math.round(num * 4) / 4;
+  };
+
+  const applyDelta = (charIdx: number, delta: number) => {
+    setChars((prev) =>
+      prev.map((c, i) =>
+        i === charIdx
+          ? {
+              ...c,
+              costs: c.costs.map((old) => {
+                const next = old + delta;
+                return Math.max(0, Math.round(next * 4) / 4);
+              }),
+            }
+          : c
+      )
+    );
+  };
+
+  const resetCharacter = (charIdx: number) => {
+    const original = originalChars[charIdx];
+    setChars((prev) =>
+      prev.map((c, i) => (i === charIdx ? { ...original } : c))
+    );
   };
 
   /* ───────── lookups over current sheet ───────── */
@@ -569,6 +592,7 @@ export default function BalancePage() {
                     >
                       Character
                     </th>
+
                     {[...Array(7)].map((_, i) => (
                       <th
                         key={i}
@@ -581,6 +605,18 @@ export default function BalancePage() {
                         E{i}
                       </th>
                     ))}
+                    <th
+                      style={{
+                        width: "220px",
+                        minWidth: "220px",
+                        maxWidth: "220px",
+                        backgroundColor: "transparent",
+                        color: "#fff",
+                        textAlign: "center",
+                      }}
+                    >
+                      Adjust
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -642,6 +678,84 @@ export default function BalancePage() {
                           />
                         </td>
                       ))}
+
+                      <td
+                        style={{
+                          width: "220px",
+                          minWidth: "220px",
+                          maxWidth: "220px",
+                          overflow: "hidden",
+                          backgroundColor: "transparent",
+                          color: "#fff",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {/* Input */}
+                          <input
+                            id={`delta-${ci}`}
+                            type="number"
+                            step="0.25"
+                            placeholder="0"
+                            className="form-control form-control-sm bg-dark text-white border-secondary"
+                            style={{
+                              width: 80,
+                              padding: "2px 6px",
+                              borderRadius: "6px",
+                              background: "rgba(0, 0, 0, 0.4)",
+                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                              textAlign: "center",
+                            }}
+                          />
+
+                          {/* Apply */}
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              padding: "3px 7px",
+                              borderRadius: "50%",
+                              background: "rgba(255, 255, 255, 0.12)",
+                              border: "1px solid rgba(255, 255, 255, 0.25)",
+                              color: "#fff",
+                              fontSize: "0.8rem",
+                            }}
+                            onClick={() => {
+                              const el = document.getElementById(
+                                `delta-${ci}`
+                              ) as HTMLInputElement;
+                              const raw = Number(el.value);
+                              if (!Number.isNaN(raw)) {
+                                applyDelta(ci, Math.round(raw * 4) / 4);
+                              }
+                              el.value = "";
+                            }}
+                          >
+                            ✔
+                          </button>
+
+                          {/* Reset */}
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              padding: "3px 7px",
+                              borderRadius: "50%",
+                              background: "rgba(255, 255, 255, 0.12)",
+                              border: "1px solid rgba(255, 255, 255, 0.25)",
+                              color: "#fff",
+                              fontSize: "0.8rem",
+                            }}
+                            onClick={() => resetCharacter(ci)}
+                          >
+                            ↺
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

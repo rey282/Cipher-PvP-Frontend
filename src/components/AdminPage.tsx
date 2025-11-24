@@ -1,21 +1,27 @@
 // src/pages/AdminPage.tsx
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
+import AdminMatchHistoryPanel from "../components/admin/AdminMatchHistoryPanel";
+import AdminRosterLogPanel from "../components/admin/AdminRosterLogPanel";
 import "./Landing.css";
 
-/* ────────── small type for autocomplete roster ────────── */
+/* ---------- types ---------- */
 type PlayerMini = {
   discord_id: string;
   username: string;
   nickname: string | null;
 };
 
+type PanelKey = "balance" | "history" | "roster" | "edit";
+
 export default function AdminPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+
+  const [activePanel, setActivePanel] = useState<PanelKey>("balance");
 
   /* ────────── autocomplete state ────────── */
   const [players, setPlayers] = useState<PlayerMini[]>([]);
@@ -23,26 +29,29 @@ export default function AdminPage() {
   const [suggest, setSuggest] = useState<PlayerMini[]>([]);
   const [fetching, setFetching] = useState(true);
 
-  /* click-outside ref to close dropdown */
   const boxRef = useRef<HTMLDivElement>(null);
+
+  /* click-outside ref to close dropdown */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+      if (!boxRef.current) return;
+      if (!boxRef.current.contains(e.target as Node)) {
         setSuggest([]);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
   }, []);
 
-  /* ────────── initial auth / roster fetch ────────── */
+
+  /* ────────── auth + fetch players ────────── */
   useEffect(() => {
     if (!loading && (!user || !user.isAdmin)) {
       navigate("/");
       return;
     }
 
-    /* fetch roster once (cached server-side) */
     fetch(`${import.meta.env.VITE_API_BASE}/api/players?season=all`, {
       credentials: "include",
     })
@@ -56,13 +65,11 @@ export default function AdminPage() {
           }))
         )
       )
-      .catch(() => {
-        /* ignore – search just won’t work */
-      })
+      .catch(() => {})
       .finally(() => setFetching(false));
   }, [user, loading, navigate]);
 
-  /* ────────── live filter suggestions ────────── */
+  /* ────────── live filter for profile search ────────── */
   useEffect(() => {
     if (!query.trim()) {
       setSuggest([]);
@@ -74,50 +81,20 @@ export default function AdminPage() {
         .filter(
           (p) =>
             p.discord_id.includes(lc) ||
-            (p.username || "").toLowerCase().includes(lc) ||
-            (p.nickname || "").toLowerCase().includes(lc)
+            p.username?.toLowerCase().includes(lc) ||
+            p.nickname?.toLowerCase().includes(lc)
         )
         .slice(0, 6)
     );
   }, [query, players]);
 
-  /* ────────── helper to jump to editable profile ────────── */
   const jump = (uid: string) => {
     setQuery("");
     setSuggest([]);
-    navigate(`/profile/${uid}`); // ← admin-editable profile path
+    navigate(`/profile/${uid}`);
   };
 
-  /* ────────── card definitions ────────── */
-  const cards = [
-    {
-      title: "Cipher PvP Balance Cost",
-      desc: "Adjust cost values for Cipher PvP characters",
-      url: "/admin/balance",
-    },
-    {
-      title: "Cerydra PvP Balance Cost",
-      desc: "Adjust cost values for Cerydra PvP characters",
-      url: "/admin/cerydra-balance",
-    },
-    {
-      title: "Edit Any Profile",
-      desc: "Jump to a player's editable profile",
-      url: "internal-edit",
-    },
-    {
-      title: "Match History",
-      desc: "View and rollback submitted matches",
-      url: "/admin/match-history",
-    },
-    {
-      title: "Roster Log",
-      desc: "View roster logs",
-      url: "/admin/roster-log",
-    },
-    { title: "Coming Soon", desc: "Coming Soon", url: null },
-  ] as const;
-  /* ────────── access-check loader ────────── */
+  /* ────────── loading gate ────────── */
   if (loading || !user) {
     return (
       <div
@@ -128,6 +105,160 @@ export default function AdminPage() {
       </div>
     );
   }
+
+  /* ────────── sidebar button helper ────────── */
+  const SidebarItem = ({
+    id,
+    label,
+    icon,
+  }: {
+    id: PanelKey;
+    label: string;
+    icon: string;
+  }) => (
+    <button
+      type="button"
+      onClick={() => setActivePanel(id)}
+      className={`admin-sidebar-item d-flex align-items-center gap-2 ${
+        activePanel === id ? "active" : ""
+      }`}
+    >
+      <span className="admin-sidebar-icon">{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+
+  /* ────────── right-panel renderer ────────── */
+  const renderPanel = () => {
+    switch (activePanel) {
+      case "balance":
+        return (
+          <div className="admin-panel-box admin-panel-fill">
+            <div className="admin-balance-inner">
+              <p className="text-white-50 mb-4 fs-5 text-center">
+                Choose which balance editor you want to open.
+              </p>
+
+              <div className="balance-buttons-stack">
+                <button
+                  type="button"
+                  className="balance-giant-btn"
+                  onClick={() => navigate("/admin/balance")}
+                >
+                  <div className="big-btn-title">Cipher PvP</div>
+                  <div className="big-btn-sub">Cipher balance cost editor</div>
+                </button>
+
+                <button
+                  type="button"
+                  className="balance-giant-btn"
+                  onClick={() => navigate("/admin/cerydra-balance")}
+                >
+                  <div className="big-btn-title">Cerydra PvP</div>
+                  <div className="big-btn-sub">Cerydra balance cost editor</div>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "history":
+        return (
+          <div className="admin-panel-box admin-panel-scroll">
+            <AdminMatchHistoryPanel />
+          </div>
+        );
+
+      case "roster":
+        return (
+          <div className="admin-panel-box admin-panel-scroll">
+            <AdminRosterLogPanel />
+          </div>
+        );
+
+      case "edit":
+        return (
+          <div className="admin-panel-box admin-panel-fill">
+            <div className="admin-panel-inner d-flex flex-column justify-content-center align-items-center text-center">
+              <p className="text-white-50 mb-4">
+                Jump directly to any player profile and edit it.
+              </p>
+
+              {/* Centered narrow input container */}
+              <div ref={boxRef} style={{ width: "100%", maxWidth: 450 }}>
+                <form
+                  onSubmit={(e: FormEvent) => {
+                    e.preventDefault();
+                    if (query.trim()) jump(query.trim());
+                  }}
+                >
+                  <input
+                    className="form-control mb-3"
+                    placeholder="ID / username / nickname"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    style={{
+                      borderRadius: 10,
+                      backgroundColor: "rgba(255,255,255,0.12)",
+                      color: "#fff",
+                      border: "1px solid rgba(255,255,255,0.3)",
+                    }}
+                  />
+
+                  <button
+                    className="btn btn-outline-light w-100"
+                    type="submit"
+                    disabled={!query.trim()}
+                  >
+                    Go →
+                  </button>
+                </form>
+
+                {suggest.length > 0 && (
+                  <ul
+                    className="list-group mt-3"
+                    style={{
+                      maxHeight: 240,
+                      overflowY: "auto",
+                      borderRadius: 10,
+                      backgroundColor: "#111",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                    }}
+                  >
+                    {suggest.map((p) => (
+                      <li
+                        key={p.discord_id}
+                        className="list-group-item list-group-item-action"
+                        style={{
+                          backgroundColor: "#111",
+                          color: "#fff",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => jump(p.discord_id)}
+                      >
+                        <strong>{p.username || "-"}</strong>
+                        {p.nickname && (
+                          <span className="text-white-50 ms-1">
+                            ({p.nickname})
+                          </span>
+                        )}
+                        <span className="text-info ms-2">{p.discord_id}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {fetching && (
+                  <small className="text-white-50 d-block mt-3">
+                    Loading roster…
+                  </small>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+    }
+  };
 
   /* ══════════════════ RENDER ══════════════════ */
   return (
@@ -151,167 +282,32 @@ export default function AdminPage() {
       />
 
       <div
-        className="position-relative z-2 text-white d-flex flex-column px-4"
-        style={{ minHeight: "100vh" }}
+        className="position-relative z-2 text-white d-flex flex-column px-3 px-md-4"
+        style={{ height: "100vh" }}
       >
         <Navbar />
 
-        {/* back */}
-        <div className="w-100 d-flex justify-content-end mb-3 pe-4">
-          <button
-            onClick={() => navigate("/")}
-            className="btn back-button-glass"
-          >
-            ← Back
-          </button>
-        </div>
-
-        {/* hero */}
-        <div className="text-center py-5 animate__animated animate__fadeInDown">
-          <h1 className="display-4 fw-bold mb-3">Cipher Admin</h1>
-          <p className="lead text-white-50">
-            Welcome, {user.global_name || user.username}!
-          </p>
-        </div>
-
-        {/* grid */}
-        <div className="container mb-5">
-          <div
-            className="row g-4 animate__animated animate__fadeInUp animate__delay-1s"
-            style={{ overflow: "visible" }}
-          >
-            {cards.map(({ title, desc, url }, i) => (
-              <div className="col-sm-6 col-lg-4" key={i}>
-                {/* special internal search card */}
-                {url === "internal-edit" ? (
-                  <div
-                    ref={boxRef}
-                    className="feature-card text-white text-center d-flex flex-column align-items-center justify-content-center"
-                    style={{
-                      height: "100%",
-                      position: "relative",
-                      zIndex: 4,
-                    }}
-                  >
-                    <div className="feature-title mb-2">{title}</div>
-                    <p className="feature-desc text-center mb-3">{desc}</p>
-
-                    <form
-                      style={{ width: "100%", maxWidth: 280 }}
-                      onSubmit={(e: FormEvent) => {
-                        e.preventDefault();
-                        if (query.trim()) jump(query.trim());
-                      }}
-                    >
-                      <input
-                        className="form-control mb-2"
-                        placeholder="ID / username / nickname"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        style={{
-                          borderRadius: 8,
-                          backgroundColor: "rgba(255, 255, 255, 0.15)",
-                          color: "#fff",
-                          border: "1px solid rgba(255, 255, 255, 0.3)",
-                        }}
-                      />
-
-                      <button
-                        className="btn btn-outline-light w-100"
-                        type="submit"
-                        disabled={!query.trim()}
-                      >
-                        Go →
-                      </button>
-
-                      {/* suggestions */}
-                      {suggest.length > 0 && (
-                        <ul
-                          className="list-group position-absolute w-100 mt-1"
-                          style={{
-                            maxHeight: 180,
-                            overflowY: "auto",
-                            backgroundColor: "#111",
-                            borderRadius: 8,
-                            zIndex: 3000,
-                            border: "1px solid rgba(255,255,255,0.2)",
-                            boxShadow: "0 0 8px rgba(0,0,0,0.5)",
-                          }}
-                        >
-                          {suggest.map((p) => (
-                            <li
-                              key={p.discord_id}
-                              className="list-group-item list-group-item-action py-1 px-2"
-                              style={{
-                                backgroundColor: "#111",
-                                color: "#fff",
-                                cursor: "pointer",
-                                border: "none",
-                              }}
-                              onClick={() => jump(p.discord_id)}
-                            >
-                              <strong>{p.username || "-"}</strong>
-                              {p.nickname && (
-                                <span className="text-white-50 ms-1">
-                                  ({p.nickname})
-                                </span>
-                              )}
-                              <span className="text-info ms-2">
-                                {p.discord_id}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-
-                      {/* small loader note */}
-                      {fetching && (
-                        <small className="text-white-50 d-block mt-2">
-                          Loading roster…
-                        </small>
-                      )}
-                    </form>
-                  </div>
-                ) : url ? (
-                  /* internal links */
-                  <Link
-                    to={url}
-                    className="feature-card text-decoration-none d-flex flex-column align-items-center justify-content-center text-white link-hover"
-                    onClick={() => window.scrollTo(0, 0)}
-                  >
-                    <div className="feature-title">{title}</div>
-                    <div className="feature-desc text-center">{desc}</div>
-                  </Link>
-                ) : (
-                  /* disabled placeholder card */
-                  <div className="feature-card text-white text-center disabled-feature d-flex flex-column align-items-center justify-content-center">
-                    <div className="feature-title">{title}</div>
-                    <div className="feature-desc">{desc}</div>
-                    <small className="text-muted">Coming&nbsp;Soon</small>
-                  </div>
-                )}
-              </div>
-            ))}
+        {/* two-column admin layout */}
+        <div className="admin-shell d-flex flex-grow-1 gap-3 mb-4">
+          {/* LEFT: mini nav */}
+          <div className="admin-sidebar d-flex flex-column">
+            <SidebarItem
+              id="balance"
+              label="Balance Cost"
+              icon="⚖️
+"
+            />
+            <SidebarItem id="history" label="Match History" icon="📜" />
+            <SidebarItem id="roster" label="Roster Log" icon="📂" />
+            <SidebarItem id="edit" label="Edit Profile" icon="👤" />
           </div>
 
-          {/* notes */}
-          <div
-            className="text-center mb-4 mt-5 animate__animated animate__fadeInUp animate__delay-2s px-3"
-            style={{
-              maxWidth: 600,
-              marginInline: "auto",
-              backgroundColor: "rgba(0,0,0,0.5)",
-              padding: "1rem 1.5rem",
-              borderRadius: 12,
-              backdropFilter: "blur(6px)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-            <h5 className="fw-bold mb-3">Admin Notes</h5>
-            <p className="mb-0">Haya is the goat.</p>
-          </div>
+          {/* RIGHT: content area */}
+          <div className="admin-content flex-grow-1">{renderPanel()}</div>
+        </div>
+
+        <div className="text-center mb-3 small text-white-50">
+          Admin: {user.global_name || user.username}
         </div>
       </div>
     </div>
