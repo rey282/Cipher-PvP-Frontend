@@ -134,28 +134,35 @@ export default function AdminPage() {
       case "balance":
         return (
           <div className="admin-panel-box admin-panel-fill">
-            <div className="admin-balance-inner">
-              <p className="text-white-50 mb-4 fs-5 text-center">
+            <div className="admin-panel-inner text-center">
+              <p className="text-white-50 mb-4">
                 Choose which balance editor you want to open.
               </p>
 
-              <div className="balance-buttons-stack">
+              <div
+                className="d-flex flex-column gap-4 mx-auto"
+                style={{ maxWidth: 450 }}
+              >
                 <button
                   type="button"
-                  className="balance-giant-btn"
+                  className="balance-select-btn"
                   onClick={() => navigate("/admin/balance")}
                 >
-                  <div className="big-btn-title">Cipher PvP</div>
-                  <div className="big-btn-sub">Cipher balance cost editor</div>
+                  <div className="balance-select-title">Cipher PvP</div>
+                  <div className="balance-select-sub">
+                    Cipher balance cost editor
+                  </div>
                 </button>
 
                 <button
                   type="button"
-                  className="balance-giant-btn"
+                  className="balance-select-btn"
                   onClick={() => navigate("/admin/cerydra-balance")}
                 >
-                  <div className="big-btn-title">Cerydra PvP</div>
-                  <div className="big-btn-sub">Cerydra balance cost editor</div>
+                  <div className="balance-select-title">Cerydra PvP</div>
+                  <div className="balance-select-sub">
+                    Cerydra balance cost editor
+                  </div>
                 </button>
               </div>
             </div>
