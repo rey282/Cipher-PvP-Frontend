@@ -74,11 +74,14 @@ export default function PlayerStats() {
   }, [season]);
 
 
-  const filtered = players.filter((p) =>
-    (p.username || p.nickname || "")
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
+  const filtered = players
+    .filter((p) => p.games_played > 0)
+    .filter((p) =>
+      (p.username || p.nickname || "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+    );
+
 
   const pageCount = Math.ceil(filtered.length / ROWS_PER_PAGE);
   const pageData = filtered.slice(
