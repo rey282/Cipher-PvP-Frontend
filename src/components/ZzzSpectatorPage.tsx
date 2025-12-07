@@ -245,7 +245,12 @@ export default function ZzzSpectatorPage() {
 
   // Dynamic cost settings coming from backend (fallback to mode defaults)
   const COST_LIMIT =
-    typeof session?.costLimit === "number" ? session.costLimit : is3v3 ? 9 : 6;
+    typeof session?.costLimit === "number"
+      ? session.costLimit
+      : is3v3
+      ? 24
+      : 16;
+
 
   const PENALTY_PER_POINT =
     typeof session?.penaltyPerPoint === "number"
@@ -270,9 +275,6 @@ export default function ZzzSpectatorPage() {
   };
   const nameLabelsBlue = buildNameLabels(team1Name, is3v3 ? 3 : 2);
   const nameLabelsRed = buildNameLabels(team2Name, is3v3 ? 3 : 2);
-
-  const costCharMs = session?.costProfile?.charMs ?? {};
-  const costWePhase = session?.costProfile?.wePhase ?? {};
 
   // Indexers
   const charByCode = useMemo(() => {
@@ -323,7 +325,6 @@ export default function ZzzSpectatorPage() {
     const raw = session?.costProfile?.name ?? "";
     return raw.trim() ? raw.trim() : "Vivian (Default)";
   }, [session?.costProfile?.name]);
-
 
   const featuredCostOverride = useMemo(
     () =>
@@ -393,6 +394,63 @@ export default function ZzzSpectatorPage() {
       cancelled = true;
     };
   }, []);
+
+  /* ───────────── Load Backend Default Costs (Minimal Patch) ───────────── */
+  const [zzzDefaultCharMs, setZzzDefaultCharMs] = useState<
+    Record<string, number[]>
+  >({});
+  const [zzzDefaultWePhase, setZzzDefaultWePhase] = useState<
+    Record<string, number[]>
+  >({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const [charCostRes, weCostRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/balance`, {
+            credentials: "include",
+          }),
+          fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/wengine-balance`, {
+            credentials: "include",
+          }),
+        ]);
+
+        if (!charCostRes.ok || !weCostRes.ok)
+          throw new Error("Failed to load ZZZ cost tables");
+
+        const charCostData = await charCostRes.json();
+        const weCostData = await weCostRes.json();
+        if (cancelled) return;
+
+        const cm: Record<string, number[]> = {};
+        (charCostData.characters || []).forEach((c: any) => {
+          const arr = Array.isArray(c.costs) ? c.costs.map(Number) : [];
+          cm[c.id] = arr.length === 7 ? arr : Array(7).fill(0);
+        });
+
+        const wp: Record<string, number[]> = {};
+        (weCostData.wengines || []).forEach((w: any) => {
+          const arr = Array.isArray(w.costs) ? w.costs.map(Number) : [];
+          wp[String(w.id)] = arr.length === 5 ? arr : Array(5).fill(0);
+        });
+
+        setZzzDefaultCharMs(cm);
+        setZzzDefaultWePhase(wp);
+      } catch (e) {
+        console.error("ZZZ backend cost load failed", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+   const costCharMs = session?.costProfile?.charMs ?? zzzDefaultCharMs ?? {};
+
+   const costWePhase = session?.costProfile?.wePhase ?? zzzDefaultWePhase ?? {};
 
   /* Subscribe to live spectator session via SSE */
   useEffect(() => {
@@ -514,7 +572,6 @@ export default function ZzzSpectatorPage() {
     const penaltyPoints = Math.floor(penalty / 0.25) * PENALTY_PER_POINT;
     return { total: Number(total.toFixed(2)), penaltyPoints };
   };
-
 
   const team1Cost = getTeamCost("B");
   const team2Cost = getTeamCost("R");
@@ -1095,7 +1152,7 @@ export default function ZzzSpectatorPage() {
 
           <div className="mb-2">
             <label className="form-label fw-semibold">
-              Penalty per 0.25 over cap
+              Penalty per 0.01 over cap
             </label>
             <input
               type="number"
@@ -1105,7 +1162,7 @@ export default function ZzzSpectatorPage() {
               disabled
             />
             <small className="text-white-50">
-              Points deducted for each 0.25 over the cost limit.
+              Points deducted for each 0.01 over the cost limit.
             </small>
           </div>
         </Modal.Body>

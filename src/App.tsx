@@ -28,6 +28,11 @@ const TeamPresets = lazy(() => import("./components/TeamPresets"));
 const ZzzSpectatorPage = lazy(() => import("./components/ZzzSpectatorPage"));
 const HsrDraftPage = lazy(() => import("./components/HsrDraft"));
 const HsrSpectatorPage = lazy(() => import("./components/HsrSpectatorPage"));
+const PlayerCharacterStats = lazy(
+  () => import("./components/PlayerCharacterStats")
+);
+const ZzzBalancePage = lazy(() => import("./components2/ZzzBalancePage"));
+
 
 /* ─────────── Layout wrapper ─────────── */
 function PageWithFooter({ children }: { children: React.ReactNode }) {
@@ -109,6 +114,17 @@ export default function App() {
           </Suspense>
         }
       />
+      <Route
+        path="player/:id/characters"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <PlayerCharacterStats />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
       <Route
         path="/profile/team-presets"
         element={
@@ -299,6 +315,17 @@ export default function App() {
             </Suspense>
           }
         />
+        <Route
+          path="vivian-balance"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <ZzzBalancePage />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+
         <Route
           path="match-history"
           element={

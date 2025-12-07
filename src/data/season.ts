@@ -2,7 +2,8 @@
 
 export const seasonOptions = [
   { label: "All-Time", value: "all" },
-  { label: "Season 3", value: "players" },
+  { label: "Season 4", value: "players" },
+  { label: "Season 3", value: "players_3" },
   { label: "Season 2", value: "players_2" },
   { label: "Season 1", value: "players_1" },
 ] as const;
@@ -32,8 +33,15 @@ export const mocOptions = [
     bossImages: ["/bosses/alltime.png"],
   },
   {
-    label: "Category Mistake (3.6)",
+    label: "Monkey Business (3.7)",
     value: 0,
+    name: "Monkey Business",
+    duration: "08 Des 2025 → 19 Jan 2026",
+    bossImages: ["/bosses/sam.png", "/bosses/hoolay.png"],
+  },
+  {
+    label: "Category Mistake (3.6)",
+    value: 6,
     name: "Category Mistake",
     duration: "27 Oct 2025 → 08 Des 2025",
     bossImages: ["/bosses/aventurine.png", "/bosses/reaver.png"],

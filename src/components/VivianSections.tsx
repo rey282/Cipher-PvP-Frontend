@@ -119,15 +119,15 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
     const [randomizeLocked, setRandomizeLocked] = useState(false);
 
     // cost knobs (Vivian)
-    const [costLimit, setCostLimit] = useState<number>(mode === "3v3" ? 9 : 6);
-    const [penaltyPerPoint, setPenaltyPerPoint] = useState<number>(2500);
+    const [costLimit, setCostLimit] = useState<number>(mode === "3v3" ? 24 : 16);
+    const [penaltyPerPoint, setPenaltyPerPoint] = useState<number>(100);
     const [showCostInputs, setShowCostInputs] = useState(false);
 
     const [showResumeModal, setShowResumeModal] = useState(false);
 
-    const defaultCostLimit = mode === "3v3" ? 9 : 6;
+    const defaultCostLimit = mode === "3v3" ? 24 : 16;
     const showLimitPill = Number(costLimit) !== defaultCostLimit;
-    const showPenaltyPill = Number(penaltyPerPoint) !== 2500;
+    const showPenaltyPill = Number(penaltyPerPoint) !== 50;
 
     const [showSidePickModal, setShowSidePickModal] = useState(false);
     const [pendingPayload, setPendingPayload] = useState<any>(null);
@@ -135,7 +135,7 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
 
     const userTouchedCost = useRef(false);
     useEffect(() => {
-      if (!userTouchedCost.current) setCostLimit(mode === "3v3" ? 9 : 6);
+      if (!userTouchedCost.current) setCostLimit(mode === "3v3" ? 24 : 16);
     }, [mode]);
 
     const fmtQuarter = (n: number) =>
@@ -1353,7 +1353,7 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
                 )}
                 {showPenaltyPill && (
                   <span className="badge rounded-pill bg-warning text-dark">
-                    Penalty {Number(penaltyPerPoint)}/0.25
+                    Penalty {Number(penaltyPerPoint)}/0.01
                   </span>
                 )}
               </div>
@@ -1449,22 +1449,22 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
 
                     <div className="col-sm-6">
                       <label className="form-label">
-                        Penalty per 0.25 over
+                        Penalty per 0.01 over
                       </label>
                       <input
                         type="number"
-                        step="1"
+                        step="0.01"
                         min={0}
                         className="form-control"
                         value={penaltyPerPoint}
                         onChange={(e) =>
                           setPenaltyPerPoint(
-                            Math.max(0, parseInt(e.target.value || "0", 10))
+                            Math.max(0, parseFloat(e.target.value || "0"))
                           )
                         }
                       />
                       <small className="text-white-50">
-                        e.g. 2500 → every 0.25 over costs 2500
+                        Example: 100 → every 0.01 over costs 100
                       </small>
                     </div>
                   </div>

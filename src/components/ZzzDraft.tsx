@@ -196,6 +196,14 @@ export default function ZzzDraftPage() {
   const [blueToken, setBlueToken] = useState<string | null>(null);
   const [redToken, setRedToken] = useState<string | null>(null);
 
+  const [zzzDefaultCharMs, setZzzDefaultCharMs] = useState<
+    Record<string, number[]>
+  >({});
+  const [zzzDefaultWePhase, setZzzDefaultWePhase] = useState<
+    Record<string, number[]>
+  >({});
+
+
   useEffect(() => {
     const k = query.get("key");
     const pt = query.get("pt");
@@ -408,11 +416,14 @@ export default function ZzzDraftPage() {
     typeof seed.penaltyPerPoint === "number";
 
   const [costLimit, setCostLimit] = useState<number>(
-    typeof seed.costLimit === "number" ? seed.costLimit : is3v3 ? 9 : 6
+    typeof seed.costLimit === "number" ? seed.costLimit : is3v3 ? 24 : 16
   );
   const [penaltyPerPoint, setPenaltyPerPoint] = useState<number>(
-    typeof seed.penaltyPerPoint === "number" ? seed.penaltyPerPoint : 2500
+    typeof seed.penaltyPerPoint === "number" ? seed.penaltyPerPoint : 50
   );
+
+  const defaultsReadyRef = useRef(false);
+
 
   useEffect(() => {
     if (!spectatorKey && !hasSeededLimits) {
@@ -438,16 +449,26 @@ export default function ZzzDraftPage() {
   }, [spectatorKey]);
 
   useEffect(() => {
+    // Do not proceed until backend defaults are loaded
+    if (
+      Object.keys(zzzDefaultCharMs).length === 0 ||
+      Object.keys(zzzDefaultWePhase).length === 0
+    ) {
+      return;
+    }
+
     let abort = false;
+
     (async () => {
+      // -------- DEFAULT MODE (no preset) --------
       if (!costProfileId) {
-        setCostProfileName(null);
-        setCostCharMs({});
-        setCostWePhase({});
+        setCostProfileName("Backend Default");
+        setCostCharMs(zzzDefaultCharMs);
+        setCostWePhase(zzzDefaultWePhase);
         return;
       }
 
-      // 1) direct preset (works for owner)
+      // -------- PRESET MODE --------
       try {
         const r = await fetch(
           `${
@@ -464,6 +485,7 @@ export default function ZzzDraftPage() {
           const arr = Array.isArray(v) ? v.map((n) => Number(n) || 0) : [];
           cm[k] = (arr.length === 7 ? arr : Array(7).fill(0)) as number[];
         });
+
         const wp: Record<string, number[]> = {};
         Object.entries(j.wePhase || {}).forEach(([k, v]: [string, any]) => {
           const arr = Array.isArray(v) ? v.map((n) => Number(n) || 0) : [];
@@ -477,7 +499,7 @@ export default function ZzzDraftPage() {
         setCostWePhase(wp);
         return;
       } catch {
-        // 2) fallback: use embedded session data (works for players)
+        // fallback for players
         try {
           if (!spectatorKey) throw new Error("no session");
           const s = await fetch(
@@ -487,10 +509,7 @@ export default function ZzzDraftPage() {
           const d = await s.json();
           if (abort) return;
 
-          if (
-            d?.costProfile &&
-            (d.costProfile.charMs || d.costProfile.wePhase)
-          ) {
+          if (d?.costProfile) {
             const cp = d.costProfile;
             setCostProfileName(cp.name || "Preset");
             setCostCharMs(cp.charMs || {});
@@ -509,10 +528,17 @@ export default function ZzzDraftPage() {
         }
       }
     })();
+
     return () => {
       abort = true;
     };
-  }, [costProfileId, spectatorKey]);
+  }, [
+    costProfileId,
+    spectatorKey,
+    zzzDefaultCharMs,
+    zzzDefaultWePhase, 
+  ]);
+
 
   const draftSequence: string[] = is3v3
     ? [
@@ -526,16 +552,16 @@ export default function ZzzDraftPage() {
         "B",
         "B",
         "R",
+        "R",
+        "B",
+        "B",
+        "R",
+        "R",
+        "B",
+        "B",
+        "R",
         "R(ACE)",
         "B(ACE)",
-        "B",
-        "R",
-        "R",
-        "B",
-        "B(ACE)",
-        "R(ACE)",
-        "R",
-        "B",
       ]
     : [
         "B",
@@ -548,8 +574,8 @@ export default function ZzzDraftPage() {
         "B",
         "B",
         "R",
-        "R(ACE)",
-        "B(ACE)",
+        "R",
+        "B",
         "B",
         "R",
       ];
@@ -695,7 +721,7 @@ export default function ZzzDraftPage() {
         ? "Uni Pick"
         : "No Rule";
 
-    const meta = resolveFeaturedMeta(f); // ✅ get name & image from catalogs
+    const meta = resolveFeaturedMeta(f);
     const title = meta.name;
     const img = meta.image_url;
 
@@ -714,7 +740,7 @@ export default function ZzzDraftPage() {
           cursor: "pointer",
         }}
         title={ruleLabel}
-        onClick={() => setShowFeaturedPopup(true)} // whole pill opens modal
+        onClick={() => setShowFeaturedPopup(true)}
       >
         <div
           style={{
@@ -856,8 +882,8 @@ export default function ZzzDraftPage() {
   // Owner auto-create (skip if we already have a key or URL carries a key)
   useEffect(() => {
     if (!user) return;
-    if (spectatorKey) return; // have a key (maybe from URL)
-    if (keyFromUrl) return; // URL join, don't create
+    if (spectatorKey) return;
+    if (keyFromUrl) return;
 
     const storedKey = sessionStorage.getItem("zzzSpectatorKey");
     if (storedKey) {
@@ -933,7 +959,7 @@ export default function ZzzDraftPage() {
     expectedTurn?: number,
     mode: "ge" | "le" | "eq" = "ge"
   ) => {
-    ignoreSseUntilRef.current = Date.now() + 1200; // was 800
+    ignoreSseUntilRef.current = Date.now() + 1200;
     expectedTurnRef.current = expectedTurn ?? null;
     expectedModeRef.current = expectedTurn != null ? mode : null;
   };
@@ -1363,7 +1389,6 @@ export default function ZzzDraftPage() {
   const redCount = draftSequence.filter((s) => s.startsWith("R")).length;
   const blueScale = useRowScale(blueRowRef, blueCount);
   const redScale = useRowScale(redRowRef, redCount);
-
   function getSlotCost(pick: DraftPick | null | undefined) {
     if (!pick) return { agentCost: 0, weCost: 0, total: 0 };
 
@@ -1421,7 +1446,7 @@ export default function ZzzDraftPage() {
     return { agentCost, weCost, total };
   }
 
-  /* ───────────── Data Fetch (characters & W-engines) ───────────── */
+  /* ───────────── Data Fetch (characters, W-engines, DEFAULT COSTS) ───────────── */
   useEffect(() => {
     Promise.all([
       fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/characters`, {
@@ -1430,13 +1455,40 @@ export default function ZzzDraftPage() {
       fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/wengines`, {
         credentials: "include",
       }),
+
+      fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/balance`, {
+        credentials: "include",
+      }),
+      fetch(`${import.meta.env.VITE_API_BASE}/api/zzz/wengine-balance`, {
+        credentials: "include",
+      }),
     ])
-      .then(async ([charRes, wengRes]) => {
+      .then(async ([charRes, wengRes, balCharRes, balWeRes]) => {
+        if (!charRes.ok || !wengRes.ok || !balCharRes.ok || !balWeRes.ok) {
+          throw new Error("Failed to fetch data");
+        }
+
         const charData = await charRes.json();
         const wengData = await wengRes.json();
-        if (!charRes.ok || !wengRes.ok) throw new Error("Failed to fetch data");
+        const balChar = await balCharRes.json();
+        const balWe = await balWeRes.json();
+
         setCharacters((charData.data || []) as Character[]);
         setWengines((wengData.data || []) as WEngine[]);
+
+        setZzzDefaultCharMs(
+          Object.fromEntries(
+            (balChar.characters || []).map((c: any) => [c.id, c.costs])
+          )
+        );
+
+        setZzzDefaultWePhase(
+          Object.fromEntries(
+            (balWe.wengines || []).map((w: any) => [String(w.id), w.costs])
+          )
+        );
+
+        defaultsReadyRef.current = true;
       })
       .catch((err) => {
         console.error(err);
@@ -1483,7 +1535,6 @@ export default function ZzzDraftPage() {
       pendingAckTurnRef.current = null;
       setBusy(false);
     }
-
 
     if (Array.isArray(pending.blueScores) && pending.blueScores.length)
       setBlueScores(pending.blueScores);
@@ -1626,7 +1677,6 @@ export default function ZzzDraftPage() {
       return false;
     }
   }
-
 
   useEffect(() => {
     // only warn for owner-ish flow (not player link joins)
@@ -1819,7 +1869,6 @@ export default function ZzzDraftPage() {
     // Save and temporarily ignore out-of-order SSE; expect the turn to move back
     ownerOptimisticSave(0, lastIdx, "le");
   };
-
 
   const slotIsBan = (i: number) =>
     draftSequence[i] === "BB" || draftSequence[i] === "RR";
@@ -2038,8 +2087,10 @@ export default function ZzzDraftPage() {
       total += slotTotal;
     }
 
-    const penalty = Math.max(0, total - costLimit);
-    const penaltyPoints = Math.floor(penalty / 0.25) * penaltyPerPoint;
+    //cost penalty is per 0.01 over
+    const over = Math.max(0, total - costLimit);
+    const steps = Math.floor(over / 0.01);
+    const penaltyPoints = steps * penaltyPerPoint;
 
     return { total: Number(total.toFixed(2)), penaltyPoints };
   };
@@ -2066,7 +2117,7 @@ export default function ZzzDraftPage() {
   if (isMobile || !cameFromStart) return null;
 
   /* ───────────── Render ───────────── */
-  const scoresLocked = uiLocked || isPlayer; // players can't edit scores
+  const scoresLocked = uiLocked || isPlayer;
 
   return (
     <div
@@ -3401,19 +3452,21 @@ export default function ZzzDraftPage() {
 
             <div className="mb-2">
               <label className="form-label fw-semibold">
-                Penalty per 0.25 over cap
+                Penalty per 0.01 over cap
               </label>
+
               <input
                 type="number"
-                step="50"
+                step="0.01"
                 min={0}
                 className="form-control"
                 value={penaltyStr}
                 onChange={(e) => setPenaltyStr(e.target.value)}
                 disabled={!isOwner}
               />
+
               <small className="text-white-50">
-                Points deducted for each 0.25 over the cost limit.
+                Points deducted for each 0.01 over the cost limit.
               </small>
             </div>
           </Modal.Body>

@@ -2788,3 +2788,34 @@ input[type="range"].big-slider {
   transform: translateY(-3px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
 }
+
+/* === Glass Action Buttons (Profile Page) === */
+
+.profile-action-btn {
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: white !important;
+  font-weight: 600;
+  transition: all .2s ease;
+
+  text-decoration: none !important;
+}
+
+.profile-action-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.profile-action-secondary {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.profile-action-secondary:hover {
+  background: rgba(0, 0, 0, 0.55);
+}

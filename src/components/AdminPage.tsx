@@ -164,6 +164,17 @@ export default function AdminPage() {
                     Cerydra balance cost editor
                   </div>
                 </button>
+
+                <button
+                  type="button"
+                  className="balance-select-btn"
+                  onClick={() => navigate("/admin/vivian-balance")}
+                >
+                  <div className="balance-select-title">ZZZ PvP</div>
+                  <div className="balance-select-sub">
+                    Vivian balance cost editor
+                  </div>
+                </button>
               </div>
             </div>
           </div>

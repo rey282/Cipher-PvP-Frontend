@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useLayoutEffect } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams, useLocation, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { toast } from "react-toastify";
 // seasons
@@ -32,8 +32,8 @@ type Match = {
   result: "win" | "lose";
   teammateNames: string[];
   opponentNames: string[];
-  myPicks: string[];
-  oppPicks: string[];
+  myPicks: { code: string; eidolon: number; superimposition: number }[];
+  oppPicks: { code: string; eidolon: number; superimposition: number }[];
   myBans: string[];
   oppBans: string[];
   prebans: string[];
@@ -46,6 +46,7 @@ type Match = {
   blueTeam: { id: string; name: string; cycles: number }[];
   myTeamSide: "red" | "blue";
 };
+
 
 type CharMap = Record<string, { name: string; image_url: string }>;
 
@@ -250,13 +251,24 @@ export default function PlayerProfile() {
             <span>
               {c.name || c.code}{" "}
               <small style={{ color: "#ffc107" }}>
-                {mode === "count"
-                  ? `(${(c as CountChar).count} ${
-                      title.includes("Picked") ? "picks" : "bans"
-                    })`
-                  : `(${(c as WRChar).wins}/${(c as WRChar).games} → ${(
-                      (c as WRChar).winRate * 100
-                    ).toFixed(1)}%)`}
+                {mode === "count" ? (
+                  <>
+                    ({(c as CountChar).count}{" "}
+                    {title.includes("Picked") ? "picks" : "bans"}
+                    {(c as any).wins !== undefined &&
+                      (c as any).losses !== undefined && (
+                        <>
+                          {" "}
+                          • {(c as any).wins}W–{(c as any).losses}L
+                        </>
+                      )}
+                    )
+                  </>
+                ) : (
+                  `(${(c as WRChar).wins}/${(c as WRChar).games} → ${(
+                    (c as WRChar).winRate * 100
+                  ).toFixed(1)}%)`
+                )}
               </small>
             </span>
           </div>
@@ -266,6 +278,9 @@ export default function PlayerProfile() {
       )}
     </>
   );
+
+
+
 
   /* ---------- dynamic section titles ---------- */
   const titles =
@@ -400,6 +415,15 @@ export default function PlayerProfile() {
                 {renderList(titles.best, summary!.bestWinRate, "wr")}
                 {renderList(titles.worst, summary!.worstWinRate, "wr")}
 
+                <div className="text-center mt-4">
+                  <Link
+                    to={`/player/${id}/characters?season=${season}`}
+                    className="profile-action-btn"
+                  >
+                    🔍 View Full Character Stats
+                  </Link>
+                </div>
+
                 <div className="mt-4 mb-4">
                   <strong>15 Cycles Counter:</strong>{" "}
                   <span className="text-warning">
@@ -409,10 +433,12 @@ export default function PlayerProfile() {
                 </div>
                 <div className="text-center">
                   <button
-                    className="btn btn-outline-light"
+                    className="profile-action-btn profile-action-secondary"
                     onClick={() => setShow(!showHist)}
                   >
-                    {showHist ? "Hide Match History" : "Show Match History"}
+                    {showHist
+                      ? "📕 Hide Match History"
+                      : "📘 Show Match History"}
                   </button>
                 </div>
               </div>
@@ -476,6 +502,7 @@ export default function PlayerProfile() {
                             : m.opponentNames.join(", ")}
                         </small>
                       </div>
+
                       <div className="row">
                         <div className="col-md-6 mb-2">
                           <h6 className="text-success">
@@ -491,8 +518,16 @@ export default function PlayerProfile() {
                                 : "Blue Team"}
                             </span>
                           </h6>
-                          {m.myPicks.map((c) => (
-                            <CImg key={c} code={c} map={charMap} size={38} />
+                          {m.myPicks.map((p) => (
+                            <div
+                              key={p.code}
+                              className="d-inline-block me-2 text-center"
+                            >
+                              <CImg code={p.code} map={charMap} size={38} />
+                              <div style={{ fontSize: "0.7rem" }}>
+                                E{p.eidolon}
+                              </div>
+                            </div>
                           ))}
                           <p className="mt-2 mb-1">
                             <strong>Bans:</strong>
@@ -509,6 +544,7 @@ export default function PlayerProfile() {
                             </p>
                           )}
                         </div>
+
                         <div className="col-md-6 mb-2">
                           <h6 className="text-danger">
                             Opponent Picks{" "}
@@ -524,8 +560,16 @@ export default function PlayerProfile() {
                             </span>
                           </h6>
 
-                          {m.oppPicks.map((c) => (
-                            <CImg key={c} code={c} map={charMap} size={38} />
+                          {m.oppPicks.map((p) => (
+                            <div
+                              key={p.code}
+                              className="d-inline-block me-2 text-center"
+                            >
+                              <CImg code={p.code} map={charMap} size={38} />
+                              <div style={{ fontSize: "0.7rem" }}>
+                                E{p.eidolon}
+                              </div>
+                            </div>
                           ))}
                           <p className="mt-2 mb-1">
                             <strong>Bans:</strong>
@@ -544,6 +588,7 @@ export default function PlayerProfile() {
                           )}
                         </div>
                       </div>
+
                       {m.prebans.length > 0 && (
                         <div className="mt-2">
                           <strong>Prebans:</strong>{" "}
@@ -552,6 +597,7 @@ export default function PlayerProfile() {
                           ))}
                         </div>
                       )}
+
                       {m.jokers.length > 0 && (
                         <div className="mt-2">
                           <strong className="text-warning">Joker Picks:</strong>{" "}
