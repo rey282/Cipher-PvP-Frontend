@@ -7,11 +7,13 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // 🔒 Manual login lock (due to Cloudflare rate limit)
+  const LOGIN_LOCKED = true;
+
   const isCerydra = location.pathname.startsWith("/cerydra");
   const isCipher = location.pathname.startsWith("/cipher");
   const isLanding = location.pathname === "/";
 
-  // Treat profile & presets as "landing-like" so we show the home navbar there
   const isProfile = location.pathname.startsWith("/profile");
   const isPresets = /\/presets(\/|$)/.test(location.pathname);
   const isLandingLike = isLanding || isProfile || isPresets;
@@ -21,7 +23,6 @@ export default function Navbar() {
     navigate(`/profile/${user.id}/presets`);
   };
 
-  // Cipher section navbar remains as-is
   const cipherNav = [
     { label: "Home", path: "/" },
     { label: "Balance Cost", path: "/cipher/balance-cost" },
@@ -30,15 +31,8 @@ export default function Navbar() {
     { label: "Character Stats", path: "/cipher/characters" },
   ];
 
-  // Home/Landing navbar (shared by Landing pages AND Cerydra pages)
-  // NOTE: Cerydra link removed here per request; Cost Test stays.
-  const homeNav = [
-    //{ label: "Cipher Format", path: "/cipher" },
-    // { label: "Cerydra Format", path: "/cerydra" },
-    { label: "Cost Test", path: "/cerydra/cost-test" },
-  ];
+  const homeNav = [{ label: "Cost Test", path: "/cerydra/cost-test" }];
 
-  // Use homeNav on landing-like pages AND on Cerydra pages
   const navLinks =
     isLandingLike || isCerydra ? homeNav : isCipher ? cipherNav : [];
 
@@ -165,19 +159,28 @@ export default function Navbar() {
         ) : (
           <button
             className="btn back-button-glass"
-            onClick={() => login(window.location.href)}
+            disabled={LOGIN_LOCKED}
+            onClick={() => {
+              if (!LOGIN_LOCKED) login(window.location.href);
+            }}
           >
-            <img
-              src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
-              alt="Discord"
-              width={20}
-              height={20}
-              style={{
-                filter: "brightness(0) saturate(100%) invert(100%)",
-                marginBottom: 4,
-              }}
-            />
-            &nbsp; Login with Discord
+            {LOGIN_LOCKED ? (
+              <>⛔ Login Disabled (Rate Limited)</>
+            ) : (
+              <>
+                <img
+                  src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
+                  alt="Discord"
+                  width={20}
+                  height={20}
+                  style={{
+                    filter: "brightness(0) saturate(100%) invert(100%)",
+                    marginBottom: 4,
+                  }}
+                />
+                &nbsp; Login with Discord
+              </>
+            )}
           </button>
         )}
       </div>
@@ -260,7 +263,6 @@ export default function Navbar() {
                     alt="avatar"
                     className="rounded-circle"
                     width={36}
-                    height={36}
                   />
                   <div>
                     <div
@@ -307,22 +309,31 @@ export default function Navbar() {
             ) : (
               <button
                 className="btn back-button-glass"
+                disabled={LOGIN_LOCKED}
                 onClick={() => {
-                  login(window.location.href);
-                  handleCloseOffcanvas();
+                  if (!LOGIN_LOCKED) {
+                    login(window.location.href);
+                    handleCloseOffcanvas();
+                  }
                 }}
               >
-                <img
-                  src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
-                  alt="Discord"
-                  width={20}
-                  height={20}
-                  style={{
-                    filter: "brightness(0) saturate(100%) invert(100%)",
-                    marginBottom: 4,
-                  }}
-                />
-                &nbsp; Login with Discord
+                {LOGIN_LOCKED ? (
+                  <>⛔ Login Disabled (Rate Limited)</>
+                ) : (
+                  <>
+                    <img
+                      src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f47e.svg"
+                      alt="Discord"
+                      width={20}
+                      height={20}
+                      style={{
+                        filter: "brightness(0) saturate(100%) invert(100%)",
+                        marginBottom: 4,
+                      }}
+                    />
+                    &nbsp; Login with Discord
+                  </>
+                )}
               </button>
             )}
           </div>
