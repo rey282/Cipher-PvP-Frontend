@@ -7,8 +7,8 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 🔒 Manual login lock (due to Cloudflare rate limit)
-  const LOGIN_LOCKED = true;
+  // Manual login lock (due to Cloudflare rate limit)
+  const LOGIN_LOCKED = false;
 
   const isCerydra = location.pathname.startsWith("/cerydra");
   const isCipher = location.pathname.startsWith("/cipher");
