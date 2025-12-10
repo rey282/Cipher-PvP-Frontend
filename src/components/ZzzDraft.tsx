@@ -427,8 +427,8 @@ export default function ZzzDraftPage() {
 
   useEffect(() => {
     if (!spectatorKey && !hasSeededLimits) {
-      setCostLimit(is3v3 ? 9 : 6);
-      setPenaltyPerPoint(2500);
+      setCostLimit(is3v3 ? 24 : 16);
+      setPenaltyPerPoint(50);
     }
   }, [is3v3, spectatorKey, hasSeededLimits]);
 
@@ -1392,59 +1392,75 @@ export default function ZzzDraftPage() {
   function getSlotCost(pick: DraftPick | null | undefined) {
     if (!pick) return { agentCost: 0, weCost: 0, total: 0 };
 
-    // --- Character cost (featured base + preset delta) ---
-    let agentCost: number;
-    const cpRow = costCharMs[pick.character.code]; // preset row [M0..M6]
-    const featuredBase = featuredCostOverride.get(pick.character.code);
+    const charCode = pick.character.code;
+    const weObj = pick.wengine;
 
-    if (Array.isArray(cpRow) && cpRow.length === 7) {
-      // base: featured customCost (if any) else preset M0
+    // MERGED COST TABLES (PRESET → FALLBACK TO DEFAULT)
+    const charRow = costCharMs[charCode] ?? zzzDefaultCharMs[charCode] ?? null;
+
+    const weRow =
+      (weObj ? costWePhase[String(weObj.id)] : null) ??
+      (weObj ? zzzDefaultWePhase[String(weObj.id)] : null) ??
+      null;
+
+    // CHARACTER COST
+
+    let agentCost = 0;
+    const featuredBase = featuredCostOverride.get(charCode);
+
+    if (Array.isArray(charRow) && charRow.length === 7) {
+      // Base cost = featured override OR preset M0
       const baseAtM0 =
         typeof featuredBase === "number"
           ? featuredBase
-          : Number((cpRow[0] || 0).toFixed(2));
+          : Number((charRow[0] || 0).toFixed(2));
+
       const atMx = Number(
-        (cpRow[Math.max(0, Math.min(6, pick.eidolon))] || 0).toFixed(2)
+        (charRow[Math.max(0, Math.min(6, pick.eidolon))] || 0).toFixed(2)
       );
-      const delta = Number((atMx - (cpRow[0] || 0)).toFixed(2));
+
+      const delta = Number((atMx - (charRow[0] || 0)).toFixed(2));
       agentCost = Number((baseAtM0 + delta).toFixed(2));
     } else {
-      // fallback: featured base over normal rule-based delta
+      // PURE fallback: use rule-based delta
       const normalAtM0 = calcAgentCost(pick.character, 0);
       const normalAtMx = calcAgentCost(pick.character, pick.eidolon);
-      const mDelta = Number((normalAtMx - normalAtM0).toFixed(2));
+      const d = Number((normalAtMx - normalAtM0).toFixed(2));
       const base = typeof featuredBase === "number" ? featuredBase : normalAtM0;
-      agentCost = Number((base + mDelta).toFixed(2));
+      agentCost = Number((base + d).toFixed(2));
     }
 
-    // --- W-Engine cost ---
+    // W-ENGINE COST
+
     let weCost = 0;
-    if (pick.wengine) {
-      const row = costWePhase[String(pick.wengine.id)];
-      if (row && row.length === 5) {
+
+    if (weObj) {
+      if (Array.isArray(weRow) && weRow.length === 5) {
+        // PRESET or DEFAULT row
         weCost = Number(
-          (row[Math.max(1, Math.min(5, pick.superimpose)) - 1] || 0).toFixed(2)
+          (weRow[Math.max(1, Math.min(5, pick.superimpose)) - 1] || 0).toFixed(
+            2
+          )
         );
       } else {
-        // fall back to rule + featured base override
-        const normalAtP1 = calcWEngineCost(pick.wengine, 1);
-        const normalAtPx = calcWEngineCost(pick.wengine, pick.superimpose);
+        // No preset → fallback rules
+        const normalAtP1 = calcWEngineCost(weObj, 1);
+        const normalAtPx = calcWEngineCost(weObj, pick.superimpose);
         const pDelta = Number((normalAtPx - normalAtP1).toFixed(2));
 
-        const weOverride =
-          pick.wengine.id != null
-            ? featuredWeCostOverride.get(String(pick.wengine.id))
-            : undefined;
+        const override = featuredWeCostOverride.get(String(weObj.id));
+        const base = typeof override === "number" ? override : normalAtP1;
 
-        const featuredBaseWE =
-          typeof weOverride === "number" ? weOverride : normalAtP1;
-        weCost = Number((featuredBaseWE + pDelta).toFixed(2));
+        weCost = Number((base + pDelta).toFixed(2));
       }
     }
-
+    
+    // TOTAL
     const total = Number((agentCost + weCost).toFixed(2));
+
     return { agentCost, weCost, total };
   }
+
 
   /* ───────────── Data Fetch (characters, W-engines, DEFAULT COSTS) ───────────── */
   useEffect(() => {
