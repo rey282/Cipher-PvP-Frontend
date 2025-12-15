@@ -16,7 +16,7 @@ The frontend is intentionally designed as a **thin client**:
 
 Cipher PvP is a multi-service system composed of:
 1. **Frontend (this repo)** — UI, visualization, user interaction
-2. **Backend (hsr-backend)** — Auth, database, rules, drafts, admin safety
+2. **Backend** — Auth, database, rules, drafts, admin safety
 3. **Discord Bot** — Match ingestion, ELO, historical data creation
 
 This repository represents **only the client layer**.
