@@ -1,64 +1,67 @@
 # Cipher PvP — Frontend Web Client
 
-This repository contains the **Cipher PvP frontend**, a React + TypeScript web client that powers all public-facing interfaces for the Cipher PvP ecosystem.
+This repository contains the **Cipher PvP frontend**, a React + TypeScript web client that powers all public-facing pages of the Cipher PvP ecosystem.
 
-The frontend is intentionally designed as a **thin client**:
-- It does **not** contain business logic authority
-- It consumes a session-based backend API
-- All validation, rules, and persistence are handled server-side
+The frontend is built as a **thin client**:
+- It does not own or enforce game logic
+- It communicates with a session-based backend API
+- All rules, validation, and persistence live on the server
 
-> This frontend **does not function standalone**.  
+> This frontend does **not** function on its own.  
 > A running Cipher backend is required.
 
 ---
 
 ## System Context
 
-Cipher PvP is a multi-service system composed of:
-1. **Frontend (this repo)** — UI, visualization, user interaction
-2. **Backend** — Auth, database, rules, drafts, admin safety
-3. **Discord Bot** — Match ingestion, ELO, historical data creation
+Cipher PvP is a multi-service system made up of:
 
-This repository represents **only the client layer**.
+1. **Frontend (this repo)** — UI, data display, and user interaction  
+2. **Backend** — Authentication, database access, rules, drafts, and admin controls  
+3. **Discord Bot** — Match ingestion, ELO updates, and historical data creation  
+
+This repository represents **only the client layer** of the system.
 
 ---
 
 ## Tech Stack
 
 - **React 19 + TypeScript**
-- **Vite** (development & build)
-- **react-router-dom** (routing)
+- **Vite**
+- **react-router-dom**
 - **Bootstrap 5 + react-bootstrap**
 - **Custom CSS** (`Landing.css`)
-- **Chart.js / Recharts** (stats & insights)
-- **react-toastify** (notifications)
+- **Chart.js / Recharts**
+- **react-toastify**
 
 ---
 
 ## Authentication Model (Client-Side)
 
-Authentication is handled entirely by the backend.
+Authentication is fully handled by the backend.
 
-### Frontend responsibilities:
-- Query session state via `GET /auth/me`
-- Redirect users to backend OAuth flow
-- Render UI conditionally based on `isAdmin`
+### What the frontend does
+- Checks session state via `GET /auth/me`
+- Redirects users to the backend OAuth flow
+- Shows or hides UI based on admin status
 
-### How login works:
-1. User clicks “Login with Discord”
-2. Browser is redirected to: GET {API_BASE}/auth/discord?redirect=<current-url>
-3. Backend performs OAuth and sets a session cookie
-4. User is redirected back to the original page
+### Login flow
+1. The user clicks **Login with Discord**
+2. The browser is redirected to  
+   `GET {API_BASE}/auth/discord?redirect=<current-url>`
+3. The backend completes OAuth and sets a session cookie
+4. The user is redirected back to the original page
 
-The frontend **never handles tokens or OAuth logic directly**.
+The frontend never handles OAuth tokens directly.
 
 ---
 
 ## Application Routes & Modes
 
-Routing is defined in `src/App.tsx` using `react-router-dom`.  
-Several pages support **query-based modes** such as seasons, cycles, and filters.  
-These modes are not cosmetic — they directly affect backend aggregation logic.
+Routes are defined in `src/App.tsx` using `react-router-dom`.
+
+Many pages support **query-based modes** such as seasons and cycles.  
+These parameters are passed directly to the backend and affect how data is queried and aggregated.
 
 ---
 
@@ -70,8 +73,8 @@ These modes are not cosmetic — they directly affect backend aggregation logic.
 | `/terms` | Terms of Service |
 | `/profile` | Logged-in user profile (editable) |
 | `/profile/:id` | Public player profile |
-| `/profile/:id/presets` | Team presets for a player |
-| `/player/:id/characters` | Per-player character statistics |
+| `/profile/:id/presets` | Team presets |
+| `/player/:id/characters` | Per-player character stats |
 
 ---
 
@@ -79,33 +82,33 @@ These modes are not cosmetic — they directly affect backend aggregation logic.
 
 | Route | Description |
 |------|------------|
-| `/cipher` | Cipher home dashboard |
+| `/cipher` | Cipher home |
 | `/cipher/players` | Player leaderboard |
 | `/cipher/player/:id` | Player profile |
 | `/cipher/characters` | Character statistics |
-| `/cipher/insights` | Analytics & insights |
-| `/cipher/balance-cost` | Public balance cost preview |
+| `/cipher/insights` | Analytics and insights |
+| `/cipher/balance-cost` | Public balance preview |
 
-#### Supported Query Modes (Cipher)
+#### Supported Query Modes
 
 | Query | Description |
 |------|------------|
 | `?season=players` | Current season |
 | `?season=players_1` | Previous season |
 | `?season=players_2` | Older seasons |
-| `?season=all` | All-time aggregation |
+| `?season=all` | All-time data |
 | `?cycle=0` | Current MOC cycle |
-| `?cycle=1..n` | Historical MOC cycles |
+| `?cycle=1..n` | Past cycles |
 | `?cycle=-1` | All-time character stats |
 
 ---
 
-### Cerydra (HSR Alt Format)
+### Cerydra (HSR Alternate Format)
 
 | Route | Description |
 |------|------------|
-| `/cerydra/balance-cost` | Public Cerydra balance preview |
-| `/cerydra/cost-test` | Cerydra cost calculator |
+| `/cerydra/balance-cost` | Public balance preview |
+| `/cerydra/cost-test` | Cost calculator |
 
 ---
 
@@ -113,14 +116,12 @@ These modes are not cosmetic — they directly affect backend aggregation logic.
 
 | Route | Description |
 |------|------------|
-| `/hsr/draft` | HSR draft interface |
-| `/hsr/s/:key` | HSR spectator view |
+| `/hsr/draft` | Draft interface |
+| `/hsr/s/:key` | Spectator view |
 
-#### Draft Modes & Behavior
-- Drafts are **stateful server sessions**
-- Actions are validated server-side
-- Spectator pages consume **Server-Sent Events (SSE)**
-- Public players interact via draft action tokens
+- Drafts are managed as live backend sessions
+- All actions are validated server-side
+- Spectator pages receive updates via **Server-Sent Events (SSE)**
 
 ---
 
@@ -128,20 +129,18 @@ These modes are not cosmetic — they directly affect backend aggregation logic.
 
 | Route | Description |
 |------|------------|
-| `/zzz/draft` | ZZZ draft interface |
-| `/zzz/s/:key` | ZZZ spectator view |
+| `/zzz/draft` | Draft interface |
+| `/zzz/s/:key` | Spectator view |
 
-#### ZZZ Draft Notes
-- Supports **2v2** and **3v3** modes
-- Draft order, bans, aces, and penalties are enforced server-side
-- Client renders turn order and state only
+- Supports **2v2** and **3v3**
+- Draft order, bans, aces, and penalties are enforced by the backend
+- The frontend only displays state and turn order
 
 ---
 
 ### Admin
 
-> Admin routes are conditionally rendered in the UI  
-> but **enforced server-side**.
+> Admin routes are shown in the UI but enforced server-side.
 
 | Route | Description |
 |------|------------|
@@ -149,170 +148,149 @@ These modes are not cosmetic — they directly affect backend aggregation logic.
 | `/admin/balance` | Cipher balance editor |
 | `/admin/cerydra-balance` | Cerydra balance editor |
 | `/admin/vivian-balance` | ZZZ (Vivian) balance editor |
-| `/admin/match-history` | Match history & rollback tools |
+| `/admin/match-history` | Match history and rollbacks |
 | `/admin/roster-log` | Roster audit log |
 
 ---
 
 ## Seasons, Cycles & Aggregation
 
-Several pages support **temporal modes** controlled via query parameters:
+Several pages support time-based views through query parameters.
 
 ### Seasons
-- Backed by separate database tables (`players`, `players_1`, `players_2`, …)
-- Defined server-side and mirrored in the frontend
-- Used by:
-  - Player leaderboard
-  - Player profiles
-  - Match history
+- Player and match data is split across seasonal tables
+- Seasons are defined server-side
+- Used by leaderboards, profiles, and match history
 
 ### MOC Cycles
-- Character stats are stored per cycle (`characters`, `characters_1`, …)
-- Cycles represent discrete balance windows
-- Used by:
-  - Character statistics page
+- Character stats are tracked per balance cycle remember
+- Each cycle represents a distinct balance window
+- Older cycles remain available for comparison
 
 ### All-Time Views
-- All-time stats are **aggregated dynamically**
-- No dedicated database table
-- Exposed via:
+- All-time data is aggregated dynamically
+- No dedicated tables exist for all-time stats
+- Accessed using:
   - `?season=all`
   - `?cycle=-1`
 
-These modes affect **actual query logic**, not just UI state.
+These parameters affect real backend queries, not just UI filters.
 
 ---
 
 ## Data Flow & Client Behavior
 
-The frontend acts as a **read-only consumer and interaction surface** for backend-managed data.
+The frontend consumes backend data and reflects it directly.
 
-### Data Sources
-- All data is fetched from the Cipher backend API
-- No persistent data is stored client-side
-- Session state is derived exclusively from backend responses
+- All data is fetched from the Cipher backend
+- No persistent state is stored client-side
+- Session state comes entirely from backend responses
 
-### Data Characteristics
-- Player stats, character stats, drafts, and costs are **pre-aggregated or computed server-side**
-- Query parameters (season, cycle, mode) directly affect backend aggregation
-
-The UI reflects backend state exactly as provided.
+Player stats, character stats, drafts, and balance data are all prepared server-side and displayed as-is.
 
 ---
 
 ## Client Responsibility Boundaries
 
-This frontend is intentionally designed to be **non-authoritative**.
+The frontend is intentionally **non-authoritative**.
 
-### The frontend is responsible for:
-- Rendering pages and dashboards
-- Displaying player, character, and match statistics
-- Visualizing draft state and turn order
-- Forwarding user actions (draft picks, admin actions, edits)
-- Reflecting permission state (admin vs non-admin)
+### What it does
+- Renders pages and dashboards
+- Displays stats and history
+- Shows draft state and turn order
+- Sends user actions to the backend
+- Reflects admin permissions
 
-### The frontend is NOT responsible for:
-- Enforcing game rules
-- Validating draft legality
-- Computing ELO, penalties, or results
-- Determining admin permissions
-- Persisting authoritative state
+### What it does not do
+- Enforce rules
+- Validate draft actions
+- Calculate ELO or penalties
+- Decide admin access
+- Store authoritative data
 
-All enforcement and validation occur on the backend.
+All enforcement happens on the backend.
 
 ---
 
 ## Draft System — Client Perspective
 
-Draft pages function as **live clients** for backend-controlled draft sessions.
+Draft pages act as live views of backend-controlled draft sessions.
 
-### Draft Interaction
-- Draft state is owned by the backend
-- The client renders:
-  - Current turn
-  - Pick / ban order
-  - Team state
-- User actions are sent to the backend for validation
+- The backend owns draft state
+- The frontend renders picks, bans, teams, and turns
+- Player actions are sent to the backend for validation
 
 ### Spectator Mode
-- Spectator pages subscribe to **Server-Sent Events (SSE)**
-- Draft updates are pushed in real time
-- No polling or client-side state reconstruction is used
+- Spectator pages use **Server-Sent Events (SSE)**
+- Updates are pushed in real time
+- No polling is used
 
 ---
 
 ## Admin Interface & Safety Model
 
-Administrative features are exposed through the UI but are **never trusted**.
+Admin features are exposed in the UI but are never trusted on their own.
 
-### Admin UI Behavior
-- Admin-only routes and controls are conditionally displayed
-- Non-admin users cannot access admin pages through navigation
+- Admin-only controls are conditionally displayed
+- All admin actions are checked server-side
+- UI checks exist for usability, not security
 
-### Enforcement
-- All admin actions are verified server-side
-- UI visibility is for usability only
-- Backend remains the single authority
-
-This prevents privilege escalation through client manipulation.
+This prevents misuse even if the frontend is modified.
 
 ---
 
 ## Balance & Cost Visualization
 
-The frontend provides **visualization and simulation** for multiple balance systems.
+The frontend provides tools to view and simulate balance data.
 
-### Supported Domains
+### Supported formats
 - Cipher (HSR main format)
 - Cerydra (HSR alternate format)
 - Vivian (ZZZ format)
 
-### Client Role
-- Display balance values
-- Allow hypothetical team cost simulations
-- Present public previews of balance data
-
-The frontend does not enforce balance limits or validate legality.
+The frontend displays balance values and allows hypothetical team calculations.  
+Final validation always happens on the backend.
 
 ---
 
 ## Styling & Visual Identity
 
-The frontend follows a consistent **glassmorphic design language**.
+The UI follows a consistent **glassmorphic** style.
 
-### Design Principles
-- Dark theme with translucent panels
-- Backdrop blur for depth
-- Minimal borders and soft contrast
+- Dark theme
+- Translucent panels
+- Subtle blur and contrast
 - Consistent spacing and typography
 
-### Styling Architecture
-- Bootstrap for layout and structure
-- react-bootstrap for UI primitives
-- Custom overrides defined in `Landing.css`
-
-This ensures visual consistency across all sections of the app.
+Styling is handled through:
+- Bootstrap for layout
+- react-bootstrap for components
+- Custom overrides in `Landing.css`
 
 ---
 
 ## System Positioning
 
 This frontend exists to:
-- Expose Cipher’s competitive ecosystem to users
-- Provide transparency into stats, balance, and drafts
-- Act as a unified interface across multiple game formats
+- Present Cipher’s competitive ecosystem
+- Make stats, drafts, and balance transparent
+- Provide a single interface across multiple game formats
 
-It is not intended to function independently or offline.
+It is not designed to run independently.
 
 ---
 
 ## Related Systems
 
-Cipher PvP is composed of multiple cooperating systems:
+Cipher PvP also includes:
 
-- **Backend API** — Authentication, rules, persistence, aggregation
-- **Discord Bot** — Match ingestion, ELO processing, automation
+- **Backend API** — Authentication, rules, persistence, aggregation  
+- **Discord Bot** — Match ingestion and automation  
 
 This repository represents the **presentation layer only**.
 
+---
 
+## License
+
+This project is licensed under the **MIT License**.
