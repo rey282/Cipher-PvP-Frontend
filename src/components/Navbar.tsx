@@ -8,7 +8,7 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   // Manual login lock 
-  const LOGIN_LOCKED = true;
+  const LOGIN_LOCKED = false;
 
   const isCerydra = location.pathname.startsWith("/cerydra");
   const isCipher = location.pathname.startsWith("/cipher");
