@@ -2302,19 +2302,32 @@ export default function CerydraDraftPage() {
       const row = costLcPhase[String(pick.lightcone.id)];
       const lcBaseOverride = featuredLcCostOverride.get(
         String(pick.lightcone.id)
-      ); // treated as P1 base if using fallback rule
+      ); 
       if (row && row.length === 5) {
-        lcCost = Number(
-          (row[Math.max(1, Math.min(5, pick.phase)) - 1] || 0).toFixed(2)
+
+        const pIndex = Math.max(1, Math.min(5, pick.phase)) - 1;
+
+        const baseAtP1 = Number((row[0] || 0).toFixed(2));
+        const atPx = Number((row[pIndex] || 0).toFixed(2));
+        const delta = Number((atPx - baseAtP1).toFixed(2));
+
+        const baseOverride = featuredLcCostOverride.get(
+          String(pick.lightcone.id)
         );
+        const base = typeof baseOverride === "number" ? baseOverride : baseAtP1;
+
+        lcCost = Number((base + delta).toFixed(2));
       } else {
         const normalAtP1 = calcLcCostHSR(pick.lightcone, 1);
         const normalAtPx = calcLcCostHSR(pick.lightcone, pick.phase);
         const pDelta = Number((normalAtPx - normalAtP1).toFixed(2));
+
         const base =
           typeof lcBaseOverride === "number" ? lcBaseOverride : normalAtP1;
+
         lcCost = Number((base + pDelta).toFixed(2));
       }
+
     }
 
     const total = Number((charCost + lcCost).toFixed(2));
@@ -2858,22 +2871,34 @@ export default function CerydraDraftPage() {
       }
       setDraftPicks((prev) => {
         const updated = [...prev];
-        if (updated[index]) {
-          if (selected === null) {
-            const { lightcone, ...rest } = updated[index]!;
-            updated[index] = { ...rest, lightcone: undefined };
-          } else {
-            const lcObj = lightcones.find(
-              (w) => String(w.id) === String(selected)
-            );
-            updated[index] = {
-              ...updated[index]!,
-              lightcone: lcObj ?? undefined,
-            };
-          }
+        if (!updated[index]) return updated;
+
+        const prevLcId = updated[index]!.lightcone?.id ?? null;
+
+        if (selected === null) {
+          const { lightcone, ...rest } = updated[index]!;
+          updated[index] = {
+            ...rest,
+            lightcone: undefined,
+            phase: 1, // ✅ reset
+          };
+        } else {
+          const lcObj = lightcones.find(
+            (w) => String(w.id) === String(selected)
+          );
+
+          const lcChanged = String(prevLcId) !== String(selected);
+
+          updated[index] = {
+            ...updated[index]!,
+            lightcone: lcObj ?? undefined,
+            phase: lcChanged ? 1 : updated[index]!.phase,
+          };
         }
+
         return updated;
       });
+
       bumpIgnoreSse();
       postPlayerAction({
         op: "setLightcone",
@@ -2892,22 +2917,32 @@ export default function CerydraDraftPage() {
     // owner
     setDraftPicks((prev) => {
       const updated = [...prev];
-      if (updated[index]) {
-        if (selected === null) {
-          const { lightcone, ...rest } = updated[index]!;
-          updated[index] = { ...rest, lightcone: undefined };
-        } else {
-          const lcObj = lightcones.find(
-            (w) => String(w.id) === String(selected)
-          );
-          updated[index] = {
-            ...updated[index]!,
-            lightcone: lcObj ?? undefined,
-          };
-        }
+      if (!updated[index]) return updated;
+
+      const prevLcId = updated[index]!.lightcone?.id ?? null;
+
+      if (selected === null) {
+        const { lightcone, ...rest } = updated[index]!;
+        updated[index] = {
+          ...rest,
+          lightcone: undefined,
+          phase: 1, // ✅ reset
+        };
+      } else {
+        const lcObj = lightcones.find((w) => String(w.id) === String(selected));
+
+        const lcChanged = String(prevLcId) !== String(selected);
+
+        updated[index] = {
+          ...updated[index]!,
+          lightcone: lcObj ?? undefined,
+          phase: lcChanged ? 1 : updated[index]!.phase,
+        };
       }
+
       return updated;
     });
+
     setShowLcModal(false);
     setTimeout(() => setActiveSlotIndex(null), 100);
     setSelectedLcId("");

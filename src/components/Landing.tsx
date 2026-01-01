@@ -56,7 +56,7 @@ const vivianMenu = [
 const cerydraMenu = [
   { label: "Rules", type: "rules" as const },
   { label: "Match History", type: "matches" as const },
-  { label: "Cerydra Cost Table", url: "/cerydra/balance-cost" },
+  { label: "Balance Cost", url: "/cerydra/balance-cost" },
 ];
 
 // Team member IDs + roles
@@ -101,6 +101,10 @@ export default function Landing() {
   const [bgFading, setBgFading] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
+  const [showBurstMenu, setShowBurstMenu] = useState<
+    null | "vivian" | "cerydra" | "cipher"
+  >(null);
+  const [burstClosing, setBurstClosing] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -247,6 +251,15 @@ export default function Landing() {
     fetchProfiles(zzzTeamIds, "zzz", setZzzTeamProfiles);
   }, []);
 
+  const closeBurstMenu = () => {
+    setBurstClosing(true);
+    setTimeout(() => {
+      setShowBurstMenu(null);
+      setBurstClosing(false);
+    }, 750);
+  };
+
+
   const gamesel = games[selected];
   const team =
     gamesel.id === "hsr"
@@ -293,7 +306,11 @@ export default function Landing() {
 
         {/* ───── Hero Section ───── */}
         <div className="flex-grow-1 d-flex flex-column justify-content-center align-items-center text-center">
-          <div className="hero animate__animated animate__fadeInDown text-white">
+          <div
+            className={`hero hero-box text-white ${
+              showBurstMenu ? "hero-hidden" : ""
+            }`}
+          >
             <h2 className="game-title mb-4">{gamesel.name}</h2>
 
             {team.length > 0 && (
@@ -354,7 +371,7 @@ export default function Landing() {
 
             <div className="mt-3">
               {gamesel.id === "zzz" ? (
-                /* ─────────── VIVIAN (ZZZ) — Start + More dropdown ─────────── */
+                /* ─────────── VIVIAN ─────────── */
                 <div className="d-flex flex-column justify-content-center align-items-center gap-2">
                   <div className="d-flex justify-content-center align-items-center gap-2">
                     {/* Start -> open draft modal (fallback to /zzz) */}
@@ -373,48 +390,16 @@ export default function Landing() {
                     {/* More dropdown */}
                     <div className="btn-group">
                       <button
-                        type="button"
-                        className="btn angled-btn dropdown-toggle"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false"
-                        title="More Vivian actions"
+                        className="btn angled-btn"
+                        onClick={() => setShowBurstMenu("vivian")}
                       >
                         More
                       </button>
-                      <ul className="dropdown-menu dropdown-menu-dark">
-                        {vivianMenu.map((item) => (
-                          <li key={item.label}>
-                            {item.type === "rules" ? (
-                              <button
-                                className="dropdown-item"
-                                onClick={() => {
-                                  if (vivianRef.current?.openRulesModal)
-                                    vivianRef.current.openRulesModal();
-                                  else navigate("/zzz");
-                                }}
-                              >
-                                Rules
-                              </button>
-                            ) : (
-                              <button
-                                className="dropdown-item"
-                                onClick={() => {
-                                  if (vivianRef.current?.openMatchesModal)
-                                    vivianRef.current.openMatchesModal();
-                                  else navigate("/zzz");
-                                }}
-                              >
-                                Match History
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
                     </div>
                   </div>
                 </div>
               ) : gamesel.id === "hsr2" ? (
-                /* ─────────── CERYDRA — Start + More dropdown ─────────── */
+                /* ─────────── CERYDRA ─────────── */
                 <div className="d-flex flex-column justify-content-center align-items-center gap-2">
                   <div className="d-flex justify-content-center align-items-center gap-2">
                     {/* Start -> open draft modal (fallback to /cerydra) */}
@@ -433,55 +418,16 @@ export default function Landing() {
                     {/* More dropdown */}
                     <div className="btn-group">
                       <button
-                        type="button"
-                        className="btn angled-btn dropdown-toggle"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false"
-                        title="More Cerydra actions"
+                        className="btn angled-btn"
+                        onClick={() => setShowBurstMenu("cerydra")}
                       >
                         More
                       </button>
-                      <ul className="dropdown-menu dropdown-menu-dark">
-                        {cerydraMenu.map((item) => (
-                          <li key={item.label}>
-                            {"url" in item ? (
-                              <button
-                                className="dropdown-item"
-                                onClick={() => navigate(item.url!)}
-                              >
-                                {item.label}
-                              </button>
-                            ) : item.type === "rules" ? (
-                              <button
-                                className="dropdown-item"
-                                onClick={() => {
-                                  if (cerydraRef.current?.openRulesModal)
-                                    cerydraRef.current.openRulesModal();
-                                  else navigate("/cerydra");
-                                }}
-                              >
-                                Rules
-                              </button>
-                            ) : (
-                              <button
-                                className="dropdown-item"
-                                onClick={() => {
-                                  if (cerydraRef.current?.openMatchesModal)
-                                    cerydraRef.current.openMatchesModal();
-                                  else navigate("/cerydra");
-                                }}
-                              >
-                                Match History
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
                     </div>
                   </div>
                 </div>
               ) : gamesel.id === "hsr" ? (
-                /* ─────────── CIPHER (HSR) — Start -> Play link + More dropdown ─────────── */
+                /* ─────────── CIPHER ─────────── */
                 <div className="d-flex flex-column justify-content-center align-items-center gap-2">
                   <div className="d-flex justify-content-center align-items-center gap-2">
                     <button
@@ -500,37 +446,11 @@ export default function Landing() {
 
                     <div className="btn-group">
                       <button
-                        type="button"
-                        className="btn angled-btn dropdown-toggle"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false"
-                        title="More Cipher actions"
+                        className="btn angled-btn"
+                        onClick={() => setShowBurstMenu("cipher")}
                       >
                         More
                       </button>
-                      <ul className="dropdown-menu dropdown-menu-dark">
-                        {cipherMenu.map((item) => (
-                          <li key={item.label}>
-                            {item.url.startsWith("http") ? (
-                              <a
-                                className="dropdown-item"
-                                href={item.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {item.label}
-                              </a>
-                            ) : (
-                              <button
-                                className="dropdown-item"
-                                onClick={() => navigate(item.url)}
-                              >
-                                {item.label}
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
                     </div>
                   </div>
                 </div>
@@ -564,6 +484,60 @@ export default function Landing() {
           ))}
         </div>
       </div>
+      {/* ───────── Burst Menu Overlay ───────── */}
+      {showBurstMenu && (
+        <div
+          className={`burst-overlay ${burstClosing ? "closing" : ""}`}
+          onClick={closeBurstMenu}
+        >
+          <div
+            className={`burst-menu ${burstClosing ? "closing" : ""}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`burst-title game-title ${
+                burstClosing ? "closing" : ""
+              }`}
+            >
+              {gamesel.name}
+            </div>
+
+            {(showBurstMenu === "vivian"
+              ? vivianMenu
+              : showBurstMenu === "cerydra"
+              ? cerydraMenu
+              : cipherMenu
+            ).map((item, i) => (
+              <button
+                key={item.label}
+                className="burst-item"
+                style={{ "--i": i } as React.CSSProperties}
+                onClick={() => {
+                  closeBurstMenu();
+
+                  if ("url" in item && item.url) {
+                    if (item.url.startsWith("http")) {
+                      window.open(item.url, "_blank", "noopener,noreferrer");
+                    } else {
+                      navigate(item.url);
+                    }
+                  } else if ("type" in item && item.type === "rules") {
+                    showBurstMenu === "vivian"
+                      ? vivianRef.current?.openRulesModal()
+                      : cerydraRef.current?.openRulesModal();
+                  } else if ("type" in item && item.type === "matches") {
+                    showBurstMenu === "vivian"
+                      ? vivianRef.current?.openMatchesModal()
+                      : cerydraRef.current?.openMatchesModal();
+                  }
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

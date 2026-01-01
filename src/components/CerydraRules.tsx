@@ -11,22 +11,19 @@ export default function CerydraRules() {
       </p>
       <strong>Match Procedure:</strong>
       <ul>
+        <li>The side that winsside pick must lock their lightcones first.</li>
         <li>
-          The side that winsside pick must lock their
-          lightcones first.
+          After locking, each team may perform one lightcone adjustment: add or
+          remove one cone they drafted.
         </li>
         <li>
-          After locking, each team may perform one lightcone
-          adjustment: add or remove one cone they drafted.
-        </li>
-        <li>
-          Open roster is required. Updated rosters must be shown at least{" "}
-          2 hours before the match.
+          Open roster is required. Updated rosters must be shown at least 2
+          hours before the match.
         </li>
         <li>Test runs are allowed before the official attempt.</li>
         <li>
-          After both sides lock their draft, the{" "}
-          first run must begin within 10 minutes.
+          After both sides lock their draft, the first run must begin within 10
+          minutes.
         </li>
         <li>
           If no one starts a run within 10 minutes, the order is forced:
@@ -36,11 +33,10 @@ export default function CerydraRules() {
       </ul>
       <strong>Draft:</strong>
       <p>
-        Two formats are supported: 2-ban and{" "}
-        3-ban. Each format has its own ban/pick sequence,
-        displayed directly on the drafting page. Slots marked as BAN may only be
-        used to ban characters, and normal pick slots allow selecting any valid,
-        unbanned character.
+        Two formats are supported: 2-ban and 3-ban. Each format has its own
+        ban/pick sequence, displayed directly on the drafting page. Slots marked
+        as BAN may only be used to ban characters, and normal pick slots allow
+        selecting any valid, unbanned character.
       </p>
       <strong>Picks:</strong>
       <ul>
@@ -55,32 +51,29 @@ export default function CerydraRules() {
       <strong>Cost:</strong>
       <ul>
         <li>
-          Every 4 points difference equals{" "}
-          +1 cycle advantage for the leading team.
-        </li>
-        <li>
-          <strong>Castorice proc:</strong> incurs a{" "}
-          +1.5 cost penalty unless Castorice is drafted on your
+          Every 4 points difference equals +1 cycle advantage for the leading
           team.
+        </li>
+      </ul>
+      <strong>Castorice proc:</strong>
+      <ul>
+        <li>
+          Incurs a +1.5 cost penalty unless Castorice is drafted on your team.
         </li>
         <li>
           If your character dies without taking another action, being healed, or
           being shielded, then no Castorice penalty applies.
         </li>
         <li>
-          If you do not own Castorice, then{" "}
-          no death penalties apply at all.
+          If you do not own Castorice, then no death penalties apply at all.
         </li>
       </ul>
       <strong>Penalty and Resets:</strong>
       <ul>
+        <li>Runs must be livestreamed.</li>
         <li>
-          Runs must be livestreamed.
-        </li>
-        <li>
-          Cones and eidolons must be shown{" "}
-          before and after each run before ending the
-          screenshare.
+          Cones and eidolons must be shown before and after each run before
+          ending the screenshare.
         </li>
         <li>Only the latest streamed run is counted as the official result.</li>
       </ul>

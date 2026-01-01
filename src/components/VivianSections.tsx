@@ -120,7 +120,7 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
 
     // cost knobs (Vivian)
     const [costLimit, setCostLimit] = useState<number>(mode === "3v3" ? 24 : 16);
-    const [penaltyPerPoint, setPenaltyPerPoint] = useState<number>(100);
+    const [penaltyPerPoint, setPenaltyPerPoint] = useState<number>(1250);
     const [showCostInputs, setShowCostInputs] = useState(false);
 
     const [showResumeModal, setShowResumeModal] = useState(false);
@@ -1353,7 +1353,7 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
                 )}
                 {showPenaltyPill && (
                   <span className="badge rounded-pill bg-warning text-dark">
-                    Penalty {Number(penaltyPerPoint)}/0.01
+                    Penalty {Number(penaltyPerPoint)}/0.25
                   </span>
                 )}
               </div>
@@ -1449,11 +1449,11 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
 
                     <div className="col-sm-6">
                       <label className="form-label">
-                        Penalty per 0.01 over
+                        Penalty per 0.25 over
                       </label>
                       <input
                         type="number"
-                        step="0.01"
+                        step="0.25"
                         min={0}
                         className="form-control"
                         value={penaltyPerPoint}
@@ -1464,7 +1464,7 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
                         }
                       />
                       <small className="text-white-50">
-                        Example: 100 → every 0.01 over costs 100
+                        Example: 1250 → every 0.25 over costs 1250
                       </small>
                     </div>
                   </div>

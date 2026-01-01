@@ -1436,14 +1436,19 @@ export default function ZzzDraftPage() {
 
     if (weObj) {
       if (Array.isArray(weRow) && weRow.length === 5) {
-        // PRESET or DEFAULT row
-        weCost = Number(
-          (weRow[Math.max(1, Math.min(5, pick.superimpose)) - 1] || 0).toFixed(
-            2
-          )
-        );
+        // PRESET / DEFAULT row (normalize to delta model)
+        const pIndex = Math.max(1, Math.min(5, pick.superimpose)) - 1;
+
+        const baseAtP1 = Number((weRow[0] || 0).toFixed(2));
+        const atPx = Number((weRow[pIndex] || 0).toFixed(2));
+        const delta = Number((atPx - baseAtP1).toFixed(2));
+
+        const featuredBase = featuredWeCostOverride.get(String(weObj.id));
+        const base = typeof featuredBase === "number" ? featuredBase : baseAtP1;
+
+        weCost = Number((base + delta).toFixed(2));
       } else {
-        // No preset → fallback rules
+        // No preset → fallback rules (already correct)
         const normalAtP1 = calcWEngineCost(weObj, 1);
         const normalAtPx = calcWEngineCost(weObj, pick.superimpose);
         const pDelta = Number((normalAtPx - normalAtP1).toFixed(2));
@@ -1454,7 +1459,7 @@ export default function ZzzDraftPage() {
         weCost = Number((base + pDelta).toFixed(2));
       }
     }
-    
+
     // TOTAL
     const total = Number((agentCost + weCost).toFixed(2));
 
@@ -1991,25 +1996,35 @@ export default function ZzzDraftPage() {
         return;
       }
 
-      // 🟦 OPTIMISTIC
       setDraftPicks((prev) => {
         const updated = [...prev];
-        if (updated[index]) {
-          if (selected === null) {
-            const { wengine, ...rest } = updated[index]!;
-            updated[index] = { ...rest, wengine: undefined };
-          } else {
-            const weObj = wengines.find(
-              (w) => String(w.id) === String(selected)
-            );
-            updated[index] = {
-              ...updated[index]!,
-              wengine: weObj ?? undefined,
-            };
-          }
+        if (!updated[index]) return updated;
+
+        const prevWeId = updated[index]!.wengine?.id ?? null;
+
+        if (selected === null) {
+          // removing weapon → reset to P1
+          const { wengine, ...rest } = updated[index]!;
+          updated[index] = {
+            ...rest,
+            wengine: undefined,
+            superimpose: 1,
+          };
+        } else {
+          const weObj = wengines.find((w) => String(w.id) === String(selected));
+
+          const weaponChanged = String(prevWeId) !== String(selected);
+
+          updated[index] = {
+            ...updated[index]!,
+            wengine: weObj ?? undefined,
+            superimpose: weaponChanged ? 1 : updated[index]!.superimpose,
+          };
         }
+
         return updated;
       });
+
       bumpIgnoreSse();
 
       postPlayerAction({
@@ -2026,20 +2041,35 @@ export default function ZzzDraftPage() {
       return;
     }
 
-    // owner local change
     setDraftPicks((prev) => {
       const updated = [...prev];
-      if (updated[index]) {
-        if (selected === null) {
-          const { wengine, ...rest } = updated[index]!;
-          updated[index] = { ...rest, wengine: undefined };
-        } else {
-          const weObj = wengines.find((w) => String(w.id) === String(selected));
-          updated[index] = { ...updated[index]!, wengine: weObj ?? undefined };
-        }
+      if (!updated[index]) return updated;
+
+      const prevWeId = updated[index]!.wengine?.id ?? null;
+
+      if (selected === null) {
+        // Removing weapon → reset superimpose
+        const { wengine, ...rest } = updated[index]!;
+        updated[index] = {
+          ...rest,
+          wengine: undefined,
+          superimpose: 1,
+        };
+      } else {
+        const weObj = wengines.find((w) => String(w.id) === String(selected));
+
+        const weaponChanged = String(prevWeId) !== String(selected);
+
+        updated[index] = {
+          ...updated[index]!,
+          wengine: weObj ?? undefined,
+          superimpose: weaponChanged ? 1 : updated[index]!.superimpose,
+        };
       }
+
       return updated;
     });
+
 
     setShowWengineModal(false);
     setTimeout(() => setActiveSlotIndex(null), 100);
@@ -2058,7 +2088,6 @@ export default function ZzzDraftPage() {
     if (isPlayer) {
       if (side !== playerSide) return;
 
-      // 🟦 OPTIMISTIC
       setDraftPicks((prev) => {
         const updated = [...prev];
         if (updated[index])
@@ -2103,9 +2132,9 @@ export default function ZzzDraftPage() {
       total += slotTotal;
     }
 
-    //cost penalty is per 0.01 over
+    //cost penalty is per 0.25 over
     const over = Math.max(0, total - costLimit);
-    const steps = Math.floor(over / 0.01);
+    const steps = Math.floor(over / 0.25);
     const penaltyPoints = steps * penaltyPerPoint;
 
     return { total: Number(total.toFixed(2)), penaltyPoints };
@@ -3468,12 +3497,12 @@ export default function ZzzDraftPage() {
 
             <div className="mb-2">
               <label className="form-label fw-semibold">
-                Penalty per 0.01 over cap
+                Penalty per 0.25 over cap
               </label>
 
               <input
                 type="number"
-                step="0.01"
+                step="0.25"
                 min={0}
                 className="form-control"
                 value={penaltyStr}
@@ -3482,7 +3511,7 @@ export default function ZzzDraftPage() {
               />
 
               <small className="text-white-50">
-                Points deducted for each 0.01 over the cost limit.
+                Points deducted for each 0.25 over the cost limit.
               </small>
             </div>
           </Modal.Body>

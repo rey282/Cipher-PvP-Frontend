@@ -57,8 +57,8 @@ export default function ZzzRules() {
       <strong>Penalty and Resets:</strong>
       <ul>
         <li>
-          Every 0.01 points above limit (6 for 2v2, 9 for 3v3) reduces team
-          score by 50.
+          Every 0.25 points above limit (6 for 2v2, 9 for 3v3) reduces team
+          score by 1250.
         </li>
         <li>Each team has 2 resets per match.</li>
         <li>Resets must be used before ending stream.</li>
