@@ -86,7 +86,7 @@ export default function ZzzCostTestPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Score: 1..65000 (ZZZ)
-  const [score, setScore] = useState<number>(1);
+  const [score, setScore] = useState<string>("");
 
   // W-Engine modal
   const [showModal, setShowModal] = useState(false);
@@ -522,7 +522,7 @@ export default function ZzzCostTestPage() {
     // let animations start before clearing
     setTimeout(() => {
       setTeam(makeEmptyTeam());
-      setScore(1);
+      setScore("");
     }, 200);
   };
 
@@ -553,14 +553,15 @@ export default function ZzzCostTestPage() {
         refinement: 1,
       });
     }
+
     const nextTeam = three.map(slotToMember);
     setTeam(nextTeam);
 
-    const importedScore =
-      typeof p.expectedScore === "number" ? p.expectedScore : null;
-
-    if (typeof importedScore === "number") {
-      setScore(Math.max(1, Math.min(65000, Math.floor(importedScore))));
+    if (typeof p.expectedScore === "number") {
+      const clamped = Math.max(1, Math.min(65000, Math.floor(p.expectedScore)));
+      setScore(String(clamped));
+    } else {
+      setScore("");
     }
 
     setSearch("");
@@ -569,6 +570,7 @@ export default function ZzzCostTestPage() {
     setSuperOpenIndex(null);
     setShowPresetsPanel(false);
   };
+
 
   const formatCost = (value: number) => {
     if (Number.isInteger(value)) return value.toString();
@@ -605,11 +607,19 @@ export default function ZzzCostTestPage() {
       toast.info("Fill 3 unique characters to export.");
       return;
     }
+
     setExportName("");
     setExportDesc("");
-    setExportScoreInput(String(Math.max(1, Math.floor(Number(score))) || 1));
+
+    setExportScoreInput(
+      score.trim() === ""
+        ? ""
+        : String(Math.max(1, Math.min(65000, Math.floor(Number(score)))))
+    );
+
     setShowExportModal(true);
   };
+
 
   const handleCreatePreset = async () => {
     if (!user?.id) return;
@@ -866,15 +876,21 @@ export default function ZzzCostTestPage() {
                 max={65000}
                 step={1}
                 inputMode="numeric"
+                placeholder="Enter expected score"
                 onChange={(e) => {
                   const v = e.target.value;
+
+                  // allow empty (so user can type)
                   if (v === "") {
-                    setScore(1);
+                    setScore("");
                     return;
                   }
-                  const n = Math.floor(Number(v));
+
+                  const n = Number(v);
                   if (Number.isFinite(n)) {
-                    setScore(Math.max(1, Math.min(65000, n)));
+                    setScore(
+                      String(Math.max(1, Math.min(65000, Math.floor(n))))
+                    );
                   }
                 }}
                 title="Saved to presets as Expected Score"
