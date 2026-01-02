@@ -73,7 +73,7 @@ export default function BalancePreviewCerydra() {
     <div
       className="page-fade-in"
       style={{
-        backgroundImage: "url('/background2.webp')",
+        backgroundImage: "url('/balance.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed",
