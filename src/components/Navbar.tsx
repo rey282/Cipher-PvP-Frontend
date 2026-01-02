@@ -18,9 +18,22 @@ export default function Navbar() {
   const isPresets = /\/presets(\/|$)/.test(location.pathname);
   const isLandingLike = isLanding || isProfile || isPresets;
 
-  const goToTeamPresets = () => {
+  const goToHsrPresets = () => {
     if (!user?.id) return;
     navigate(`/profile/${user.id}/presets`);
+  };
+
+  const goToZzzPresets = () => {
+    if (!user?.id) return;
+    navigate(`/profile/${user.id}/zzz-presets`);
+  };
+
+  const goToHsrCostTest = () => {
+    navigate("/cerydra/cost-test");
+  };
+
+  const goToZzzCostTest = () => {
+    navigate("/zzz/cost-test");
   };
 
   const cipherNav = [
@@ -31,7 +44,7 @@ export default function Navbar() {
     { label: "Character Stats", path: "/cipher/characters" },
   ];
 
-  const homeNav = [{ label: "Cost Test", path: "/cerydra/cost-test" }];
+  const homeNav: { label: string; path: string }[] = [];
 
   const navLinks =
     isLandingLike || isCerydra ? homeNav : isCipher ? cipherNav : [];
@@ -81,15 +94,64 @@ export default function Navbar() {
             </Link>
           ))}
 
-          {showTeamPresetsLink && (
+          <div className="dropdown">
             <button
-              type="button"
-              className="admin-link fw-semibold text-decoration-none btn btn-link p-0"
-              style={{ textDecoration: "none" }}
-              onClick={goToTeamPresets}
+              className="admin-link fw-semibold btn btn-link p-0 text-decoration-none"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
             >
-              Team Presets
+              Cost Test ▾
             </button>
+
+            <ul className="dropdown-menu dropdown-menu-end glass-dropdown">
+              <li>
+                <button
+                  className="dropdown-item text-white"
+                  onClick={goToHsrCostTest}
+                >
+                  HSR Cost Test
+                </button>
+              </li>
+              <li>
+                <button
+                  className="dropdown-item text-white"
+                  onClick={goToZzzCostTest}
+                >
+                  ZZZ Cost Test
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {showTeamPresetsLink && (
+            <div className="dropdown">
+              <button
+                className="admin-link fw-semibold btn btn-link p-0 text-decoration-none"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                Team Presets ▾
+              </button>
+
+              <ul className="dropdown-menu dropdown-menu-end glass-dropdown">
+                <li>
+                  <button
+                    className="dropdown-item text-white"
+                    onClick={goToHsrPresets}
+                  >
+                    HSR Presets
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className="dropdown-item text-white"
+                    onClick={goToZzzPresets}
+                  >
+                    ZZZ Presets
+                  </button>
+                </li>
+              </ul>
+            </div>
           )}
         </div>
 
@@ -230,15 +292,42 @@ export default function Navbar() {
               </Link>
             ))}
 
+            {/* Cost Test (mobile, public) */}
+            <Link
+              to="/cerydra/cost-test"
+              className="admin-link fw-semibold text-decoration-none"
+              onClick={handleCloseOffcanvas}
+            >
+              HSR Cost Test
+            </Link>
+
+            <Link
+              to="/zzz/cost-test"
+              className="admin-link fw-semibold text-decoration-none"
+              onClick={handleCloseOffcanvas}
+            >
+              ZZZ Cost Test
+            </Link>
+
             {/* Team Presets (mobile) */}
             {showTeamPresetsLink && (
-              <Link
-                to={`/profile/${user?.id}/presets`}
-                className="admin-link fw-semibold text-decoration-none"
-                onClick={handleCloseOffcanvas}
-              >
-                Team Presets
-              </Link>
+              <>
+                <Link
+                  to={`/profile/${user?.id}/presets`}
+                  className="admin-link fw-semibold text-decoration-none"
+                  onClick={handleCloseOffcanvas}
+                >
+                  HSR Presets
+                </Link>
+
+                <Link
+                  to={`/profile/${user?.id}/zzz-presets`}
+                  className="admin-link fw-semibold text-decoration-none"
+                  onClick={handleCloseOffcanvas}
+                >
+                  ZZZ Presets
+                </Link>
+              </>
             )}
 
             {/* Admin Link */}

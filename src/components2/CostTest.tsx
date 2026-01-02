@@ -171,6 +171,69 @@ export default function CostTestPage() {
 
   useEffect(() => () => unlockBody(), []);
 
+  function animatePick(fromEl: HTMLElement, toEl: HTMLElement) {
+    const from = fromEl.getBoundingClientRect();
+    const to = toEl.getBoundingClientRect();
+
+    const clone = fromEl.cloneNode(true) as HTMLElement;
+    document.body.appendChild(clone);
+
+    clone.style.position = "fixed";
+    clone.style.left = `${from.left}px`;
+    clone.style.top = `${from.top}px`;
+    clone.style.width = `${from.width}px`;
+    clone.style.height = `${from.height}px`;
+    clone.style.margin = "0";
+    clone.style.zIndex = "9999";
+    clone.style.pointerEvents = "none";
+    clone.style.transition =
+      "transform 420ms cubic-bezier(.22,1,.36,1), opacity 420ms ease";
+
+    const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+
+    requestAnimationFrame(() => {
+      clone.style.transform = `translate(${dx}px, ${dy}px) scale(0.45)`;
+      clone.style.opacity = "0.2";
+    });
+
+    clone.addEventListener("transitionend", () => clone.remove(), {
+      once: true,
+    });
+  }
+
+  function animateReturn(fromEl: HTMLElement, toEl: HTMLElement) {
+    const from = fromEl.getBoundingClientRect();
+    const to = toEl.getBoundingClientRect();
+
+    const clone = fromEl.cloneNode(true) as HTMLElement;
+    document.body.appendChild(clone);
+
+    clone.style.position = "fixed";
+    clone.style.left = `${from.left}px`;
+    clone.style.top = `${from.top}px`;
+    clone.style.width = `${from.width}px`;
+    clone.style.height = `${from.height}px`;
+    clone.style.margin = "0";
+    clone.style.zIndex = "9999";
+    clone.style.pointerEvents = "none";
+    clone.style.transition =
+      "transform 420ms cubic-bezier(.22,1,.36,1), opacity 420ms ease";
+
+    const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+
+    requestAnimationFrame(() => {
+      clone.style.transform = `translate(${dx}px, ${dy}px) scale(0.6)`;
+      clone.style.opacity = "0.1";
+    });
+
+    clone.addEventListener("transitionend", () => clone.remove(), {
+      once: true,
+    });
+  }
+
+
   /* ───────────── Helpers ───────────── */
   const isSignatureCone = (
     cone: LightCone,
@@ -417,12 +480,24 @@ export default function CostTestPage() {
     const firstEmpty = team.findIndex((m) => !m.characterId);
     if (firstEmpty === -1) return;
 
+    const fromEl = document.querySelector(
+      `.hsr-char-pool-item[data-char-code="${char.code}"]`
+    ) as HTMLElement | null;
+
+    const toEl = document.querySelector(
+      `[data-slot-index="${firstEmpty}"]`
+    ) as HTMLElement | null;
+
+    if (fromEl && toEl) {
+      animatePick(fromEl, toEl);
+    }
+
     setTeam((prev) => {
       const newTeam = [...prev];
       newTeam[firstEmpty] = {
         characterId: char.code,
-        eidolon: 0,
         characterInfo: char,
+        eidolon: 0,
         lightConeId: "",
         lightConeData: undefined,
         superimpose: 1,
@@ -436,14 +511,32 @@ export default function CostTestPage() {
     setSuperOpenIndex(null);
   };
 
+
   const removeSlot = (index: number) => {
+    const member = team[index];
+    if (!member?.characterId) return;
+
+    const fromEl = document.querySelector(
+      `[data-slot-index="${index}"] .hsr-slot-char`
+    ) as HTMLElement | null;
+
+    const toEl = document.querySelector(
+      `.hsr-char-pool-item[data-char-code="${member.characterId}"]`
+    ) as HTMLElement | null;
+
+    if (fromEl && toEl) {
+      animateReturn(fromEl, toEl);
+    }
+
     const filtered = team.filter((_, i) => i !== index);
     const compacted = filtered.filter((m) => m.characterId);
     const emptySlots = Array.from({ length: 4 - compacted.length }, () =>
       emptyMember()
     );
+
     setTeam([...compacted, ...emptySlots]);
   };
+
 
   const openConeModal = (index: number) => {
     setActiveSlotIndex(index);
@@ -466,9 +559,28 @@ export default function CostTestPage() {
   };
 
   const clearTeam = () => {
-    setTeam(makeEmptyTeam());
-    setClearSpeed(0);
+    team.forEach((member, index) => {
+      if (!member.characterId) return;
+
+      const fromEl = document.querySelector(
+        `[data-slot-index="${index}"] .hsr-slot-char`
+      ) as HTMLElement | null;
+
+      const toEl = document.querySelector(
+        `.hsr-char-pool-item[data-char-code="${member.characterId}"]`
+      ) as HTMLElement | null;
+
+      if (fromEl && toEl) {
+        setTimeout(() => animateReturn(fromEl, toEl), index * 80);
+      }
+    });
+
+    setTimeout(() => {
+      setTeam(makeEmptyTeam());
+      setClearSpeed(0);
+    }, 220);
   };
+
 
   /* ───────────── Import / Export with TeamPresets ───────────── */
   const slotToMember = (slot: PresetSlot): TeamMember => {
@@ -905,6 +1017,7 @@ export default function CostTestPage() {
                 return (
                   <div
                     key={index}
+                    data-slot-index={index}
                     onClick={() => char && openConeModal(index)}
                     style={{
                       flex: "0 0 auto",
@@ -926,6 +1039,7 @@ export default function CostTestPage() {
                     {char ? (
                       <div style={{ position: "relative" }}>
                         <img
+                          className="hsr-slot-char"
                           src={char.image_url}
                           alt={char.name}
                           loading="lazy"
@@ -1284,6 +1398,8 @@ export default function CostTestPage() {
                       .map((char) => (
                         <div
                           key={char.code}
+                          className="hsr-char-pool-item"
+                          data-char-code={char.code}
                           onClick={() => assignCharacterToSlot(char)}
                           title={char.name}
                           style={{

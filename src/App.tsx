@@ -32,6 +32,8 @@ const PlayerCharacterStats = lazy(
   () => import("./components/PlayerCharacterStats")
 );
 const ZzzBalancePage = lazy(() => import("./components2/ZzzBalancePage"));
+const ZzzTeamPresets = lazy(() => import("./components/ZzzTeamPresets"));
+const ZzzCostTestPage = lazy(() => import("./components/ZzzCostTestPage"));
 
 
 /* ─────────── Layout wrapper ─────────── */
@@ -147,6 +149,28 @@ export default function App() {
         }
       />
 
+      <Route
+        path="/profile/zzz-presets"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <ZzzTeamPresets />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
+      <Route
+        path="/profile/:id/zzz-presets"
+        element={
+          <Suspense fallback={<LoadingSplash />}>
+            <PageWithFooter>
+              <ZzzTeamPresets />
+            </PageWithFooter>
+          </Suspense>
+        }
+      />
+
       {/* Cipher Format */}
       <Route path="/cipher">
         <Route
@@ -247,6 +271,17 @@ export default function App() {
             </Suspense>
           }
         />
+        <Route
+          path="cost-test"
+          element={
+            <Suspense fallback={<LoadingSplash />}>
+              <PageWithFooter>
+                <ZzzCostTestPage />
+              </PageWithFooter>
+            </Suspense>
+          }
+        />
+
         <Route
           path="s/:key"
           element={

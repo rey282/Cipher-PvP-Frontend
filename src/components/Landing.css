@@ -2,11 +2,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&display=swap');
 
 /* ───────── layout & background ───────── */
-.landing-wrapper,
-.page-fade-in {
-  animation: fadeInPage 0.5s ease-in-out;
+body.modal-open .landing-wrapper,
+body.modal-open .page-fade-in {
+  animation: none !important;
 }
-@keyframes fadeInPage { from { opacity: 0; } to { opacity: 1; } }
 
 .landing-wrapper {
   position: relative;
@@ -908,12 +907,10 @@ span.beta-badge {
   }
 }
 
-/* Ensure the app can always scroll unless a modal is truly open */
 html,
 body,
 #root {
   height: auto;
-  overflow-y: auto !important;
 }
 
 /* If you use page fade wrappers elsewhere, prefer svh (mobile-safe) */
@@ -2963,12 +2960,23 @@ input[type="range"].big-slider {
 
 /* ───────────────── Dark fantasy backdrop ───────────────── */
 
-.modal-backdrop.show {
+.modal-backdrop {
   background:
     radial-gradient(circle at 50% 30%, rgba(168, 85, 247, 0.25), transparent 60%),
     linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.9));
+  transition: opacity 0.25s ease, backdrop-filter 0.25s ease;
+  backdrop-filter: blur(0px);
+}
+
+/* When visible */
+.modal-backdrop.show {
   opacity: 1 !important;
   backdrop-filter: blur(4px);
+}
+
+/* When closing – blur fades BEFORE removal */
+.modal-backdrop:not(.show) {
+  backdrop-filter: blur(0px);
 }
 
 /* ───────────────── Modal frame (HSR glass panel) ───────────────── */
@@ -3005,9 +3013,14 @@ input[type="range"].big-slider {
     0 0 24px rgba(236, 72, 153, 0.25);
 }
 
-/* Gentle ambient pulse (optional but recommended) */
-.custom-dark-modal {
+/* Ambient modal glow  */
+.modal.show .custom-dark-modal {
   animation: modalBreath 6s ease-in-out infinite alternate;
+}
+
+/* Prevent repaint flash during modal close */
+.modal.fade:not(.show) {
+  pointer-events: none;
 }
 
 @keyframes modalBreath {
@@ -3047,11 +3060,9 @@ input[type="range"].big-slider {
   opacity: 0;
 }
 
-/* Backdrop sync */
 .modal-backdrop {
-  transition: opacity 0.35s ease;
+  transition: opacity 0.25s ease !important;
 }
-
 /* ───────────────── More Button Scatter Effect ───────────────── */
 
 .btn-more {
@@ -3248,4 +3259,95 @@ input[type="range"].big-slider {
   transform: translateY(-24px) scale(0.97);
   filter: blur(3px);
   pointer-events: none;
+}
+
+.preset-view-dialog-3 {
+  max-width: 720px;
+}
+
+/* ================================
+   Cost Test – Pick Animation
+   ================================ */
+
+/* Source tiles (character pool) */
+.zzz-char-pool-item {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Make sure cloned element animates smoothly */
+.zzz-char-pool-item,
+.zzz-char-pool-item * {
+  box-sizing: border-box;
+}
+
+/* Prevent image stretching during flight */
+.zzz-char-pool-item {
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+}
+
+.zzz-slot-lock {
+  animation: zzz-slot-lock-in 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes zzz-slot-lock-in {
+  0% {
+    box-shadow: 0 0 0 rgba(0, 200, 255, 0);
+    transform: scale(1);
+  }
+
+  40% {
+    box-shadow: 0 0 18px rgba(0, 200, 255, 0.45);
+    transform: scale(1.035);
+  }
+
+  100% {
+    box-shadow: 0 0 0 rgba(0, 200, 255, 0);
+    transform: scale(1);
+  }
+}
+
+/* HSR Cost Test – animation helpers */
+.hsr-char-pool-item {
+  cursor: pointer;
+  user-select: none;
+}
+
+.hsr-char-pool-item,
+.hsr-char-pool-item * {
+  box-sizing: border-box;
+}
+
+.hsr-slot-lock {
+  animation: hsr-slot-lock-in 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes hsr-slot-lock-in {
+  0% {
+    box-shadow: 0 0 0 rgba(120, 160, 255, 0);
+    transform: scale(1);
+  }
+
+  40% {
+    box-shadow: 0 0 18px rgba(120, 160, 255, 0.45);
+    transform: scale(1.035);
+  }
+
+  100% {
+    box-shadow: 0 0 0 rgba(120, 160, 255, 0);
+    transform: scale(1);
+  }
+}
+
+html:has(.modal),
+body:has(.modal) {
+  overflow-y: hidden !important;
+}
+
+/* Only restore scrolling AFTER modal is fully gone */
+html:not(:has(.modal)),
+body:not(:has(.modal)) {
+  overflow-y: auto;
 }

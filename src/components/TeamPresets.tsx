@@ -825,7 +825,7 @@ export default function TeamPresets() {
                     height={40}
                   />
                 )}
-                <h2 className="m-0">Team Presets</h2>
+                <h2 className="m-0">HSR Team Presets</h2>
 
                 {presets.length > 0 && (
                   <button
@@ -838,7 +838,7 @@ export default function TeamPresets() {
                     aria-label="Delete all presets"
                     title="Delete all presets (requires typing confirm)"
                   >
-                    🗑️ Delete All
+                    Delete All
                   </button>
                 )}
               </div>
