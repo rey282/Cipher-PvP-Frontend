@@ -615,6 +615,8 @@ export default function ZzzDraftPage() {
   const [createdAtMs, setCreatedAtMs] = useState<number | null>(null);
   const [finishedFromServer, setFinishedFromServer] = useState<boolean>(false);
 
+  const autoFinalizedRef = useRef(false);
+
   // derived "live": created < 2h ago AND not finished
   const isLive =
     !!createdAtMs &&
@@ -1609,6 +1611,26 @@ export default function ZzzDraftPage() {
   })();
 
   const isOwner = !!user && !isPlayer;
+
+  useEffect(() => {
+    // Owner only
+    if (!user || isPlayer) return;
+
+    // Already finalized or already auto-triggered
+    if (uiLocked || autoFinalizedRef.current) return;
+
+    if (canFinalize) {
+      autoFinalizedRef.current = true;
+
+      setUiLocked(true);
+      requestSave(0);
+
+      toast.success("Match completed!", {
+        autoClose: 2000,
+      });
+    }
+  }, [canFinalize, uiLocked, user, isPlayer]);
+
 
   // Settings modal
   const [showSettings, setShowSettings] = useState(false);
