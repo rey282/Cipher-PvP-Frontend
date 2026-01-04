@@ -604,6 +604,14 @@ export default function ZzzDraftPage() {
     is3v3 ? [0, 0, 0] : [0, 0]
   );
 
+  const [blueScoreInput, setBlueScoreInput] = useState<string[]>(
+    is3v3 ? ["", "", ""] : ["", ""]
+  );
+  const [redScoreInput, setRedScoreInput] = useState<string[]>(
+    is3v3 ? ["", "", ""] : ["", ""]
+  );
+
+
   // per-side locks after draft complete
   const [blueLocked, setBlueLocked] = useState<boolean>(false);
   const [redLocked, setRedLocked] = useState<boolean>(false);
@@ -2975,46 +2983,69 @@ export default function ZzzDraftPage() {
                     </div>
 
                     <div className="score-inputs">
-                      {(is3v3 ? [0, 1, 2] : [0, 1]).map((i) => (
-                        <div className="score-input-group" key={i}>
-                          <label>{nameLabels[i] || `Player ${i + 1}`}</label>
-                          <input
-                            type="number"
-                            className="form-control score-input"
-                            placeholder="0"
-                            inputMode="numeric"
-                            min={SCORE_MIN}
-                            max={SCORE_MAX}
-                            disabled={scoresLocked}
-                            value={scores[i] === 0 ? "" : String(scores[i])}
-                            onChange={(e) => {
-                              if (scoresLocked) return;
-                              const v = e.target.value;
-                              const updated = [...scores];
-                              if (v === "") {
-                                updated[i] = 0;
-                              } else {
-                                const n = parseInt(v, 10) || 0;
-                                updated[i] = Math.max(
-                                  SCORE_MIN,
-                                  Math.min(SCORE_MAX, n)
-                                );
-                              }
-                              setScores(updated);
-                            }}
-                            onBlur={() => {
-                              if (scoresLocked) return;
-                              const updated = [...scores];
-                              updated[i] = Math.max(
-                                SCORE_MIN,
-                                Math.min(SCORE_MAX, updated[i] || 0)
-                              );
-                              setScores(updated);
-                              requestSave(0);
-                            }}
-                          />
-                        </div>
-                      ))}
+                      {(is3v3 ? [0, 1, 2] : [0, 1]).map((i) => {
+                        const inputArr = isBlue
+                          ? blueScoreInput
+                          : redScoreInput;
+                        const setInputArr = isBlue
+                          ? setBlueScoreInput
+                          : setRedScoreInput;
+
+                        return (
+                          <div className="score-input-group" key={i}>
+                            <label>{nameLabels[i] || `Player ${i + 1}`}</label>
+
+                            <input
+                              type="number"
+                              className="form-control score-input"
+                              placeholder="0"
+                              inputMode="numeric"
+                              min={SCORE_MIN}
+                              max={SCORE_MAX}
+                              disabled={scoresLocked}
+                              value={inputArr[i]}
+                              onChange={(e) => {
+                                if (scoresLocked) return;
+
+                                const next = [...inputArr];
+                                next[i] = e.target.value; // 👈 string only
+                                setInputArr(next);
+                              }}
+                              onBlur={() => {
+                                if (scoresLocked) return;
+
+                                const raw = inputArr[i];
+                                const parsed =
+                                  raw === ""
+                                    ? 0
+                                    : Math.max(
+                                        SCORE_MIN,
+                                        Math.min(
+                                          SCORE_MAX,
+                                          parseInt(raw, 10) || 0
+                                        )
+                                      );
+
+                                const nextScores = [...scores];
+                                nextScores[i] = parsed;
+                                setScores(nextScores);
+
+                                const nextInputs = [...inputArr];
+                                nextInputs[i] =
+                                  parsed === 0 ? "" : String(parsed);
+                                setInputArr(nextInputs);
+
+                                requestSave(0); // ✅ save only when user finishes
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
 
                     <div className="score-total">
