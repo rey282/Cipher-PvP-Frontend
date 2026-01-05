@@ -1152,7 +1152,7 @@ export default function ZzzSpectatorPage() {
 
           <div className="mb-2">
             <label className="form-label fw-semibold">
-              Penalty per 0.01 over cap
+              Penalty per 0.25 over cap
             </label>
             <input
               type="number"
@@ -1162,7 +1162,7 @@ export default function ZzzSpectatorPage() {
               disabled
             />
             <small className="text-white-50">
-              Points deducted for each 0.01 over the cost limit.
+              Points deducted for each 0.25 over the cost limit.
             </small>
           </div>
         </Modal.Body>
