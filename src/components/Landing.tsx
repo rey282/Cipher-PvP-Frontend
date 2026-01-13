@@ -374,7 +374,17 @@ export default function Landing() {
                 /* ─────────── VIVIAN ─────────── */
                 <div className="d-flex flex-column justify-content-center align-items-center gap-2">
                   <div className="d-flex justify-content-center align-items-center gap-2">
-                    {/* Start -> open draft modal (fallback to /zzz) */}
+                    {/* Discord */}
+                    <a
+                      href="https://discord.gg/MHzc5GRDQW"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="discord-circle-btn"
+                      title="Join Discord"
+                    >
+                      <i className="bi bi-discord" />
+                    </a>
+                    {/* Start -> open draft modal */}
                     <button
                       className="btn angled-btn"
                       onClick={() => {
@@ -402,6 +412,16 @@ export default function Landing() {
                 /* ─────────── CERYDRA ─────────── */
                 <div className="d-flex flex-column justify-content-center align-items-center gap-2">
                   <div className="d-flex justify-content-center align-items-center gap-2">
+                    {/* Discord */}
+                    <a
+                      href="https://discord.gg/MHzc5GRDQW"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="discord-circle-btn"
+                      title="Join Discord"
+                    >
+                      <i className="bi bi-discord" />
+                    </a>
                     {/* Start -> open draft modal (fallback to /cerydra) */}
                     <button
                       className="btn angled-btn"
@@ -430,6 +450,16 @@ export default function Landing() {
                 /* ─────────── CIPHER ─────────── */
                 <div className="d-flex flex-column justify-content-center align-items-center gap-2">
                   <div className="d-flex justify-content-center align-items-center gap-2">
+                    {/* Discord */}
+                    <a
+                      href="https://discord.gg/MHzc5GRDQW"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="discord-circle-btn"
+                      title="Join Discord"
+                    >
+                      <i className="bi bi-discord" />
+                    </a>
                     <button
                       className="btn angled-btn"
                       onClick={() =>

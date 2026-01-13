@@ -3351,3 +3351,29 @@ html:not(:has(.modal)),
 body:not(:has(.modal)) {
   overflow-y: auto;
 }
+
+.discord-circle-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(114, 137, 218, 0.9);
+  color: white;
+  text-decoration: none;
+
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 12px rgba(114, 137, 218, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.discord-circle-btn:hover {
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 0 18px rgba(114, 137, 218, 0.75);
+}
+
+.discord-circle-btn i {
+  font-size: 20px;
+}

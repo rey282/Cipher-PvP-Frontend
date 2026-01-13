@@ -462,7 +462,7 @@ export default function ZzzDraftPage() {
     (async () => {
       // -------- DEFAULT MODE (no preset) --------
       if (!costProfileId) {
-        setCostProfileName("Backend Default");
+        setCostProfileName("Vivian Default Cost");
         setCostCharMs(zzzDefaultCharMs);
         setCostWePhase(zzzDefaultWePhase);
         return;
