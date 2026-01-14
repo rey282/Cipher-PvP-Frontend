@@ -197,7 +197,7 @@ export default function PlayerCharacterStats() {
               src={
                 playerInfo.avatar
                   ? `https://cdn.discordapp.com/avatars/${playerId}/${playerInfo.avatar}.png`
-                  : "/default-avatar.png"
+                  : "/default.png"
               }
               alt=""
               style={{

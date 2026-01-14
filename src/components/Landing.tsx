@@ -209,6 +209,16 @@ export default function Landing() {
     setTimeout(() => navigate(url), 500);
   };
 
+  const gamesel = games[selected];
+  const team =
+    gamesel.id === "hsr"
+      ? hsrTeamProfiles
+      : gamesel.id === "hsr2"
+      ? genshinTeamProfiles
+      : gamesel.id === "zzz"
+      ? zzzTeamProfiles
+      : [];
+
   // Cached fetch of team avatars
   const fetchProfiles = async (
     teamList: { id: string; role: string }[],
@@ -222,7 +232,7 @@ export default function Landing() {
     const results = await Promise.all(
       teamList.map((member) =>
         fetch(
-          `${import.meta.env.VITE_API_BASE}/api/player/${member.id}/summary`,
+          `${import.meta.env.VITE_API_BASE}/api/player/${member.id}?lite=1`,
           { credentials: "include" }
         )
           .then((res) => (res.ok ? res.json() : null))
@@ -246,10 +256,15 @@ export default function Landing() {
   };
 
   useEffect(() => {
-    fetchProfiles(hsrTeamIds, "hsr", setHsrTeamProfiles);
-    fetchProfiles(genshinTeamIds, "genshin", setGenshinTeamProfiles);
-    fetchProfiles(zzzTeamIds, "zzz", setZzzTeamProfiles);
-  }, []);
+    if (gamesel.id === "hsr") {
+      fetchProfiles(hsrTeamIds, "hsr", setHsrTeamProfiles);
+    } else if (gamesel.id === "hsr2") {
+      fetchProfiles(genshinTeamIds, "genshin", setGenshinTeamProfiles);
+    } else if (gamesel.id === "zzz") {
+      fetchProfiles(zzzTeamIds, "zzz", setZzzTeamProfiles);
+    }
+  }, [gamesel.id]);
+
 
   const closeBurstMenu = () => {
     setBurstClosing(true);
@@ -258,17 +273,6 @@ export default function Landing() {
       setBurstClosing(false);
     }, 750);
   };
-
-
-  const gamesel = games[selected];
-  const team =
-    gamesel.id === "hsr"
-      ? hsrTeamProfiles
-      : gamesel.id === "hsr2"
-      ? genshinTeamProfiles
-      : gamesel.id === "zzz"
-      ? zzzTeamProfiles
-      : [];
 
   return (
     <div className={`landing-wrapper ${leaving ? "fade-out" : ""}`}>
@@ -327,7 +331,7 @@ export default function Landing() {
                         src={
                           m.avatar
                             ? `https://cdn.discordapp.com/avatars/${m.id}/${m.avatar}.png?size=64`
-                            : "/avatars/default.png"
+                            : "/default.png"
                         }
                         alt={m.username}
                         className="member-avatar"

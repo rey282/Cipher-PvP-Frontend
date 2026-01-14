@@ -63,7 +63,7 @@ const CImg = ({
   const info = map[code] || {};
   return (
     <img
-      src={info.image_url || "/placeholder.png"}
+      src={info.image_url || "/default.png"}
       title={info.name || code}
       alt={code}
       style={{
@@ -338,20 +338,24 @@ export default function PlayerProfile() {
 
         <div className="container">
           <div className="d-flex justify-content-center align-items-center gap-3 mb-2">
-            {summary?.avatar && summary?.playerId && (
-              <img
-                src={`https://cdn.discordapp.com/avatars/${summary.playerId}/${summary.avatar}.png?size=64`}
-                alt="avatar"
-                className="rounded-circle"
-                width={48}
-                height={48}
-                style={{ objectFit: "cover", border: "2px solid white" }}
-              />
-            )}
+            <img
+              src={
+                summary?.avatar && summary?.playerId
+                  ? `https://cdn.discordapp.com/avatars/${summary.playerId}/${summary.avatar}.png?size=64`
+                  : "/default.png"
+              }
+              alt="avatar"
+              className="rounded-circle"
+              width={48}
+              height={48}
+              style={{ objectFit: "cover", border: "2px solid white" }}
+            />
+
             <h1 className="display-5 fw-bold text-center mb-1">
               Player Summary: {summary?.global_name || summary?.username}
             </h1>
           </div>
+
           {season && (
             <p className="text-center text-white-50 mb-2">
               Season View: <strong>{getSeasonLabel(season)}</strong>

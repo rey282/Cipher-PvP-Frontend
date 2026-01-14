@@ -1,7 +1,37 @@
 import "./Footer.css";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 export default function Footer() {
+
+  const CREATOR_IDS = [
+    "249042315736252417", // YanYan
+    "371513247641370625", // Haya
+  ];
+
+  const [creators, setCreators] = useState<any[]>([]);
+
+  useEffect(() => {
+    Promise.all(
+      CREATOR_IDS.map((id) =>
+        fetch(`${import.meta.env.VITE_API_BASE}/api/player/${id}?lite=1`, {
+          credentials: "include",
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) =>
+            d
+              ? {
+                  id,
+                  avatar: d.avatar,
+                  name: d.global_name || d.username,
+                }
+              : null
+          )
+          .catch(() => null)
+      )
+    ).then((rows) => setCreators(rows.filter(Boolean)));
+  }, []);
+
   // Smooth scroll to top on internal navigation
   const handleInternalClick = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -26,7 +56,8 @@ export default function Footer() {
               />
             </a>
             <p className="text-white-50 small mb-3">
-              Cipher is a community-built PvP platform for Honkai Star Rail and Zenless Zone Zero.
+              Cipher is a community-built PvP platform for Honkai Star Rail and
+              Zenless Zone Zero.
             </p>
             <p className="text-white-50 small mb-0">
               <em>
@@ -162,22 +193,32 @@ export default function Footer() {
               Made by <strong>Cipher Dev Team</strong>
             </p>
             <div className="d-flex justify-content-center justify-content-md-end align-items-center gap-3 mb-3">
-              <div className="text-center">
-                <img
-                  src="/avatars/yanyan.png"
-                  alt="YanYan"
-                  className="footer-avatar"
-                />
-                <p className="text-white-50 small mb-0 mt-1">YanYan</p>
-              </div>
-              <div className="text-center">
-                <img
-                  src="/avatars/haya.png"
-                  alt="Haya"
-                  className="footer-avatar"
-                />
-                <p className="text-white-50 small mb-0 mt-1">Haya</p>
-              </div>
+              {creators.length > 0 ? (
+                creators.map((c) => (
+                  <div key={c.id} className="text-center">
+                    <img
+                      src={
+                        c.avatar
+                          ? `https://cdn.discordapp.com/avatars/${c.id}/${c.avatar}.png?size=64`
+                          : "/default.png"
+                      }
+                      className="footer-avatar"
+                    />
+                    <p className="text-white-50 small mb-0 mt-1">{c.name}</p>
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div className="text-center">
+                    <img src="/default.png" className="footer-avatar" />
+                    <p className="text-white-50 small mb-0 mt-1">YanYan</p>
+                  </div>
+                  <div className="text-center">
+                    <img src="/default.png" className="footer-avatar" />
+                    <p className="text-white-50 small mb-0 mt-1">Haya</p>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="tech-stack-wrapper pt-4">

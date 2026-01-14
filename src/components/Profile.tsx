@@ -269,9 +269,8 @@ export default function Profile() {
   const elo = profile.elo > 0 ? Math.round(profile.elo) : "—";
   const avatarUrl = profile.avatar
     ? `https://cdn.discordapp.com/avatars/${profile.discord_id}/${profile.avatar}.png?size=128`
-    : isSelf && user.avatar
-    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`
-    : "/default-avatar.png";
+    : "/default.png";
+
 
   return (
     <div
@@ -315,7 +314,7 @@ export default function Profile() {
               loading="lazy"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src =
-                  "/default-avatar.png";
+                  "/default.png";
               }}
               style={{ objectFit: "cover" }}
             />

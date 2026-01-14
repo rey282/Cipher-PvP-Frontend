@@ -40,7 +40,7 @@ const CImg = ({
   const info = map[code] || {};
   return (
     <img
-      src={info.image_url || "/placeholder.png"}
+      src={info.image_url || "/default.png"}
       title={info.name || code}
       alt={code}
       style={{
