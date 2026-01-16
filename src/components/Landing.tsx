@@ -83,6 +83,7 @@ const genshinTeamIds: { id: string; role: string }[] = [
 const zzzTeamIds: { id: string; role: string }[] = [
   { id: "663145925807702029", role: "Server Owner" },
   { id: "371513247641370625", role: "Developer" },
+  { id: "151231613219504128", role: "Balancer" },
   { id: "313955497604677633", role: "Staff" },
   { id: "478408402700206081", role: "Staff" },
 ];
