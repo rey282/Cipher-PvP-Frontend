@@ -120,12 +120,12 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
 
     // cost knobs (Vivian)
     const [costLimit, setCostLimit] = useState<number>(mode === "3v3" ? 24 : 16);
-    const [penaltyPerPoint, setPenaltyPerPoint] = useState<number>(1250);
+    const [penaltyPerPoint, setPenaltyPerPoint] = useState<number>(1500);
     const [showCostInputs, setShowCostInputs] = useState(false);
 
     const [showResumeModal, setShowResumeModal] = useState(false);
 
-    const defaultCostLimit = mode === "3v3" ? 24 : 16;
+    const defaultCostLimit = mode === "3v3" ? 21 : 16;
     const showLimitPill = Number(costLimit) !== defaultCostLimit;
     const showPenaltyPill = Number(penaltyPerPoint) !== 50;
 
@@ -135,7 +135,7 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
 
     const userTouchedCost = useRef(false);
     useEffect(() => {
-      if (!userTouchedCost.current) setCostLimit(mode === "3v3" ? 24 : 16);
+      if (!userTouchedCost.current) setCostLimit(mode === "3v3" ? 21 : 16);
     }, [mode]);
 
     const fmtQuarter = (n: number) =>
@@ -1464,7 +1464,7 @@ const VivianSection = forwardRef<VivianSectionHandle, Props>(
                         }
                       />
                       <small className="text-white-50">
-                        Example: 1250 → every 0.25 over costs 1250
+                        Example: 1500 → every 0.25 over costs 1500
                       </small>
                     </div>
                   </div>
