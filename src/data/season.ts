@@ -33,8 +33,15 @@ export const mocOptions = [
     bossImages: ["/bosses/alltime.png"],
   },
   {
-    label: "Monkey Business (3.7)",
+    label: "Breached Nest (3.8)",
     value: 0,
+    name: "Breached Nest",
+    duration: "19 Jan 2026 → 02 March 2026",
+    bossImages: ["/bosses/cocolia.png", "/bosses/harbinger.png"],
+  },
+  {
+    label: "Monkey Business (3.7)",
+    value: 7,
     name: "Monkey Business",
     duration: "08 Des 2025 → 19 Jan 2026",
     bossImages: ["/bosses/sam.png", "/bosses/hoolay.png"],
