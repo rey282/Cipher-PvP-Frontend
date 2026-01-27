@@ -896,7 +896,7 @@ export default function CostTestPage() {
 
         <div
           className="flex-grow-1 px-2"
-          style={{ maxWidth: "1600px", margin: "0 auto" }}
+          style={{ maxWidth: "1900px", margin: "0 auto" }}
         >
           {/* Team + Info */}
           <div

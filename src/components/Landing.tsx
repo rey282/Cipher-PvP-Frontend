@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import "./Landing.css";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
+import AnimatedIconBg from "../components/AnimatedIconBg";
 
 import VivianSections, { type VivianSectionHandle } from "./VivianSections";
 import CerydraSections, { type CerydraSectionHandle } from "./CerydraSections";
@@ -34,6 +35,42 @@ const games = [
     link: "/cerydra",
   },
 ];
+
+const hsrIconUrls = [
+  "/icons/abundance.png",
+  "/icons/destruction.png",
+  "/icons/erudition.png",
+  "/icons/harmony.png",
+  "/icons/nihility.png",
+  "/icons/preservation.png",
+  "/icons/remembrance.png",
+  "/icons/thehunt.png",
+  "/icons/fire.png",
+  "/icons/ice.png",
+  "/icons/imaginary.png",
+  "/icons/lightning.png",
+  "/icons/physical.png",
+  "/icons/quantum.png",
+  "/icons/wind.png",
+];
+
+const zzzIconUrls = [
+  "/zzzicons/Icon_Anomaly.webp",
+  "/zzzicons/Icon_Attack.webp",
+  "/zzzicons/Icon_Auric_Ink.webp",
+  "/zzzicons/Icon_Defense.webp",
+  "/zzzicons/Icon_Electric.webp",
+  "/zzzicons/Icon_Ether.webp",
+  "/zzzicons/Icon_Fire.webp",
+  "/zzzicons/Icon_Frost.webp",
+  "/zzzicons/Icon_Honed_Edge.webp",
+  "/zzzicons/Icon_Ice.webp",
+  "/zzzicons/Icon_Physical.webp",
+  "/zzzicons/Icon_Rupture.webp",
+  "/zzzicons/Icon_Stun.webp",
+  "/zzzicons/Icon_Support.webp",
+];
+
 
 /** Cipher actions */
 const CIPHER_PLAY_URL = "https://draft.cipher.uno/draft?mode=cipher";
@@ -277,16 +314,28 @@ export default function Landing() {
 
   return (
     <div className={`landing-wrapper ${leaving ? "fade-out" : ""}`}>
-      <div
-        className="bg-layer"
-        style={{ backgroundImage: `url(${currentBg})` }}
-      />
-      {bgFading && (
-        <div
-          className="bg-layer fading-in"
-          style={{ backgroundImage: `url(${fadeBg})` }}
+      <div className="space-bg" />
+
+      {(gamesel.id === "hsr" || gamesel.id === "hsr2") && (
+        <AnimatedIconBg
+          iconUrls={hsrIconUrls}
+          opacity={1}
+          spawnMs={500}
+          maxParticles={90}
+          sizeRange={[40, 96]}
         />
       )}
+
+      {gamesel.id === "zzz" && (
+        <AnimatedIconBg
+          iconUrls={zzzIconUrls}
+          opacity={1}
+          spawnMs={500}
+          maxParticles={90}
+          sizeRange={[40, 96]}
+        />
+      )}
+
       <div className="overlay" />
 
       <div
@@ -471,7 +520,7 @@ export default function Landing() {
                         window.open(
                           CIPHER_PLAY_URL,
                           "_blank",
-                          "noopener,noreferrer"
+                          "noopener,noreferrer",
                         )
                       }
                       title="Start draft"
@@ -540,8 +589,8 @@ export default function Landing() {
             {(showBurstMenu === "vivian"
               ? vivianMenu
               : showBurstMenu === "cerydra"
-              ? cerydraMenu
-              : cipherMenu
+                ? cerydraMenu
+                : cipherMenu
             ).map((item, i) => (
               <button
                 key={item.label}

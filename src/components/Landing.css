@@ -2960,18 +2960,20 @@ input[type="range"].big-slider {
 
 /* ───────────────── Dark fantasy backdrop ───────────────── */
 
+/* Backdrop: only fade opacity (no blur animation) */
 .modal-backdrop {
   background:
     radial-gradient(circle at 50% 30%, rgba(168, 85, 247, 0.25), transparent 60%),
     linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.9));
-  transition: opacity 0.25s ease, backdrop-filter 0.25s ease;
-  backdrop-filter: blur(0px);
+  backdrop-filter: blur(4px);
+  /* constant */
+  -webkit-backdrop-filter: blur(4px);
+  transition: opacity 0.25s ease !important;
 }
 
-/* When visible */
-.modal-backdrop.show {
-  opacity: 1 !important;
-  backdrop-filter: blur(4px);
+/* Bootstrap controls opacity via .show anyway */
+.modal-backdrop:not(.show) {
+  opacity: 0 !important;
 }
 
 /* When closing – blur fades BEFORE removal */
@@ -3013,9 +3015,8 @@ input[type="range"].big-slider {
     0 0 24px rgba(236, 72, 153, 0.25);
 }
 
-/* Ambient modal glow  */
-.modal.show .custom-dark-modal {
-  animation: modalBreath 6s ease-in-out infinite alternate;
+.modal.fade:not(.show) .custom-dark-modal {
+  animation: none !important;
 }
 
 /* Prevent repaint flash during modal close */
@@ -3341,17 +3342,10 @@ input[type="range"].big-slider {
   }
 }
 
-html:has(.modal),
-body:has(.modal) {
-  overflow-y: hidden !important;
+body.modal-open {
+  overflow: hidden !important;
+  padding-right: 0 !important;
 }
-
-/* Only restore scrolling AFTER modal is fully gone */
-html:not(:has(.modal)),
-body:not(:has(.modal)) {
-  overflow-y: auto;
-}
-
 .discord-circle-btn {
   width: 42px;
   height: 42px;
@@ -3376,4 +3370,13 @@ body:not(:has(.modal)) {
 
 .discord-circle-btn i {
   font-size: 20px;
+}
+
+.space-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 25% 20%, #0b1024 0%, #05070d 35%, #000 75%),
+    #000;
 }
