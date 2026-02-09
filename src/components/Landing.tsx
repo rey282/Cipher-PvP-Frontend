@@ -44,6 +44,7 @@ const hsrIconUrls = [
   "/icons/nihility.png",
   "/icons/preservation.png",
   "/icons/remembrance.png",
+  "/icons/elation.png",
   "/icons/thehunt.png",
   "/icons/fire.png",
   "/icons/ice.png",

@@ -60,6 +60,7 @@ const pathOptions = [
   "Preservation",
   "Abundance",
   "Remembrance",
+  "Elation",
 ] as const;
 
 const elementOptions = [
