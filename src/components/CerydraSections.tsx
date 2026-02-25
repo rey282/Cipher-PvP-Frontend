@@ -199,6 +199,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
     // if you don't already have them defined:
     const [showSidePickModal, setShowSidePickModal] = useState(false);
     const [pendingStart, setPendingStart] = useState<PendingStart | null>(null);
+    const [sideTransferLocked, setSideTransferLocked] = useState(false);
 
     // Timer
     const [enableTimer, setEnableTimer] = useState<boolean>(true);
@@ -1279,6 +1280,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
 
       const chooser: "A" | "B" = Math.random() < 0.5 ? "A" : "B";
       setPendingStart({ chooser, teamA: t1, teamB: t2, core });
+      setSideTransferLocked(false);
       setShowSidePickModal(true);
     };
     // ───────────────────────────────
@@ -1325,6 +1327,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
         penaltyPerPoint: core.penaltyPerPoint,
         timerEnabled: core.timerEnabled ?? true,
         reserveSeconds: core.reserveSeconds ?? 0,
+        sidePickWinner: choice === "blue" ? "B" : "R",
       };
 
       sessionStorage.setItem("hsrDraftId", draftId);
@@ -1336,6 +1339,19 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
       navigate("/hsr/draft", { state: { ...payload, draftId } });
     };
 
+    const transferSidePick = () => {
+      if (sideTransferLocked) return;
+
+      setPendingStart((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          chooser: prev.chooser === "A" ? "B" : "A",
+        };
+      });
+
+      setSideTransferLocked(true);
+    };
     return (
       <>
         {/* Hidden input for CSV import */}
@@ -1549,7 +1565,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                         value={cycleBreakpoint}
                         onChange={(e) =>
                           setCycleBreakpoint(
-                            Math.max(1, parseInt(e.target.value || "4", 10))
+                            Math.max(1, parseInt(e.target.value || "4", 10)),
                           )
                         }
                       />
@@ -1588,7 +1604,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                             // allow empty while typing; digits only
                             const digitsOnly = e.target.value.replace(
                               /[^\d]/g,
-                              ""
+                              "",
                             );
                             setReserveMinutesStr(digitsOnly);
                           }}
@@ -1598,7 +1614,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                               const def = getDefaultMinutesForMode(mode);
                               const n = Math.max(
                                 1,
-                                parseInt(reserveMinutesStr || String(def), 10)
+                                parseInt(reserveMinutesStr || String(def), 10),
                               );
 
                               setReserveMinutesStr(String(n));
@@ -1663,8 +1679,8 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                           {f.rule === "globalBan"
                             ? "Universal Ban"
                             : f.rule === "globalPick"
-                            ? "Universal Pick"
-                            : "None"}
+                              ? "Universal Pick"
+                              : "None"}
                           {typeof f.customCost === "number"
                             ? ` • Cost ${f.customCost.toFixed(2)}`
                             : ""}
@@ -1913,13 +1929,13 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                           `${
                             import.meta.env.VITE_API_BASE
                           }/api/characters?cycle=0`,
-                          { credentials: "include" }
+                          { credentials: "include" },
                         ),
                         fetch(
                           `${
                             import.meta.env.VITE_API_BASE
                           }/api/cerydra/cone-balance`,
-                          { credentials: "include" }
+                          { credentials: "include" },
                         ),
                       ]);
                       const [cJ, lJ] = await Promise.all([
@@ -1947,10 +1963,10 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                       });
 
                       setCharMeta((prev) =>
-                        Object.keys(prev).length ? prev : cMap
+                        Object.keys(prev).length ? prev : cMap,
                       );
                       setLcMeta((prev) =>
-                        Object.keys(prev).length ? prev : lMap
+                        Object.keys(prev).length ? prev : lMap,
                       );
 
                       const charMs: Record<string, number[]> = {};
@@ -1985,7 +2001,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
               </div>
             </div>
 
-            {/* Existing presets list (compact) */}
+            {/* Existing presets list */}
             {costPresets.length > 0 && (
               <div className="d-flex flex-wrap gap-2 mb-3">
                 {costPresets.map((p) => (
@@ -2028,7 +2044,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                             {
                               method: "DELETE",
                               credentials: "include",
-                            }
+                            },
                           );
                           if (r.ok) {
                             toast.success("Deleted.");
@@ -2039,11 +2055,11 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                                 }/api/hsr/cost-presets/my`,
                                 {
                                   credentials: "include",
-                                }
+                                },
                               );
                               const j = r2.ok ? await r2.json() : { data: [] };
                               setCostPresets(
-                                Array.isArray(j.data) ? j.data.slice(0, 2) : []
+                                Array.isArray(j.data) ? j.data.slice(0, 2) : [],
                               );
                             } catch {
                               setCostPresets([]);
@@ -2194,7 +2210,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                                       value={String(v)}
                                       onChange={(e) => {
                                         const val = clean2(
-                                          Number(e.target.value || 0)
+                                          Number(e.target.value || 0),
                                         );
                                         setCostEditing((prev) => {
                                           if (!prev) return prev;
@@ -2307,7 +2323,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                                       value={String(v)}
                                       onChange={(e) => {
                                         const val = clean2(
-                                          Number(e.target.value || 0)
+                                          Number(e.target.value || 0),
                                         );
                                         setCostEditing((prev) => {
                                           if (!prev) return prev;
@@ -2384,11 +2400,11 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                             }/api/hsr/cost-presets/my`,
                             {
                               credentials: "include",
-                            }
+                            },
                           );
                           const j = r2.ok ? await r2.json() : { data: [] };
                           setCostPresets(
-                            Array.isArray(j.data) ? j.data.slice(0, 2) : []
+                            Array.isArray(j.data) ? j.data.slice(0, 2) : [],
                           );
                         } catch {
                           setCostPresets([]);
@@ -2459,6 +2475,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
           onHide={() => {
             setShowSidePickModal(false);
             setPendingStart(null);
+            setSideTransferLocked(false);
           }}
           centered
           contentClassName="custom-dark-modal"
@@ -2495,15 +2512,32 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
             >
               Cancel
             </Button>
+
+            <Button
+              className="btn-glass btn-glass-outline"
+              onClick={transferSidePick}
+              disabled={!pendingStart || sideTransferLocked}
+              title={
+                sideTransferLocked
+                  ? "Side pick already transferred"
+                  : "Give the side pick to the other team"
+              }
+            >
+              ⇄ {sideTransferLocked ? "Transferred" : "Transfer Side Pick"}
+            </Button>
+
             <Button
               className="btn-glass"
               onClick={() => finalizeSideChoice("blue")}
+              disabled={!pendingStart}
             >
               Blue
             </Button>
+
             <Button
               className="btn-glass btn-glass-warning"
               onClick={() => finalizeSideChoice("red")}
+              disabled={!pendingStart}
             >
               Red
             </Button>
@@ -2566,8 +2600,8 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                           {f.rule === "globalBan"
                             ? "Universal Ban"
                             : f.rule === "globalPick"
-                            ? "Universal Pick"
-                            : "No special rule"}
+                              ? "Universal Pick"
+                              : "No special rule"}
                           {typeof f.customCost === "number"
                             ? ` • Cost ${f.customCost.toFixed(2)}`
                             : ""}
@@ -2591,8 +2625,8 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                             {f.rule === "globalBan"
                               ? "Universal Ban"
                               : f.rule === "globalPick"
-                              ? "Universal Pick"
-                              : "No special rule"}
+                                ? "Universal Pick"
+                                : "No special rule"}
                           </Dropdown.Toggle>
 
                           <Dropdown.Menu
@@ -2694,8 +2728,8 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                                     (f.kind === "character"
                                       ? x.code === f.code
                                       : x.id === f.id)
-                                  )
-                              )
+                                  ),
+                              ),
                             )
                           }
                           title="Remove"
@@ -2765,7 +2799,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((c) => {
                       const selected = featuredList.some(
-                        (f) => f.kind === "character" && f.code === c.code
+                        (f) => f.kind === "character" && f.code === c.code,
                       );
                       const disabled = !selected && featuredList.length >= 15;
                       return (
@@ -2780,8 +2814,8 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                                     !(
                                       f.kind === "character" &&
                                       f.code === c.code
-                                    )
-                                )
+                                    ),
+                                ),
                               );
                             } else {
                               if (featuredList.length >= 15) return;
@@ -2856,7 +2890,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                       })
                       .map((w) => {
                         const selected = featuredList.some(
-                          (f) => f.kind === "lightcone" && f.id === w.id
+                          (f) => f.kind === "lightcone" && f.id === w.id,
                         );
                         const disabled = !selected && featuredList.length >= 15;
                         return (
@@ -2868,8 +2902,10 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                                 setFeaturedList((list) =>
                                   list.filter(
                                     (f) =>
-                                      !(f.kind === "lightcone" && f.id === w.id)
-                                  )
+                                      !(
+                                        f.kind === "lightcone" && f.id === w.id
+                                      ),
+                                  ),
                                 );
                               } else {
                                 if (featuredList.length >= 15) return;
@@ -2926,7 +2962,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
               onClick={() => {
                 if (!canSaveFeatured) {
                   toast.error(
-                    "Each featured item needs either a rule or a custom cost."
+                    "Each featured item needs either a rule or a custom cost.",
                   );
                   return;
                 }
@@ -3052,10 +3088,10 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                               Math.min(
                                 Math.max(
                                   1,
-                                  Math.ceil(recentMatches.length / 10)
+                                  Math.ceil(recentMatches.length / 10),
                                 ),
-                                p + 1
-                              )
+                                p + 1,
+                              ),
                             )
                           }
                           disabled={

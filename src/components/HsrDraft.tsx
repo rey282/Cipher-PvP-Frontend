@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Modal, Button } from "react-bootstrap";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
+import { Crown } from "lucide-react";
 
 /* ───────────── Types (HSR) ───────────── */
 type Character = {
@@ -68,6 +69,8 @@ type SpectatorState = {
   timerPenaltyCountR?: number;
   applyTimerPenaltyB?: boolean;
   applyTimerPenaltyR?: boolean;
+
+  sidePickWinner?: "B" | "R" | null;
 };
 
 type FeaturedCfg = {
@@ -97,6 +100,7 @@ type DraftInit = {
   draftId?: string;
   timerEnabled?: boolean;
   reserveSeconds?: number;
+  sidePickWinner?: "B" | "R" | null;
 };
 
 function normalizeFeatured(list: any[]): FeaturedCfg[] {
@@ -367,6 +371,11 @@ export default function CerydraDraftPage() {
     }
   })();
   const seed = navState ?? stored ?? {};
+
+  const [sidePickWinner, setSidePickWinner] = useState<"B" | "R" | null>(() => {
+    const v = (seed as any)?.sidePickWinner;
+    return v === "B" || v === "R" ? v : null;
+  });
 
   /* Featured from seed; will be overwritten by SSE/GET from server */
   const [featuredList, setFeaturedList] = useState<FeaturedCfg[]>(
@@ -850,7 +859,7 @@ export default function CerydraDraftPage() {
             lightconeId: p.lightcone?.id ?? null,
             superimpose: p.phase,
           }
-        : null
+        : null,
     ),
     blueScores,
     redScores,
@@ -874,6 +883,8 @@ export default function CerydraDraftPage() {
     timerPenaltyCountR: timerPenCount.R,
     applyTimerPenaltyB,
     applyTimerPenaltyR,
+
+    sidePickWinner,
   });
 
   // Compact Featured preview / popup
@@ -1629,6 +1640,11 @@ export default function CerydraDraftPage() {
       // ── Timer + penalties from server/session ────────────────────────────────────
       const st = payload?.state || {};
 
+      if (Object.prototype.hasOwnProperty.call(st, "sidePickWinner")) {
+        const v = st.sidePickWinner;
+        setSidePickWinner(v === "B" || v === "R" ? v : null);
+      }
+
       // include-cycle-penalty toggles
       if (typeof st.applyCyclePenaltyB === "boolean")
         setApplyCyclePenaltyB(st.applyCyclePenaltyB);
@@ -1948,6 +1964,11 @@ export default function CerydraDraftPage() {
 
         // ── Timer + penalties from server/session (GET fallback) ─────────────────────
         const st = data?.state || {};
+
+        if (Object.prototype.hasOwnProperty.call(st, "sidePickWinner")) {
+          const v = st.sidePickWinner;
+          setSidePickWinner(v === "B" || v === "R" ? v : null);
+        }
 
         // include-cycle-penalty toggles
         if (typeof st.applyCyclePenaltyB === "boolean")
@@ -3152,6 +3173,17 @@ export default function CerydraDraftPage() {
                         style={{ backgroundColor: color }}
                       />
                       {name}
+                      {sidePickWinner === prefix && (
+                        <Crown
+                          size={35}
+                          strokeWidth={2.5}
+                          style={{
+                            marginLeft: 8,
+                            color: "#facc15", // gold
+                            filter: "drop-shadow(0 0 4px rgba(250,204,21,0.5))",
+                          }}
+                        />
+                      )}
                       {draftComplete && (
                         <>
                           {locked ? (
@@ -3438,8 +3470,8 @@ export default function CerydraDraftPage() {
                                             i,
                                             parseInt(
                                               (e.target as HTMLInputElement)
-                                                .value
-                                            )
+                                                .value,
+                                            ),
                                           )
                                         }
                                       />
@@ -3487,8 +3519,8 @@ export default function CerydraDraftPage() {
                                             i,
                                             parseInt(
                                               (e.target as HTMLInputElement)
-                                                .value
-                                            )
+                                                .value,
+                                            ),
                                           )
                                         }
                                       />
@@ -3554,7 +3586,7 @@ export default function CerydraDraftPage() {
                                               setEidolonOpenIndex(
                                                 eidolonOpenIndex === i
                                                   ? null
-                                                  : i
+                                                  : i,
                                               );
                                             }}
                                           >
@@ -3595,7 +3627,7 @@ export default function CerydraDraftPage() {
                                                 setPhaseOpenIndex(
                                                   phaseOpenIndex === i
                                                     ? null
-                                                    : i
+                                                    : i,
                                                 );
                                               }}
                                             >
@@ -3657,7 +3689,7 @@ export default function CerydraDraftPage() {
                                                 setEidolonOpenIndex(
                                                   eidolonOpenIndex === i
                                                     ? null
-                                                    : i
+                                                    : i,
                                                 );
                                               }}
                                             >
@@ -3699,7 +3731,7 @@ export default function CerydraDraftPage() {
                                                   setPhaseOpenIndex(
                                                     phaseOpenIndex === i
                                                       ? null
-                                                      : i
+                                                      : i,
                                                   );
                                                 }}
                                               >
@@ -3724,7 +3756,7 @@ export default function CerydraDraftPage() {
                               </div>
                             )}
                           </div>
-                        ) : null
+                        ) : null,
                       )}
                     </div>
                   </div>

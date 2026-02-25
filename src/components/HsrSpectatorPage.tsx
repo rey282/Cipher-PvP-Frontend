@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import "../components/Landing.css";
 import { Modal, Button } from "react-bootstrap";
-
+import { Crown } from "lucide-react";
 
 /* ───────────── Types (HSR) ───────────── */
 type Character = {
@@ -75,6 +75,8 @@ type SpectatorState = {
   timerPenaltyCountR?: number;
   applyTimerPenaltyB?: boolean;
   applyTimerPenaltyR?: boolean;
+
+  sidePickWinner?: "B" | "R" | null;
 };
 
 type HsrMode = "2ban" | "3ban" | "6ban";
@@ -333,6 +335,7 @@ export default function HsrSpectatorPage() {
   const useSmall = mode === "3ban" || mode === "6ban"; 
 
   const state: SpectatorState | null = session?.state ?? null;
+  const sidePickWinner = state?.sidePickWinner ?? null;
 
   const draftSequence = state?.draftSequence ?? [];
   const currentTurn = state?.currentTurn ?? 0;
@@ -1061,6 +1064,17 @@ export default function HsrSpectatorPage() {
                       style={{ backgroundColor: color }}
                     />
                     {name}
+                    {sidePickWinner === prefix && (
+                      <Crown
+                        size={35}
+                        strokeWidth={2.5}
+                        style={{
+                          marginLeft: 8,
+                          color: "#facc15", // gold
+                          filter: "drop-shadow(0 0 4px rgba(250,204,21,0.5))",
+                        }}
+                      />
+                    )}
                     {draftComplete && locked && (
                       <span
                         className="badge bg-secondary ms-2"
@@ -1296,7 +1310,7 @@ export default function HsrSpectatorPage() {
                             );
                           })()}
                         </div>
-                      ) : null
+                      ) : null,
                     )}
                   </div>
                 </div>
