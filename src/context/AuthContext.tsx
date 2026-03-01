@@ -37,30 +37,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const newUser = data.user ?? null;
         setUser(newUser);
 
+        // ✅ Show welcome toast if not shown in this session
         if (newUser && !sessionStorage.getItem("welcomed")) {
           sessionStorage.setItem("welcomed", "true");
           const name = newUser.global_name || newUser.username;
           toast.success(`Welcome, ${name}!`);
         }
       })
-      .catch((e) => {
-        console.error("Auth /me failed:", e);
-        setUser(null);
-      })
       .finally(() => setLoading(false));
   }, []);
 
   /* ─── Start Discord OAuth ─── */
   const login = (redirectTo = window.location.href) => {
-    if (sessionStorage.getItem("oauth_in_progress") === "1") return;
-    sessionStorage.setItem("oauth_in_progress", "1");
-
     localStorage.setItem("redirectAfterLogin", redirectTo);
-
     const authUrl = `${
       import.meta.env.VITE_API_BASE
     }/auth/discord?redirect=${encodeURIComponent(redirectTo)}`;
-
     window.location.href = authUrl;
   };
 
@@ -77,8 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /* ─── One-time redirect AFTER login ─── */
   useEffect(() => {
     if (!loading && user) {
-      sessionStorage.removeItem("oauth_in_progress");
-
       const dest = localStorage.getItem("redirectAfterLogin");
       if (dest) {
         localStorage.removeItem("redirectAfterLogin");
@@ -91,11 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [loading, user, navigate]);
-  useEffect(() => {
-    if (!loading && !user) {
-      sessionStorage.removeItem("oauth_in_progress");
-    }
-  }, [loading, user]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>
