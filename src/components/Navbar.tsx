@@ -4,11 +4,18 @@ import "../components/Landing.css";
 
 export default function Navbar() {
   const { user, loading, login, logout } = useAuth();
+    const avatarUrl = user?.avatar
+      ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`
+      : user
+        ? `https://cdn.discordapp.com/embed/avatars/${
+            Number(user.discriminator || 0) % 5
+          }.png`
+        : "";
   const location = useLocation();
   const navigate = useNavigate();
 
   // Manual login lock 
-  const LOGIN_LOCKED = false;
+  const LOGIN_LOCKED = true
 
   const isCerydra = location.pathname.startsWith("/cerydra");
   const isCipher = location.pathname.startsWith("/cipher");
@@ -177,7 +184,7 @@ export default function Navbar() {
               style={{ outline: "none" }}
             >
               <img
-                src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
+                src={avatarUrl}
                 alt="avatar"
                 className="rounded-circle"
                 width={36}
@@ -227,7 +234,7 @@ export default function Navbar() {
             }}
           >
             {LOGIN_LOCKED ? (
-              <>⛔ Login Disabled (Rate Limited)</>
+              <>Login Disabled (Rate Limited)</>
             ) : (
               <>
                 <img
@@ -348,7 +355,7 @@ export default function Navbar() {
               <>
                 <div className="d-flex align-items-center gap-2">
                   <img
-                    src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
+                    src={avatarUrl}
                     alt="avatar"
                     className="rounded-circle"
                     width={36}
