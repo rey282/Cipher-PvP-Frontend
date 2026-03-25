@@ -2278,12 +2278,6 @@ export default function CerydraDraftPage() {
     const extras = Array.isArray(lc.signatureForNames)
       ? lc.signatureForNames.map(norm)
       : [];
-
-    // Order of precedence:
-    // 4) LC subname matches character subname (primary)
-    // 3) LC subname matches character name
-    // 2) Extras include character subname or name (alt owners)
-    if (charSub && lcSub === charSub) return 4;
     if (lcSub === charName) return 3;
     if (charSub && extras.includes(charSub)) return 2;
     if (extras.includes(charName)) return 2;
@@ -2577,9 +2571,7 @@ export default function CerydraDraftPage() {
       .filter(Boolean)
       .map(norm);
 
-    const charNames = [char.name, (char as any).subname]
-      .filter(Boolean)
-      .map(norm);
+    const charNames = [char.name].filter(Boolean).map(norm);
 
     return charNames.some((n) => candidates.includes(n));
   };

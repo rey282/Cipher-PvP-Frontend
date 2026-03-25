@@ -268,7 +268,21 @@ export default function TeamPresets() {
           ]);
 
         setCharInfos(charData.data || charData || []);
-        setCones(cerConeData.cones || cerConeData || []);
+        const normalizedCones: LightCone[] = (cerConeData.cones || []).map(
+          (w: any) => ({
+            id: String(w.id),
+            name: w.name,
+            subname: w.subname || "",
+            costs: w.costs || [0, 0, 0, 0, 0],
+            rarity: String(w.rarity || 5),
+            imageUrl: w.imageUrl,
+            signatureForNames: Array.isArray(w.signatureForNames)
+              ? w.signatureForNames
+              : [],
+          }),
+        );
+
+        setCones(normalizedCones);
         setCerCharCosts(cerCostData.characters || cerCostData || []);
         setCipherChars(cipCharData.characters || cipCharData || []);
         setCipherCones(cipConeData.cones || cipConeData || []);
@@ -702,13 +716,18 @@ export default function TeamPresets() {
 
   const isSignatureCone = (
     cone: LightCone,
-    char: CharacterInfo | undefined
+    char: CharacterInfo | undefined,
   ) => {
     if (!char) return false;
+
     const coneSub = (cone.subname || "").toLowerCase();
     const charName = char.name.toLowerCase();
-    const charSub = (char.subname || "").toLowerCase();
-    return coneSub === charName || (!!charSub && coneSub === charSub);
+
+    const extras = Array.isArray(cone.signatureForNames)
+      ? cone.signatureForNames.map((n) => n.toLowerCase())
+      : [];
+
+    return coneSub === charName || extras.includes(charName);
   };
 
   /* ───────────── Render ───────────── */
