@@ -34,8 +34,15 @@ export const mocOptions = [
     bossImages: ["/bosses/alltime.png"],
   },
   {
-    label: "Cyber Mystery (4.0)",
+    label: "Grand Finale (4.1)",
     value: 0,
+    name: "Grand Finale",
+    duration: "13 April 2026 → 05 May 2026",
+    bossImages: ["/bosses/nikador.webp", "/bosses/kafka.webp"],
+  },
+  {
+    label: "Cyber Mystery (4.0)",
+    value: 9,
     name: "Cyber Mystery",
     duration: "02 March 2026 → 13 April 2026",
     bossImages: ["/bosses/sparxiconofficial.webp", "/bosses/lygus.png"],
