@@ -361,6 +361,24 @@ export default function TeamPresets() {
     setShowModal(true);
   };
 
+  const hasUnsavedChanges =
+    nameInput.trim() !== "" ||
+    descriptionInput.trim() !== "" ||
+    expectedCycleInput.trim() !== "" ||
+    slotsState.some((s) => s.characterId);
+
+  const closePresetModal = () => {
+    if (hasUnsavedChanges) {
+      const confirmClose = window.confirm("Discard this preset draft?");
+
+      if (!confirmClose) return;
+    }
+
+    setShowModal(false);
+    setEidolonOpenIndex(null);
+    setSuperOpenIndex(null);
+  };
+
   const openBulkDelete = () => {
     if (!presets.length) {
       toast.info("No presets to delete.");
@@ -453,7 +471,7 @@ export default function TeamPresets() {
       );
       return [...compacted, ...empties];
     });
-    // also close popups if they were on this index
+    
     setEidolonOpenIndex(null);
     setSuperOpenIndex(null);
   };
@@ -1146,7 +1164,6 @@ export default function TeamPresets() {
               onClick={() => {
                 setEidolonOpenIndex(null);
                 setSuperOpenIndex(null);
-                setShowModal(false);
               }}
             >
               <div
@@ -1162,7 +1179,7 @@ export default function TeamPresets() {
                     <button
                       type="button"
                       className="btn-close btn-close-white"
-                      onClick={() => setShowModal(false)}
+                      onClick={closePresetModal}
                     />
                   </div>
 
@@ -1275,7 +1292,7 @@ export default function TeamPresets() {
                           return arr?.[slot.eidolon] ?? 0;
                         })();
                         const sCery = cone
-                          ? cone.costs?.[slot.superimpose - 1] ?? 0
+                          ? (cone.costs?.[slot.superimpose - 1] ?? 0)
                           : 0;
                         const fmt = (v: number) =>
                           v % 1 === 0 ? String(v) : v.toFixed(1);
@@ -1351,7 +1368,7 @@ export default function TeamPresets() {
                                           setEidolonOpenIndex(
                                             eidolonOpenIndex === idx
                                               ? null
-                                              : idx
+                                              : idx,
                                           );
                                         }}
                                       >
@@ -1392,7 +1409,7 @@ export default function TeamPresets() {
                                             setSuperOpenIndex(
                                               superOpenIndex === idx
                                                 ? null
-                                                : idx
+                                                : idx,
                                             );
                                           }}
                                         >
@@ -1429,7 +1446,8 @@ export default function TeamPresets() {
                                         onChange={(e) => {
                                           const updated = [...slotsState];
                                           updated[idx].eidolon = Number(
-                                            (e.target as HTMLInputElement).value
+                                            (e.target as HTMLInputElement)
+                                              .value,
                                           );
                                           setSlotsState(updated);
                                         }}
@@ -1484,7 +1502,8 @@ export default function TeamPresets() {
                                         onChange={(e) => {
                                           const updated = [...slotsState];
                                           updated[idx].superimpose = Number(
-                                            (e.target as HTMLInputElement).value
+                                            (e.target as HTMLInputElement)
+                                              .value,
                                           );
                                           setSlotsState(updated);
                                         }}
@@ -1506,7 +1525,7 @@ export default function TeamPresets() {
                                             >
                                               {label}
                                             </span>
-                                          )
+                                          ),
                                         )}
                                       </div>
                                     </div>
@@ -1638,7 +1657,7 @@ export default function TeamPresets() {
                               .sort((a, b) => a.name.localeCompare(b.name))
                               .map((char) => {
                                 const alreadyPicked = slotsState.some(
-                                  (s) => s.characterId === char.code
+                                  (s) => s.characterId === char.code,
                                 );
                                 return (
                                   <div
@@ -1683,7 +1702,7 @@ export default function TeamPresets() {
                   <div className="modal-footer">
                     <button
                       className="btn-glass-muted"
-                      onClick={() => setShowModal(false)}
+                      onClick={closePresetModal}
                     >
                       Cancel
                     </button>
@@ -1756,7 +1775,8 @@ export default function TeamPresets() {
                         ? slotsState[activeSlotIndex].characterInfo ||
                           charInfos.find(
                             (c) =>
-                              c.code === slotsState[activeSlotIndex].characterId
+                              c.code ===
+                              slotsState[activeSlotIndex].characterId,
                           )
                         : undefined;
 
@@ -1919,10 +1939,10 @@ export default function TeamPresets() {
 
                     const imageId = char ? extractImageId(char.image_url) : "";
                     const eCery = imageId
-                      ? cerCharCostMap.get(imageId)?.[s.eidolon] ?? 0
+                      ? (cerCharCostMap.get(imageId)?.[s.eidolon] ?? 0)
                       : 0;
                     const sCery = cone
-                      ? cone.costs?.[s.superimpose - 1] ?? 0
+                      ? (cone.costs?.[s.superimpose - 1] ?? 0)
                       : 0;
                     const fmt = (v: number) =>
                       v % 1 === 0 ? String(v) : v.toFixed(1);
