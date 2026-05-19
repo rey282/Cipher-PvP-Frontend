@@ -243,8 +243,12 @@ function buildSequenceForMode(mode: HsrMode): string[] {
       "R",
       "R",
       "B",
-      "RR",
-      "BB",
+      "B",
+      "R",
+      "R(ACE)",
+      "B(ACE)",
+      "B",
+      "R",
       "R",
       "B",
       "B",
@@ -253,9 +257,10 @@ function buildSequenceForMode(mode: HsrMode): string[] {
       "B",
       "B",
       "R",
+      "R(ACE)",
+      "B(ACE)",
     ];
   }
-
   // 2ban default
   return [
     "BB",

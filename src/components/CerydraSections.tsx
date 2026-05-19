@@ -128,7 +128,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
     const modeRef = useRef<HsrMode>("2ban");
 
     const MAX_PLAYERS = 3;
-    const nPlayers = mode === "3ban" ? 2 : 2;
+    const nPlayers = mode === "3ban" ? 3 : 2;
 
     const [team1Names, setTeam1Names] = useState<string[]>(
       Array(MAX_PLAYERS).fill("")
@@ -1429,7 +1429,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
 
                 <Form.Check
                   inline
-                  label="Cipher Draft Test"
+                  label="3v3"
                   name="mode"
                   type="radio"
                   checked={mode === "3ban"}
@@ -1438,7 +1438,7 @@ const CerydraSection = forwardRef<CerydraSectionHandle, Props>(
                       setMode("3ban");
                       const prevDef = getDefaultMinutesForMode(modeRef.current);
                       modeRef.current = "3ban";
-                      const nextDef = getDefaultMinutesForMode("3ban"); 
+                      const nextDef = getDefaultMinutesForMode("3ban"); // 12
                       if (
                         reserveMinutesStr.trim() === "" ||
                         reserveMinutesStr === String(prevDef)
