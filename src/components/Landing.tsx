@@ -4,7 +4,7 @@ import "./Landing.css";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import AnimatedIconBg from "../components/AnimatedIconBg";
-import { useAuth } from "../context/AuthContext";
+
 import VivianSections, { type VivianSectionHandle } from "./VivianSections";
 import CerydraSections, { type CerydraSectionHandle } from "./CerydraSections";
 
@@ -71,7 +71,6 @@ const zzzIconUrls = [
   "/zzzicons/Icon_Stun.webp",
   "/zzzicons/Icon_Support.webp",
 ];
-
 
 /** Cipher actions */
 const CIPHER_PLAY_URL = "https://draft.cipher.uno/draft?mode=cipher";
@@ -178,18 +177,6 @@ export default function Landing() {
 
   const vivianRef = useRef<VivianSectionHandle | null>(null);
   const cerydraRef = useRef<CerydraSectionHandle>(null);
-  const { user, login } = useAuth();
-
-  const [showLoginModal, setShowLoginModal] = useState(false);
-
-  const requireLogin = (action: () => void) => {
-    if (!user) {
-      setShowLoginModal(true);
-      return;
-    }
-
-    action();
-  };
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -265,16 +252,16 @@ export default function Landing() {
     gamesel.id === "hsr"
       ? hsrTeamProfiles
       : gamesel.id === "hsr2"
-      ? genshinTeamProfiles
-      : gamesel.id === "zzz"
-      ? zzzTeamProfiles
-      : [];
+        ? genshinTeamProfiles
+        : gamesel.id === "zzz"
+          ? zzzTeamProfiles
+          : [];
 
   // Cached fetch of team avatars
   const fetchProfiles = async (
     teamList: { id: string; role: string }[],
     cacheKey: "hsr" | "genshin" | "zzz",
-    setter: (profiles: any[]) => void
+    setter: (profiles: any[]) => void,
   ) => {
     if (teamCache[cacheKey]) {
       setter(teamCache[cacheKey]!);
@@ -284,7 +271,7 @@ export default function Landing() {
       teamList.map((member) =>
         fetch(
           `${import.meta.env.VITE_API_BASE}/api/player/${member.id}?lite=1`,
-          { credentials: "include" }
+          { credentials: "include" },
         )
           .then((res) => (res.ok ? res.json() : null))
           .then((data) =>
@@ -296,10 +283,10 @@ export default function Landing() {
                   global_name: data.global_name,
                   role: member.role,
                 }
-              : null
+              : null,
           )
-          .catch(() => null)
-      )
+          .catch(() => null),
+      ),
     );
     const filtered = results.filter(Boolean) as any[];
     teamCache[cacheKey] = filtered;
@@ -315,7 +302,6 @@ export default function Landing() {
       fetchProfiles(zzzTeamIds, "zzz", setZzzTeamProfiles);
     }
   }, [gamesel.id]);
-
 
   const closeBurstMenu = () => {
     setBurstClosing(true);
@@ -455,11 +441,9 @@ export default function Landing() {
                     <button
                       className="btn angled-btn"
                       onClick={() => {
-                        requireLogin(() => {
-                          if (vivianRef.current?.openDraftModal)
-                            vivianRef.current.openDraftModal();
-                          else navigate("/zzz");
-                        });
+                        if (vivianRef.current?.openDraftModal)
+                          vivianRef.current.openDraftModal();
+                        else navigate("/zzz");
                       }}
                       title="Start draft"
                     >
@@ -495,11 +479,9 @@ export default function Landing() {
                     <button
                       className="btn angled-btn"
                       onClick={() => {
-                        requireLogin(() => {
-                          if (cerydraRef.current?.openDraftModal)
-                            cerydraRef.current.openDraftModal();
-                          else navigate("/cerydra");
-                        });
+                        if (cerydraRef.current?.openDraftModal)
+                          cerydraRef.current.openDraftModal();
+                        else navigate("/cerydra");
                       }}
                       title="Start draft"
                     >
@@ -636,36 +618,6 @@ export default function Landing() {
                 {item.label}
               </button>
             ))}
-          </div>
-        </div>
-      )}
-      {showLoginModal && (
-        <div
-          className="login-modal-overlay"
-          onClick={() => setShowLoginModal(false)}
-        >
-          <div className="login-modal" onClick={(e) => e.stopPropagation()}>
-            <i className="bi bi-discord" style={{ fontSize: 48 }} />
-
-            <h2>Login Required</h2>
-
-            <p>You need to login with Discord to create drafts.</p>
-
-            <div className="login-modal-buttons">
-              <button
-                className="btn angled-btn"
-                onClick={() => login(window.location.href)}
-              >
-                Login with Discord
-              </button>
-
-              <button
-                className="btn angled-btn secondary"
-                onClick={() => setShowLoginModal(false)}
-              >
-                Maybe Later
-              </button>
-            </div>
           </div>
         </div>
       )}
