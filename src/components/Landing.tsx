@@ -4,7 +4,7 @@ import "./Landing.css";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import AnimatedIconBg from "../components/AnimatedIconBg";
-
+import { useAuth } from "../context/AuthContext";
 import VivianSections, { type VivianSectionHandle } from "./VivianSections";
 import CerydraSections, { type CerydraSectionHandle } from "./CerydraSections";
 
@@ -178,6 +178,18 @@ export default function Landing() {
 
   const vivianRef = useRef<VivianSectionHandle | null>(null);
   const cerydraRef = useRef<CerydraSectionHandle>(null);
+  const { user, login } = useAuth();
+
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  const requireLogin = (action: () => void) => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    action();
+  };
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -443,9 +455,11 @@ export default function Landing() {
                     <button
                       className="btn angled-btn"
                       onClick={() => {
-                        if (vivianRef.current?.openDraftModal)
-                          vivianRef.current.openDraftModal();
-                        else navigate("/zzz");
+                        requireLogin(() => {
+                          if (vivianRef.current?.openDraftModal)
+                            vivianRef.current.openDraftModal();
+                          else navigate("/zzz");
+                        });
                       }}
                       title="Start draft"
                     >
@@ -481,9 +495,11 @@ export default function Landing() {
                     <button
                       className="btn angled-btn"
                       onClick={() => {
-                        if (cerydraRef.current?.openDraftModal)
-                          cerydraRef.current.openDraftModal();
-                        else navigate("/cerydra");
+                        requireLogin(() => {
+                          if (cerydraRef.current?.openDraftModal)
+                            cerydraRef.current.openDraftModal();
+                          else navigate("/cerydra");
+                        });
                       }}
                       title="Start draft"
                     >
@@ -620,6 +636,36 @@ export default function Landing() {
                 {item.label}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+      {showLoginModal && (
+        <div
+          className="login-modal-overlay"
+          onClick={() => setShowLoginModal(false)}
+        >
+          <div className="login-modal" onClick={(e) => e.stopPropagation()}>
+            <i className="bi bi-discord" style={{ fontSize: 48 }} />
+
+            <h2>Login Required</h2>
+
+            <p>You need to login with Discord to create drafts.</p>
+
+            <div className="login-modal-buttons">
+              <button
+                className="btn angled-btn"
+                onClick={() => login(window.location.href)}
+              >
+                Login with Discord
+              </button>
+
+              <button
+                className="btn angled-btn secondary"
+                onClick={() => setShowLoginModal(false)}
+              >
+                Maybe Later
+              </button>
+            </div>
           </div>
         </div>
       )}
