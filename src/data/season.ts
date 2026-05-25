@@ -2,7 +2,8 @@
 
 export const seasonOptions = [
   { label: "All-Time", value: "all" },
-  { label: "Season 5", value: "players" },
+  { label: "Season 6", value: "players" },
+  { label: "Season 5", value: "players_5" },
   { label: "Season 4", value: "players_4" },
   { label: "Season 3", value: "players_3" },
   { label: "Season 2", value: "players_2" },
@@ -34,10 +35,17 @@ export const mocOptions = [
     bossImages: ["/bosses/alltime.png"],
   },
   {
-    label: "Grand Finale (4.1)",
+    label: "Duty Action (4.2)",
     value: 0,
+    name: "Duty Action",
+    duration: "25 May 2026 → 06 July 2026",
+    bossImages: ["/bosses/harbinger.png", "/bosses/pompom.webp"],
+  },
+  {
+    label: "Grand Finale (4.1)",
+    value: 10,
     name: "Grand Finale",
-    duration: "13 April 2026 → 05 May 2026",
+    duration: "13 April 2026 → 25 May 2026",
     bossImages: ["/bosses/nikador.webp", "/bosses/kafka.webp"],
   },
   {
