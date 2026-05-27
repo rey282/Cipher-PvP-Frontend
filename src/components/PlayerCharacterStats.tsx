@@ -50,6 +50,7 @@ const pathOptions = [
   "Preservation",
   "Abundance",
   "Remembrance",
+  "Elation",
 ] as const;
 
 const elementOptions = [
@@ -328,6 +329,22 @@ export default function PlayerCharacterStats() {
                       (e.currentTarget.style.transform = "none")
                     }
                   >
+                    {c.path && (
+                      <img
+                        src={`/icons/${c.path.toLowerCase().replace(/\s/g, "")}.png`}
+                        alt={c.path}
+                        title={c.path}
+                        style={{
+                          position: "absolute",
+                          top: 6,
+                          right: 6,
+                          width: 36,
+                          height: 36,
+                          padding: 6,
+                          zIndex: 2,
+                        }}
+                      />
+                    )}
                     <div
                       style={{
                         width: "100%",
