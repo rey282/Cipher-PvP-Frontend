@@ -35,8 +35,15 @@ export const mocOptions = [
     bossImages: ["/bosses/alltime.png"],
   },
   {
-    label: "Duty Action (4.2)",
+    label: "Academy Ghost Story (4.3)",
     value: 0,
+    name: "Academy Ghost Story",
+    duration: "06 July 2026 → 17 August 2026",
+    bossImages: ["/bosses/reaver.png", "/bosses/sparxiconofficial.webp"],
+  },
+  {
+    label: "Duty Action (4.2)",
+    value: 11,
     name: "Duty Action",
     duration: "25 May 2026 → 06 July 2026",
     bossImages: ["/bosses/harbinger.png", "/bosses/pompom.webp"],
