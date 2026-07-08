@@ -466,7 +466,7 @@ export default function CostTestPage() {
     if (!member.lightConeId) return 0;
     const limited = cipherConeLimitedMap.get(member.lightConeId);
     if (!limited) return 0;
-    const steps = [0.25, 0.375, 0.5, 0.625, 0.75];
+    const steps = [0.25, 0.375, 0.5, 0.75, 1];
     const idx = Math.min(Math.max(member.superimpose, 1), 5) - 1;
     return steps[idx];
   };

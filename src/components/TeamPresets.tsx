@@ -576,7 +576,7 @@ export default function TeamPresets() {
     if (!slot.lightConeId) return 0;
     const limited = cipherConeLimitedMap.get(slot.lightConeId);
     if (!limited) return 0;
-    const steps = [0.25, 0.375, 0.5, 0.625, 0.75];
+    const steps = [0.25, 0.375, 0.5, 0.75, 1];
     return steps[Math.min(Math.max(slot.superimpose, 1), 5) - 1];
   };
 
@@ -810,7 +810,7 @@ export default function TeamPresets() {
       const eArr = cipherCharCostMap.get(s.characterId.toLowerCase());
       const e = eArr?.[s.eidolon] ?? 0;
       const limited = cipherConeLimitedMap.get(s.lightConeId);
-      const steps = [0.25, 0.375, 0.5, 0.625, 0.75];
+      const steps = [0.25, 0.375, 0.5, 0.75, 1];
       const sc = limited
         ? steps[Math.min(Math.max(s.superimpose, 1), 5) - 1]
         : 0;
